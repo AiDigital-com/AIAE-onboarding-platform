@@ -1,0 +1,73 @@
+.tiptap.ProseMirror .video-node-shell {
+  display: block;
+  margin: 2rem 0;
+  max-width: 100%;
+  line-height: 0;
+}
+
+.tiptap.ProseMirror .video-node {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 480px;
+  line-height: 0;
+}
+
+.tiptap.ProseMirror .video-node video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: block;
+  border-radius: var(--tt-radius-xs, 0.25rem);
+  background: #000;
+}
+
+.tiptap.ProseMirror .video-node.is-selected video {
+  outline: 0.125rem solid var(--tt-brand-color-500);
+}
+
+.tiptap.ProseMirror .video-node__drag-handle {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--tt-radius-xs, 0.25rem);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  /* Always at least visible (not opacity:0 by default) — a hover-only fade-in handle
+     introduces a timing race between "is the handle mounted/hit-testable yet" and the
+     user's mousedown, which is what made dragging feel like it only worked sometimes. */
+  opacity: 0.75;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  transition: opacity 0.12s ease;
+}
+
+.tiptap.ProseMirror .video-node:hover .video-node__drag-handle,
+.tiptap.ProseMirror .video-node.is-selected .video-node__drag-handle {
+  opacity: 1;
+}
+
+.tiptap.ProseMirror .video-node__drag-handle:active {
+  cursor: grabbing;
+}
+
+.tiptap.ProseMirror .video-node__error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 9;
+  padding: 1rem;
+  border-radius: var(--tt-radius-xs, 0.25rem);
+  background: var(--tt-gray-light-100, #f2f1f3);
+  color: var(--tt-gray-light-a-600, #667085);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  text-align: center;
+  white-space: normal;
+}

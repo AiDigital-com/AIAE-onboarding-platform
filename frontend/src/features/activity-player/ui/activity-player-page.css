@@ -1,0 +1,29 @@
+.activity-player-page {
+    min-height: 100vh;
+    margin: -24px;
+    padding: 16px 16px 32px;
+    background:
+        radial-gradient(circle at 12% 0%, rgba(0, 9, 220, 0.14), transparent 30%),
+        radial-gradient(circle at 88% 10%, rgba(174, 243, 62, 0.2), transparent 28%),
+        linear-gradient(180deg, #f8fafc 0%, #edf7ff 100%);
+}
+
+@media (min-width: 900px) {
+    .activity-player-page {
+        padding: 32px 40px;
+    }
+}
+
+.activity-player-page .ui-state--error {
+    margin: 24px;
+}
+
+.activity-player-page .flashcards-player {
+    max-width: 1500px;
+    margin: 0 auto;
+}
+
+.activity-player-page .quiz-player {
+    max-width: 960px;
+    margin: 0 auto;
+}

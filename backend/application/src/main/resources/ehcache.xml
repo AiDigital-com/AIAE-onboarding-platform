@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Hibernate L2/query cache regions (JCache via Ehcache), loaded through
+  hibernate.javax.cache.uri in application.yml. `missing_cache_strategy: fail`
+  means every region Hibernate needs must be declared here explicitly —
+  no on-demand cache creation. Aliases are prefixed with "hibernate-cache."
+  to match spring.jpa.properties.hibernate.cache.region_prefix.
+
+  Only the approved read-mostly dictionary entities are cached (see
+  @org.hibernate.annotations.Cache usages under
+  domain/.../common/dictionary/entities/). Mutable aggregates (users,
+  lessons, roadmaps, materials, progress, ...) are never added here.
+
+  ENTITY CACHE regions default to the entity's fully-qualified class name
+  (no @Cache(region = ...) override). QUERY CACHE regions are explicit,
+  short names set via @QueryHint(HINT_CACHE_REGION, "...") on each
+  dictionary repository's findByCode method — every such name must have a
+  matching <cache> entry here, or startup fails fast.
+-->
+<config xmlns="http://www.ehcache.org/v3">
+
+	<!-- ENTITY CACHE -->
+	<cache alias="hibernate-cache.com.aidigital.aionboarding.domain.common.dictionary.entities.UserRole">
+		<resources>
+			<heap unit="entries">100</heap>
+		</resources>
+	</cache>
+
+	<cache alias="hibernate-cache.com.aidigital.aionboarding.domain.common.dictionary.entities.LessonStatus">
+		<resources>
+			<heap unit="entries">100</heap>
+		</resources>
+	</cache>
+
+	<cache alias="hibernate-cache.com.aidigital.aionboarding.domain.common.dictionary.entities.LessonPublicationStatus">
+		<resources>
+			<heap unit="entries">100</heap>
+		</resources>
+	</cache>
+
+	<cache alias="hibernate-cache.com.aidigital.aionboarding.domain.common.dictionary.entities.LessonContentFormat">
+		<resources>
+			<heap unit="entries">100</heap>
+		</resources>
+	</cache>
+
+	<cache alias="hibernate-cache.com.aidigital.aionboarding.domain.common.dictionary.entities.LessonAssetKind">
+		<resources>
+			<heap unit="entries">100</heap>
+		</resources>
+	</cache>
+
+	<cache alias="hibernate-cache.com.aidigital.aionboarding.domain.common.dictionary.entities.MaterialFileKind">
+		<resources>
+			<heap unit="entries">100</heap>
+		</resources>
+	</cache>
+
+	<cache alias="hibernate-cache.com.aidigital.aionboarding.domain.common.dictionary.entities.ActivityType">
+		<resources>
+			<heap unit="entries">100</heap>
+		</resources>
+	</cache>
+
+	<cache alias="hibernate-cache.com.aidigital.aionboarding.domain.common.dictionary.entities.ActivityProgressStatus">
+		<resources>
+			<heap unit="entries">100</heap>
+		</resources>
+	</cache>
+
+	<!-- QUERY CACHE — one per dictionary repository's findByCode(), named via
+		 @QueryHint(HINT_CACHE_REGION, ...) in each *Repository.java. -->
+	<cache alias="hibernate-cache.findUserRoleByCode">
+		<resources>
+			<heap unit="entries">100</heap>
+		</resources>
+	</cache>
+
+	<cache alias="hibernate-cache.findLessonStatusByCode">
+		<resources>
+			<heap unit="entries">100</heap>
+		</resources>
+	</cache>
+
+	<cache alias="hibernate-cache.findLessonPublicationStatusByCode">
+		<resources>
+			<heap unit="entries">100</heap>
+		</resources>
+	</cache>
+
+	<cache alias="hibernate-cache.findLessonContentFormatByCode">
+		<resources>
+			<heap unit="entries">100</heap>
+		</resources>
+	</cache>
+
+	<cache alias="hibernate-cache.findLessonAssetKindByCode">
+		<resources>
+			<heap unit="entries">100</heap>
+		</resources>
+	</cache>
+
+	<cache alias="hibernate-cache.findMaterialFileKindByCode">
+		<resources>
+			<heap unit="entries">100</heap>
+		</resources>
+	</cache>
+
+	<cache alias="hibernate-cache.findActivityTypeByCode">
+		<resources>
+			<heap unit="entries">100</heap>
+		</resources>
+	</cache>
+
+	<cache alias="hibernate-cache.findActivityProgressStatusByCode">
+		<resources>
+			<heap unit="entries">100</heap>
+		</resources>
+	</cache>
+
+	<!-- Required infrastructure regions when hibernate.cache.use_query_cache
+		 is enabled (see application.yml); named per
+		 org.hibernate.cache.spi.RegionFactory.DEFAULT_*_UNQUALIFIED_NAME,
+		 also prefixed by region_prefix. -->
+	<cache alias="hibernate-cache.default-query-results-region">
+		<resources>
+			<heap unit="entries">200</heap>
+		</resources>
+	</cache>
+
+	<cache alias="hibernate-cache.default-update-timestamps-region">
+		<resources>
+			<heap unit="entries">200</heap>
+		</resources>
+	</cache>
+
+</config>

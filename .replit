@@ -1,0 +1,37 @@
+modules = ["java-21", "nodejs-22", "postgresql-16"]
+hidden = [".idea", ".vscode", "target", "node_modules", "generated-sources", ".cache"]
+
+[nix]
+channel = "stable-24_11"
+
+[deployment]
+deploymentTarget = "gce"
+build = ["bash", "scripts/replit-build.sh"]
+run = ["bash", "scripts/replit-run.sh"]
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[env]
+PORT = "5000"
+SPRING_PROFILES_ACTIVE = "replit"
+VITE_CLERK_JWT_TEMPLATE = "aidigital-api"
+
+[workflows]
+runButton = "Run"
+
+[[workflows.workflow]]
+name = "Run"
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/replit-dev-backend.sh"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/replit-dev-frontend.sh"
+
+[agent]
+expertMode = true

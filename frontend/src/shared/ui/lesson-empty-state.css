@@ -1,0 +1,46 @@
+.lesson-empty-state {
+    padding: 32px;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    background: #fff;
+}
+
+.lesson-empty-state__copy {
+    display: grid;
+    gap: 8px;
+}
+
+.lesson-empty-state__title {
+    margin: 0;
+    color: #0b0b0b;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.lesson-empty-state__description {
+    margin: 0;
+    color: #6f7282;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.lesson-empty-state__action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 16px;
+    padding: 10px 16px;
+    border: 1px solid rgba(0, 9, 220, 0.2);
+    border-radius: 999px;
+    background: #fff;
+    color: #0009dc;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.2;
+    text-align: center;
+    cursor: pointer;
+}
+
+.lesson-empty-state__action:hover {
+    background: #f5f5fe;
+}

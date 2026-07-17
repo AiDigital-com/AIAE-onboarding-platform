@@ -1,0 +1,231 @@
+:root {
+    --task-tray-border: rgba(0, 9, 220, 0.16);
+    --task-tray-header-bg: #0b0b0b;
+}
+
+.task-tray {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 1500;
+    width: 260px;
+    overflow: hidden;
+    border-radius: 8px;
+    border: 1px solid var(--task-tray-border);
+    background-color: #fff;
+    box-shadow: 0 16px 42px rgba(8, 8, 8, 0.14);
+    transition: width 0.18s ease;
+}
+
+.task-tray--expanded {
+    width: 320px;
+}
+
+.task-tray--mobile {
+    width: calc(100vw - 32px);
+}
+
+.task-tray__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 10px;
+    color: #fff;
+    background-color: var(--task-tray-header-bg);
+}
+
+.task-tray__header--error {
+    background-color: #7f1d1d;
+}
+
+.task-tray__header-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.task-tray__title {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 900;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.task-tray__subtitle {
+    display: block;
+    margin: 0;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.72);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.task-tray__icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.task-tray__icon-button:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.task-tray__progress {
+    height: 3px;
+    background: rgba(169, 190, 248, 0.28);
+    overflow: hidden;
+}
+
+.task-tray__progress-bar {
+    height: 100%;
+    width: 40%;
+    background: #0009dc;
+    animation: task-tray-indeterminate 1.2s ease-in-out infinite;
+}
+
+.task-tray__list {
+    max-height: 280px;
+    overflow: auto;
+}
+
+.task-tray__item {
+    padding: 10px;
+    border-top: 1px solid #eef2f7;
+    background-color: #fff;
+}
+
+.task-tray__item--error {
+    background-color: #fff7f7;
+}
+
+.task-tray__item-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.task-tray__item-icon {
+    padding-top: 2px;
+    color: #0009dc;
+    flex: 0 0 auto;
+}
+
+.task-tray__item-icon--error {
+    color: #dc2626;
+}
+
+.task-tray__item-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.task-tray__item-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.task-tray__item-title {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 900;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.task-tray__item-status {
+    flex: 0 0 auto;
+    font-size: 0.75rem;
+    font-weight: 850;
+    color: #0009dc;
+}
+
+.task-tray__item-status--error {
+    color: #dc2626;
+}
+
+.task-tray__item-status--success {
+    color: #15803d;
+}
+
+.task-tray__item-description {
+    display: -webkit-box;
+    margin: 2px 0 0;
+    font-size: 0.75rem;
+    line-height: 1.3;
+    color: #64748b;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+}
+
+.task-tray__item-description--error {
+    -webkit-line-clamp: 3;
+}
+
+.task-tray__item-progress {
+    margin-top: 6px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(169, 190, 248, 0.28);
+    overflow: hidden;
+}
+
+.task-tray__item-progress-bar {
+    height: 100%;
+    width: 40%;
+    border-radius: inherit;
+    background: #0009dc;
+    animation: task-tray-indeterminate 1.2s ease-in-out infinite;
+}
+
+.task-tray__footer {
+    padding: 8px 10px;
+    border-top: 1px solid #eef2f7;
+}
+
+.task-tray__clear-button {
+    border: none;
+    background: transparent;
+    padding: 0;
+    font-size: 0.8125rem;
+    font-weight: 800;
+    color: #0009dc;
+    cursor: pointer;
+}
+
+@keyframes task-tray-indeterminate {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(250%);
+    }
+}
+
+@media (max-width: 600px) {
+    .task-tray {
+        right: 16px;
+        bottom: 16px;
+        width: calc(100vw - 32px);
+    }
+
+    .task-tray--expanded {
+        width: calc(100vw - 32px);
+    }
+}

@@ -1,0 +1,279 @@
+.home {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    padding: var(--space-6);
+    min-height: 100%;
+    background: linear-gradient(180deg, #f8fafc 0%, #eef6ff 58%, #f8fafc 100%);
+}
+
+.home-hero {
+    position: relative;
+    overflow: hidden;
+    padding: var(--space-6);
+    border-radius: 20px;
+    border: 1px solid color-mix(in srgb, var(--brand-yves-klein-blue) 12%, transparent);
+    background: linear-gradient(135deg, #ffffff 0%, #eef6ff 54%, #f4fff1 100%);
+}
+
+.home-hero__layout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    align-items: flex-start;
+}
+
+.home-hero__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    max-width: 760px;
+}
+
+.home-hero__brand-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.home-hero__logo {
+    border-radius: 10px;
+}
+
+.home-hero__welcome {
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-sm);
+    font-weight: 850;
+    color: var(--brand-yves-klein-blue);
+    background: color-mix(in srgb, var(--brand-skywave) 28%, transparent);
+    border-radius: var(--radius-full);
+}
+
+.home-hero__headline {
+    margin: 0 0 var(--space-3);
+    font-size: clamp(2rem, 4vw, 3.75rem);
+    font-weight: 950;
+    line-height: 0.98;
+    letter-spacing: 0;
+    color: var(--brand-midnight-charcoal);
+}
+
+.home-hero__lede {
+    margin: 0;
+    max-width: 700px;
+    font-size: var(--text-subhead);
+    line-height: 1.7;
+    color: var(--text-muted);
+}
+
+.home-hero__actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.home-hero__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-6);
+    font-size: var(--text-subhead);
+    font-weight: 900;
+    text-decoration: none;
+    border-radius: var(--radius-full);
+    border: 1px solid transparent;
+}
+
+.home-hero__btn--primary {
+    color: var(--text-on-accent);
+    background: var(--accent-primary);
+}
+
+.home-hero__btn--primary:hover {
+    background: var(--accent-primary-hover);
+}
+
+.home-hero__btn--secondary {
+    color: var(--text-default);
+    background: var(--surface-default);
+    border-color: var(--border-default);
+}
+
+.home-hero__aside {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    width: 100%;
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    border: 1px solid color-mix(in srgb, var(--brand-yves-klein-blue) 12%, transparent);
+    background: rgba(255, 255, 255, 0.72);
+}
+
+.home-hero__aside-item {
+    padding: var(--space-3);
+    border-radius: 10px;
+    background: var(--surface-default);
+    border: 1px solid #eef2f7;
+}
+
+.home-hero__aside-label {
+    margin: 0;
+    font-weight: 900;
+    color: var(--text-default);
+}
+
+.home-hero__aside-description {
+    margin: var(--space-1) 0 0;
+    font-size: var(--text-badge);
+    color: var(--text-muted);
+}
+
+.home-flow {
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    border: 1px solid #e5e7eb;
+    background: rgba(255, 255, 255, 0.92);
+}
+
+.home-flow__header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+.home-flow__title {
+    margin: 0 0 var(--space-1);
+    font-size: var(--text-section);
+    font-weight: 950;
+    color: var(--text-heading);
+}
+
+.home-flow__subtitle {
+    margin: 0;
+    max-width: 640px;
+    font-size: var(--text-body);
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+
+.home-flow__action {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    align-self: flex-start;
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--text-body);
+    font-weight: 850;
+    text-decoration: none;
+    color: var(--text-default);
+    background: var(--surface-default);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-full);
+}
+
+.home-flow__action:hover {
+    background: var(--surface-muted);
+}
+
+.home-flow__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+}
+
+.home-step-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    min-height: 182px;
+    border-radius: var(--radius-lg);
+    border: 1px solid color-mix(in srgb, var(--brand-yves-klein-blue) 12%, transparent);
+    background: var(--surface-default);
+}
+
+.home-step-card--compact {
+    min-height: 150px;
+    padding: var(--space-4);
+}
+
+.home-step-card__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.home-step-card__icon {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-sm);
+    color: var(--brand-yves-klein-blue);
+    background: color-mix(in srgb, var(--brand-skywave) 24%, transparent);
+}
+
+.home-step-card__index {
+    margin-left: auto;
+    padding: 2px var(--space-2);
+    font-size: var(--text-sm);
+    font-weight: 950;
+    color: var(--brand-midnight-charcoal);
+    background: var(--brand-lime);
+    border-radius: var(--radius-full);
+}
+
+.home-step-card__title {
+    margin: 0 0 var(--space-2);
+    font-size: var(--text-subhead);
+    font-weight: 950;
+    line-height: 1.15;
+    color: var(--text-heading);
+}
+
+.home-step-card__description {
+    margin: 0;
+    font-size: var(--text-body);
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+
+@media (min-width: 600px) {
+    .home-hero__actions {
+        flex-direction: row;
+    }
+}
+
+@media (min-width: 900px) {
+    .home-hero {
+        padding: var(--space-10);
+    }
+
+    .home-hero__layout {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .home-hero__aside {
+        width: 360px;
+        flex-shrink: 0;
+    }
+
+    .home-flow {
+        padding: var(--space-6);
+    }
+
+    .home-flow__header {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .home-flow__grid {
+        grid-template-columns: repeat(var(--home-flow-columns, 3), minmax(0, 1fr));
+    }
+}

@@ -1,0 +1,48 @@
+# application-local.yml
+#
+# Spring profile for local verification. The database can be started with
+# `docker compose --env-file .env.local -f compose.local.yml up -d postgres`;
+# secrets and optional
+# third-party integrations come from the ignored `.env.local` file.
+#
+# This profile deliberately keeps real Clerk JWT validation. A mock-auth local
+# profile would not verify the production security chain.
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:app}
+    username: ${POSTGRES_USER:app}
+    password: ${POSTGRES_PASSWORD:app}
+    hikari:
+      maximum-pool-size: ${DB_MAX_POOL_SIZE:10}
+      minimum-idle: 1
+      idle-timeout: 60000
+      connection-timeout: 2000
+      auto-commit: false
+
+server:
+  port: ${PORT:5000}
+
+app:
+  auth:
+    # Exact local browser origin. A Clerk publishable key (or explicit issuer +
+    # JWKS) is still required; local mode never bypasses JWT validation.
+    authorized-parties: ${AUTH_AUTHORIZED_PARTIES:http://localhost:5173}
+  security:
+    cors:
+      allowed-origins: ${APP_SECURITY_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+    csp:
+      frame-ancestors: "${APP_SECURITY_CSP_FRAME_ANCESTORS:'self'}"
+  usage-logging:
+    environment: local
+  external:
+    # Prevent accidental paid/network calls during local security verification.
+    # Enable integrations explicitly in `.env.local` when a workflow needs one.
+    openai:
+      enabled: ${OPENAI_ENABLED:false}
+    storage:
+      enabled: ${STORAGE_ENABLED:false}
+    heygen:
+      enabled: ${HEYGEN_ENABLED:false}
+    youtube:
+      enabled: ${YOUTUBE_ENABLED:false}

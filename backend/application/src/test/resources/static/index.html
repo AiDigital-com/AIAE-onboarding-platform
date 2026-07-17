@@ -1,0 +1,19 @@
+<!doctype html>
+<!--
+  Test-only SPA shell fixture. Mirrors the real Vite build output
+  (backend/application/src/main/resources/static/index.html, gitignored) so
+  StaticDeliveryHeadersIntegrationTest can assert the no-cache/must-revalidate
+  headers SpaFallbackController applies to "/" without depending on the frontend
+  having been built first. On the test classpath this fixture takes precedence
+  over any real build output, exactly like the /assets/ fixture beside it.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AIAE Onboarding Platform</title>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

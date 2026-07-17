@@ -1,0 +1,123 @@
+/* ── Login — split screen: brand panel + Clerk sign-in panel ─────────────── */
+
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    background: var(--surface-default);
+}
+
+.login-shell {
+    width: 100%;
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(500px, 540px);
+}
+
+.login-brand {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 56px clamp(48px, 6vw, 80px);
+    background: var(--accent-primary);
+    color: var(--text-on-accent);
+}
+
+.login-brand__logo {
+    width: 58px;
+    height: 58px;
+    margin-bottom: 34px;
+    display: grid;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--surface-default) 74%, transparent);
+    border-radius: var(--radius-lg);
+    background: var(--surface-default);
+    color: var(--accent-primary);
+    box-shadow: 0 18px 40px color-mix(in srgb, var(--text-default) 18%, transparent);
+    font-family: "Barlow Semi Condensed", Inter, Arial, sans-serif;
+    font-size: 25px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.login-brand__eyebrow {
+    margin: 0 0 8px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: uppercase;
+    opacity: 0.88;
+}
+
+.login-brand__title {
+    margin: 0 0 16px;
+    font-size: 58px;
+    font-weight: 700;
+    line-height: 1.08;
+    letter-spacing: 0;
+}
+
+.login-brand__subtitle {
+    max-width: 520px;
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.48;
+    opacity: 0.92;
+}
+
+.login-panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 56px clamp(40px, 5vw, 64px);
+    background: var(--surface-default);
+}
+
+.login-panel__title {
+    width: 100%;
+    max-width: 420px;
+    margin: 0 0 22px;
+    font-size: 28px;
+    line-height: 1.15;
+    letter-spacing: 0;
+    color: var(--text-default);
+}
+
+.login-panel__clerk-root,
+.login-panel__clerk-box {
+    width: 100%;
+    max-width: 420px;
+}
+
+.login-panel__clerk-card {
+    width: 100%;
+}
+
+.login-panel__clerk-main {
+    width: 100%;
+}
+
+.login-panel__clerk-footer {
+    width: 100%;
+}
+
+@media (max-width: 900px) {
+    .login-shell {
+        grid-template-columns: 1fr;
+    }
+
+    .login-brand {
+        display: none;
+    }
+
+    .login-panel {
+        padding: 40px 24px;
+    }
+
+    .login-panel__title,
+    .login-panel__clerk-root,
+    .login-panel__clerk-box {
+        max-width: 420px;
+    }
+}

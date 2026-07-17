@@ -1,0 +1,78 @@
+.remove-lesson-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 2500;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+}
+
+.remove-lesson-dialog__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.42);
+}
+
+.remove-lesson-dialog__panel {
+    position: relative;
+    width: min(520px, 100%);
+    padding: 24px;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 24px 80px rgba(15, 23, 42, 0.18);
+}
+
+.remove-lesson-dialog__title {
+    margin: 0 0 16px;
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.remove-lesson-dialog__body {
+    display: grid;
+    gap: 12px;
+    color: #172033;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.remove-lesson-dialog__muted {
+    margin: 0;
+    color: #667085;
+    font-size: 14px;
+}
+
+.remove-lesson-dialog__lesson-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.remove-lesson-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.remove-lesson-dialog__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #fff;
+    color: #172033;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    cursor: pointer;
+}
+
+.remove-lesson-dialog__btn--danger {
+    border-color: #d92d20;
+    background: #d92d20;
+    color: #fff;
+}

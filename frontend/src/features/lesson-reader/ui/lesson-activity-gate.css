@@ -1,0 +1,183 @@
+.lesson-activity-gate {
+    margin-top: 40px;
+    padding: 20px;
+    border: 1px solid rgba(0, 9, 220, 0.14);
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(239, 246, 255, 0.96) 0%, rgba(245, 243, 255, 0.96) 100%);
+}
+
+@media (min-width: 900px) {
+    .lesson-activity-gate {
+        margin-top: 56px;
+        padding: 24px;
+    }
+}
+
+.lesson-activity-gate__intro {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.lesson-activity-gate__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.lesson-activity-gate__badge {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: #0009dc;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.lesson-activity-gate__badge--success {
+    background: #229e5a;
+}
+
+.lesson-activity-gate__badge--outline {
+    padding: 0 11px;
+    border: 1px solid rgba(0, 9, 220, 0.14);
+    background: #fff;
+    color: #172033;
+    font-weight: 700;
+}
+
+.lesson-activity-gate__title {
+    margin: 0;
+    color: #0f172a;
+    font-size: 24px;
+    font-weight: 900;
+}
+
+.lesson-activity-gate__description {
+    margin: 0;
+    color: #667085;
+    font-size: 14px;
+}
+
+.lesson-activity-gate__list {
+    display: grid;
+    gap: 12px;
+}
+
+.lesson-activity-gate__item {
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.06);
+}
+
+@media (min-width: 900px) {
+    .lesson-activity-gate__item {
+        grid-template-columns: 1fr auto;
+        align-items: center;
+    }
+}
+
+.lesson-activity-gate__item-main {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    min-width: 0;
+}
+
+.lesson-activity-gate__icon {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    font-size: 18px;
+    font-weight: 900;
+}
+
+.lesson-activity-gate__icon--quiz {
+    color: #0009dc;
+    background: #eef2ff;
+}
+
+.lesson-activity-gate__icon--flashcards {
+    color: #0f766e;
+    background: #ccfbf1;
+}
+
+.lesson-activity-gate__item-copy h3 {
+    margin: 0 0 6px;
+    color: #0f172a;
+    font-size: 16px;
+    font-weight: 900;
+}
+
+.lesson-activity-gate__item-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.lesson-activity-gate__chip {
+    display: inline-flex;
+    align-items: center;
+    height: 24px;
+    padding: 0 8px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 999px;
+    background: #fff;
+    color: #172033;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.lesson-activity-gate__chip--success {
+    border-color: transparent;
+    background: #229e5a;
+    color: #fff;
+}
+
+.lesson-activity-gate__chip--warning {
+    border-color: transparent;
+    background: #ff642d;
+    color: #fff;
+}
+
+.lesson-activity-gate__open {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    padding: 0 20px;
+    border: 0;
+    border-radius: 999px;
+    background: #0009dc;
+    color: #fff;
+    font-weight: 900;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.lesson-activity-gate__open--review {
+    border: 1px solid rgba(0, 9, 220, 0.2);
+    background: #fff;
+    color: #0009dc;
+}
+
+.lesson-activity-gate__open:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@media (max-width: 899px) {
+    .lesson-activity-gate__open {
+        width: 100%;
+    }
+}

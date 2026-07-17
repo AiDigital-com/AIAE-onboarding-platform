@@ -1,0 +1,257 @@
+.lesson-attachments {
+    margin-top: 40px;
+    min-width: 0;
+}
+
+.lesson-attachments__title {
+    margin: 0 0 10px;
+    font-size: 18px;
+    font-weight: 900;
+}
+
+.lesson-attachments__grid {
+    display: grid;
+    grid-template-columns: repeat(2, 136px);
+    gap: 12px;
+    justify-content: center;
+    min-width: 0;
+}
+
+@media (min-width: 600px) {
+    .lesson-attachments__grid {
+        grid-template-columns: repeat(3, 136px);
+        justify-content: flex-start;
+    }
+}
+
+@media (min-width: 900px) {
+    .lesson-attachments__grid {
+        grid-template-columns: repeat(4, 136px);
+    }
+}
+
+@media (min-width: 1200px) {
+    .lesson-attachments__grid {
+        grid-template-columns: repeat(5, 136px);
+    }
+}
+
+.lesson-attachments__item {
+    position: relative;
+    min-width: 0;
+}
+
+.lesson-attachments__card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    /* Fill the grid cell so every card in a row renders the same height,
+       regardless of attachment kind (image/pdf vs link/youtube meta row). */
+    height: 100%;
+    padding: 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fff;
+    color: inherit;
+    font: inherit;
+    text-align: center;
+    cursor: pointer;
+}
+
+.lesson-attachments__delete {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 1;
+    width: 26px;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    border: 1px solid #ffd2d2;
+    border-radius: 999px;
+    background: #fff;
+    color: #d62f2f;
+    box-shadow: 0 6px 14px rgba(17, 24, 39, 0.12);
+    cursor: pointer;
+}
+
+.lesson-attachments__drag-handle {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    z-index: 2;
+    width: 26px;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    border: 1px solid #c7d2fe;
+    border-radius: 999px;
+    background: #fff;
+    color: #0009dc;
+    box-shadow: 0 6px 14px rgba(17, 24, 39, 0.12);
+    cursor: grab;
+}
+
+.lesson-attachments__drag-handle:active {
+    cursor: grabbing;
+}
+
+.lesson-attachments__drag-handle:focus-visible {
+    outline: 2px solid #0009dc;
+    outline-offset: 2px;
+}
+
+.lesson-attachments__delete:hover {
+    background: #fff5f5;
+}
+
+.lesson-attachments__delete:disabled {
+    cursor: wait;
+}
+
+.lesson-attachments__delete-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(214, 47, 47, 0.2);
+    border-top-color: #d62f2f;
+    border-radius: 999px;
+    animation: lesson-attachments-spin 0.75s linear infinite;
+}
+
+.lesson-attachments__card:disabled {
+    opacity: 0.62;
+    cursor: not-allowed;
+}
+
+.lesson-attachments__card:not(:disabled):hover {
+    border-color: #bfdbfe;
+    background: #f8fafc;
+    transform: translateY(-1px);
+}
+
+.lesson-attachments__preview {
+    width: 100%;
+    max-width: 112px;
+    aspect-ratio: 1 / 1;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid #eef2f7;
+    border-radius: 8px;
+    background: #f8fafc;
+}
+
+.lesson-attachments--list {
+    width: 100%;
+    margin-top: 0;
+    overflow: hidden;
+}
+
+.lesson-attachments--list .lesson-attachments__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+}
+
+.lesson-attachments--list .lesson-attachments__card {
+    width: 100%;
+}
+
+.lesson-attachments--list .lesson-attachments__preview {
+    max-width: none;
+}
+
+.lesson-attachments--list .lesson-attachments__name,
+.lesson-attachments--list .lesson-attachments__meta {
+    max-width: 100%;
+}
+
+.lesson-attachments--column {
+    width: 100%;
+    margin-top: 0;
+}
+
+.lesson-attachments--column .lesson-attachments__grid {
+    grid-template-columns: minmax(0, 1fr);
+    justify-content: stretch;
+}
+
+.lesson-attachments__preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.lesson-attachments__name {
+    width: 100%;
+    max-width: 132px;
+    font-size: 14px;
+    font-weight: 850;
+    line-height: 1.2;
+    /* Always reserve the two clamped lines so one-line and two-line titles
+       produce identically sized cards. */
+    min-height: 2.4em;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-break: break-word;
+}
+
+.lesson-attachments__meta {
+    width: 100%;
+    max-width: 132px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #667085;
+    font-size: 12px;
+}
+
+/* Video/YouTube assets play inline, so they take the full row width instead of the
+   small square thumbnail used for images/links/files. grid-column has to land on
+   .lesson-attachments__item — the actual grid cell — not the player-card div nested inside it. */
+.lesson-attachments__item:has(.lesson-attachments__player-card) {
+    grid-column: 1 / -1;
+}
+
+.lesson-attachments__player-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    max-width: 480px;
+}
+
+.lesson-attachments__player {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: 0;
+    border-radius: 12px;
+    background: #000;
+}
+
+.lesson-attachments__preview--video {
+    max-width: none;
+    aspect-ratio: 16 / 9;
+    color: #0009dc;
+    font-size: 32px;
+}
+
+.lesson-attachments__player--error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    color: #cbd2de;
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: center;
+}
+
+@keyframes lesson-attachments-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

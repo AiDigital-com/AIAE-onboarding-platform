@@ -1,0 +1,23 @@
+package com.aidigital.aionboarding.domain.common.dictionary.entities;
+
+import com.aidigital.aionboarding.domain.common.dictionary.DictionaryEntity;
+import jakarta.persistence.Cacheable;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
+import org.hibernate.annotations.Immutable;
+
+@Entity
+@Table(name = "material_file_kind")
+@Cacheable
+@Cache(usage = CacheConcurrencyStrategy.READ_ONLY, region = "com.aidigital.aionboarding.domain.common.dictionary.entities.MaterialFileKind")
+@Immutable
+@Getter
+@Setter
+@NoArgsConstructor
+public class MaterialFileKind extends DictionaryEntity {
+}

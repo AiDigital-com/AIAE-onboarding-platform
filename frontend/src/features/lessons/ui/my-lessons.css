@@ -1,0 +1,104 @@
+.my-lessons {
+    min-height: calc(100vh - 48px);
+    margin: -24px;
+    padding: 24px 20px 40px;
+    background: #f9f9f9;
+}
+
+@media (min-width: 900px) {
+    .my-lessons {
+        padding: 40px;
+    }
+}
+
+.my-lessons__inner {
+    max-width: 1500px;
+    margin: 0 auto;
+}
+
+.my-lessons__hero {
+    display: grid;
+    gap: 16px;
+    margin-bottom: 32px;
+}
+
+.my-lessons__eyebrow {
+    margin: 0;
+    color: #0009dc;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.my-lessons__title {
+    margin: 0;
+    color: #0b0b0b;
+    font-family: "Barlow Semi Condensed", Inter, Arial, sans-serif;
+    font-size: clamp(48px, 8vw, 64px);
+    font-weight: 900;
+    line-height: 0.95;
+}
+
+.my-lessons__lede {
+    max-width: 620px;
+    margin: 0;
+    color: #80808e;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.my-lessons__sections {
+    display: grid;
+    gap: 32px;
+}
+
+.my-lessons__section {
+    display: grid;
+    gap: 16px;
+}
+
+.my-lessons__section-header {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+@media (min-width: 600px) {
+    .my-lessons__section-header {
+        flex-direction: row;
+        align-items: baseline;
+        justify-content: space-between;
+    }
+}
+
+.my-lessons__section-title {
+    margin: 0;
+    color: #0b0b0b;
+    font-size: clamp(28px, 4vw, 34px);
+    font-weight: 900;
+    line-height: 1;
+}
+
+.my-lessons__section-description {
+    margin: 4px 0 0;
+    color: #6f7282;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.my-lessons__section-count {
+    color: #0009dc;
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.my-lessons__load-more {
+    display: flex;
+    justify-content: center;
+    padding: 24px 0;
+}

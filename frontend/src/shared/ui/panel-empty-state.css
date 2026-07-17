@@ -1,0 +1,26 @@
+.panel-empty-state {
+    padding: 32px;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    background: #fff;
+}
+
+.panel-empty-state__copy {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.panel-empty-state__title {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 700;
+    color: #0b0b0b;
+}
+
+.panel-empty-state__description {
+    margin: 0;
+    color: #80808e;
+    font-size: 14px;
+    line-height: 1.5;
+}

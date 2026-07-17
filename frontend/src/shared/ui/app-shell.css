@@ -1,0 +1,107 @@
+.app-shell {
+    min-height: 100vh;
+    background: hsl(var(--secondary));
+}
+
+/*
+ * Sidebar is position:fixed at 84px wide. Content gets padding-left of 96px
+ * (84px sidebar + 12px breathing room) to sit clear of it.
+ * On hover the sidebar expands to 280px on top of the content — no layout shift.
+ */
+.app-shell__main {
+    min-height: 100vh;
+    padding-left: 96px;   /* 84px collapsed sidebar + 12px gap */
+    padding-right: var(--space-6);
+    padding-top: var(--space-6);
+    padding-bottom: var(--space-10);
+}
+
+/* Lesson reader: sidebar hidden, no padding — full-bleed reading surface */
+.app-shell__main--reading {
+    padding: 0;
+}
+
+.page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+
+.page-header__title {
+    margin: 0;
+    font-size: var(--text-page-title);
+    font-weight: 700;
+    color: hsl(var(--header-text));
+}
+
+.page-header__subtitle {
+    margin: var(--space-1) 0 0;
+    font-size: var(--text-base);
+    color: hsl(var(--muted-foreground));
+}
+
+.page-header__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-shrink: 0;
+}
+
+.not-found {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    text-align: center;
+    gap: var(--space-4);
+}
+
+.not-found__title {
+    margin: 0;
+    color: hsl(var(--primary));
+    font-weight: 900;
+    line-height: 0.95;
+}
+
+.not-found__title span {
+    display: block;
+}
+
+.not-found__title span:first-child {
+    font-size: clamp(2.5rem, 8vw, 4.5rem);
+}
+
+.not-found__title span:nth-child(2) {
+    font-size: clamp(2rem, 6vw, 3.5rem);
+}
+
+.not-found__title span:last-child {
+    font-size: clamp(1.5rem, 4vw, 2.5rem);
+}
+
+.not-found__message {
+    margin: 0;
+    max-width: 28rem;
+    color: hsl(var(--header-text));
+    font-size: var(--text-base);
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.not-found__link {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-3) var(--space-5);
+    border-radius: 999px;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.not-found__link:hover {
+    background: hsl(var(--primary-hover));
+}

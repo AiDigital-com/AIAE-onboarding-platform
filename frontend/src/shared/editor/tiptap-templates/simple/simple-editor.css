@@ -1,0 +1,142 @@
+.simple-editor-wrapper {
+  --tt-toolbar-height: 44px;
+  --tt-theme-text: var(--tt-gray-light-900);
+  width: 100%;
+  max-height: calc(92vh - 190px);
+  min-height: 520px;
+  overflow: auto;
+  border-radius: 0;
+  background-color: var(--tt-bg-color);
+  color: var(--tt-theme-text);
+}
+
+.simple-editor-wrapper.lesson-details-editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+}
+
+.simple-editor-scroll {
+  width: 100%;
+  min-height: 420px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.simple-editor-wrapper.lesson-details-editor .simple-editor-scroll {
+  min-height: 0;
+  overflow: auto;
+  flex: 1 1 auto;
+}
+
+.simple-editor-wrapper.lesson-details-editor .simple-editor-content {
+  min-height: 0;
+  overflow: visible;
+  flex: 0 0 auto;
+}
+
+.simple-editor-bottom-spacer {
+  display: none;
+}
+
+.simple-editor-image-input {
+  display: none;
+}
+
+.simple-editor-image-upload-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(0, 9, 220, 0.22);
+  border-top-color: #0009dc;
+  border-radius: 999px;
+  animation: simple-editor-spin 0.75s linear infinite;
+}
+
+.simple-editor-wrapper.lesson-details-editor .simple-editor-bottom-spacer {
+  display: block;
+  flex: 0 0 0px;
+}
+
+.simple-editor-wrapper .tiptap-toolbar[data-variant="fixed"] {
+  position: sticky;
+  top: 0;
+  /* Only needs to stay above this editor's own scrolling content — must stay well below every
+     app-level dialog/drawer backdrop (the lowest of which is 1300), or a confirmation modal
+     opened over the editor (e.g. "Delete lesson?") won't darken the toolbar. */
+  z-index: 5;
+}
+
+.simple-editor-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.simple-editor-content .tiptap.ProseMirror.simple-editor {
+  flex: 1;
+  min-height: 420px;
+  padding: 2rem;
+  outline: none;
+  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.75;
+  color: #111827;
+}
+
+
+.simple-editor-content .tiptap.ProseMirror.simple-editor p {
+  margin: 0.75em 0;
+}
+
+.simple-editor-content .tiptap.ProseMirror.simple-editor ul,
+.simple-editor-content .tiptap.ProseMirror.simple-editor ol {
+  padding-left: 1.6rem;
+  margin: 0.75em 0;
+}
+
+.simple-editor-content .tiptap.ProseMirror.simple-editor blockquote {
+  border-left: 4px solid #0009dc;
+  margin: 1rem 0;
+  padding: 0.55rem 1rem;
+  color: #172033;
+  background: rgba(142, 231, 241, 0.2);
+  border-radius: 0.5rem;
+}
+
+.simple-editor-content .tiptap.ProseMirror.simple-editor a {
+  color: #0009dc;
+  font-weight: 750;
+  text-decoration: underline;
+  text-decoration-color: rgba(0, 9, 220, 0.28);
+  text-underline-offset: 0.18em;
+}
+
+.simple-editor-content .tiptap.ProseMirror.simple-editor code {
+  border-radius: 0.35rem;
+  padding: 0.12rem 0.35rem;
+  color: #080808;
+  background: rgba(174, 243, 62, 0.32);
+}
+
+.simple-editor-content .tiptap.ProseMirror.simple-editor hr {
+  border: 0;
+  border-top: 1px solid rgba(0, 9, 220, 0.16);
+  margin: 2rem 0;
+}
+
+@media screen and (max-width: 480px) {
+  .simple-editor-content .tiptap.ProseMirror.simple-editor {
+    padding: 1rem;
+  }
+}
+
+@keyframes simple-editor-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

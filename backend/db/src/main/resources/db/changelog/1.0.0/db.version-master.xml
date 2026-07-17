@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
+
+    <changeSet id="1.0.0-usage-events" author="aionboarding">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="usage_events"/>
+            </not>
+        </preConditions>
+        <sqlFile path="sql/usage_events.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="1.0.0-users-dictionaries" author="aionboarding">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="user_role"/>
+            </not>
+        </preConditions>
+        <sqlFile path="sql/users_dictionaries.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="1.0.0-permissions" author="aionboarding">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="user_permission_overrides"/>
+            </not>
+        </preConditions>
+        <sqlFile path="sql/permissions.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="1.0.0-teams" author="aionboarding">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="team_members"/>
+            </not>
+        </preConditions>
+        <sqlFile path="sql/teams.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="1.0.0-materials" author="aionboarding">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="material_file_kind"/>
+            </not>
+        </preConditions>
+        <sqlFile path="sql/materials.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="1.0.0-lessons" author="aionboarding">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="lesson_status"/>
+            </not>
+        </preConditions>
+        <sqlFile path="sql/lessons.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="1.0.0-lesson-activities" author="aionboarding">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="activity_type"/>
+            </not>
+        </preConditions>
+        <sqlFile path="sql/lesson_activities.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="1.0.0-learning" author="aionboarding">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="user_lessons"/>
+            </not>
+        </preConditions>
+        <sqlFile path="sql/learning.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="1.0.0-roadmaps" author="aionboarding">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="roadmaps"/>
+            </not>
+        </preConditions>
+        <sqlFile path="sql/roadmaps.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="1.0.0-roadmap-team-assignments" author="aionboarding">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="roadmap_team_assignments"/>
+            </not>
+        </preConditions>
+        <sqlFile path="sql/roadmap_team_assignments.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="1.0.0-groups-grades" author="aionboarding">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="grades"/>
+            </not>
+        </preConditions>
+        <sqlFile path="sql/groups_grades.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="1.0.0-jsonb-array-contains-ci-function" author="aionboarding">
+        <preConditions onFail="MARK_RAN">
+            <dbms type="postgresql"/>
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM information_schema.routines
+                WHERE routine_schema = 'public' AND routine_name = 'jsonb_array_contains_ci'
+            </sqlCheck>
+        </preConditions>
+        <sqlFile path="sql/jsonb_array_contains_ci_function.sql" relativeToChangelogFile="true" splitStatements="false"/>
+        <rollback>
+            <sql dbms="postgresql">DROP FUNCTION IF EXISTS jsonb_array_contains_ci(jsonb, text);</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="1.0.0-lesson-assistant-conversations" author="aionboarding">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="lesson_assistant_conversations"/>
+            </not>
+        </preConditions>
+        <sqlFile path="sql/lesson_assistant_conversations.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+    <changeSet id="1.0.0-pending-uploads" author="aionboarding">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="pending_uploads"/>
+            </not>
+        </preConditions>
+        <sqlFile path="sql/pending_uploads.sql" relativeToChangelogFile="true"/>
+    </changeSet>
+
+</databaseChangeLog>

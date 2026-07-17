@@ -1,0 +1,46 @@
+.feature-empty-state {
+    padding: 2rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 1rem;
+    background: #fff;
+}
+
+.feature-empty-state__copy {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.feature-empty-state__title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0b0b0b;
+}
+
+.feature-empty-state__description {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: #80808e;
+}
+
+.feature-empty-state__action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid rgba(0, 9, 220, 0.24);
+    border-radius: 999px;
+    background: #fff;
+    color: #33344a;
+    font-size: 0.875rem;
+    font-weight: 800;
+    line-height: 1.2;
+    text-align: center;
+    cursor: pointer;
+}
+
+.feature-empty-state__action:hover {
+    background: #f5f5fe;
+}

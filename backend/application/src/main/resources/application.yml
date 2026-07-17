@@ -1,0 +1,242 @@
+# Base application config. Profile-specific overrides:
+#   - application-replit.yml  → Replit workspace + Reserved VM deploy
+#   - application-local.yml   → docker-compose / local-dev
+#
+# REPLACE before use:
+#   - server.servlet.context-path → /<app-name> ONLY if your deployment needs one
+#     (a separate path-prefix beyond /api/v1/). Most Replit MVPs leave it empty.
+#
+# !!! DO NOT add `spring.security.oauth2.resourceserver.jwt.*` properties here !!!
+# Spring Boot's OAuth2 auto-config triggers on ANY of those properties (even
+# empty strings) and tries to fetch JWKS from the empty URL at startup.
+# SecurityConfig provides the JwtDecoder bean directly; that's enough to
+# satisfy the resource-server chain without poking auto-config.
+
+spring:
+  application:
+    # Replace APP_SERVICE_NAME with the generated app's stable slug during
+    # handoff (e.g. employee-directory). The fallback keeps the scaffold
+    # runnable before the first project-specific rename.
+    name: ${APP_SERVICE_NAME:aionboarding}
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+  cache:
+    type: jcache
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:oph}
+    username: ${POSTGRES_USER:oph}
+    password: ${POSTGRES_PASSWORD:oph}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      idle-timeout: 60000
+      maximum-pool-size: ${DB_MAX_POOL_SIZE:50}
+      connection-timeout: 2000
+      minimum-idle: 1
+      auto-commit: false
+  jta:
+    enabled: false
+  jpa:
+    open-in-view: false
+    database: postgresql
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        cache:
+          use_second_level_cache: true
+          use_query_cache: true
+          region_prefix: hibernate-cache
+          region:
+            factory_class: org.hibernate.cache.jcache.JCacheRegionFactory
+        javax:
+          cache:
+            uri: ehcache.xml
+            missing_cache_strategy: fail
+            provider: org.ehcache.jsr107.EhcacheCachingProvider
+        query:
+          in_clause_parameter_padding: true
+          mutation_strategy:
+            global_temporary:
+              create_tables: false
+              drop_tables: false
+          immutable_entity_update_query_handling_mode: exception
+        criteria:
+          literal_handling_mode: bind
+        default_batch_fetch_size: 300
+      jakarta:
+        persistence:
+          sharedCache:
+            mode: ENABLE_SELECTIVE
+  liquibase:
+    change-log: classpath:db/changelog/db.root-master.xml
+
+server:
+  port: ${PORT:5000}
+  # Replit + Reserved VM terminate TLS at the edge and forward X-Forwarded-*
+  # headers. `framework` makes Spring honour them so absolute URLs / Swagger /
+  # CORS resolve to the public https origin rather than http://localhost:5000.
+  forward-headers-strategy: framework
+  compression:
+    enabled: true
+    # Explicit text-only allow-list — matches Spring Boot's own
+    # default, spelled out so images/fonts/video (already-compressed formats)
+    # never get re-compressed. Below the 2KB default min-response-size, gzip's
+    # own overhead isn't worth paying, so that default is left as-is.
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json,application/xml
+  servlet:
+    # Default empty (root) — Spring serves /api/v1/... directly. Set a
+    # path-prefix only when a deployment specifically needs one; if you
+    # set it, also set APP_CONTEXT_PATH in docker-compose.yml so the
+    # backend healthcheck and the frontend nginx /api proxy match.
+    context-path: ${APP_CONTEXT_PATH:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,prometheus,info"
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    distribution:
+      # p50/p95/p99 for the auto-configured MVC timer (route template + method + status +
+      # outcome tags only — Spring's default low-cardinality shape, no path variables/IDs).
+      percentiles-histogram:
+        http.server.requests: true
+        http.client.requests: true
+        external.client.requests: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+        http.client.requests: 0.5, 0.95, 0.99
+        external.client.requests: 0.5, 0.95, 0.99
+
+springdoc:
+  swagger-ui:
+    url: /api/v1/specs/openapi.yaml
+
+logging:
+  level:
+    root: INFO
+    org.zalando.logbook: TRACE   # TRACE on the logbook logger → emit req/resp lines
+
+# App-specific config — these become AuthProperties / UsageLoggingProperties
+# via @ConfigurationProperties("app.auth") and ("app.usage-logging").
+app:
+  auth:
+    allowed-email-domain: ${AUTH_ALLOWED_EMAIL_DOMAIN:aidigital.com}
+    publishable-key: ${CLERK_PUBLISHABLE_KEY:}
+    # Comma-separated EXACT trusted browser origins for the JWT azp claim (required).
+    # Never a publishable key. Blank values fail startup (AuthStartupValidator).
+    authorized-parties: ${AUTH_AUTHORIZED_PARTIES:}
+    # Clerk SSO is the ONLY auth mode. Issuer/JWKS derive from publishable-key
+    # when AUTH_ISSUER_URI / AUTH_JWKS_URI are blank.
+    sso:
+      issuer-uri: ${AUTH_ISSUER_URI:}
+      jwk-set-uri: ${AUTH_JWKS_URI:}
+      audience: ${AUTH_AUDIENCE:}
+  security:
+    cors:
+      allowed-origins: "${APP_SECURITY_CORS_ALLOWED_ORIGINS:https://*.replit.dev,https://*.repl.co,http://localhost:5173,http://localhost:5000}"
+      max-age-seconds: ${APP_SECURITY_CORS_MAX_AGE_SECONDS:3600}
+    csp:
+      frame-ancestors: "${APP_SECURITY_CSP_FRAME_ANCESTORS:'self' https://*.replit.dev https://*.repl.co}"
+      frame-src: "${APP_SECURITY_CSP_FRAME_SRC:'self' https://*.clerk.accounts.dev https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com}"
+  # Logbook HTTP req/resp logging — bound by LogbookConfig. Defaults inline
+  # in LogbookProperties mirror the canonical rules; override here per-app.
+  # See observability/logbook-http-logging-rules.md.
+  logbook:
+    # Diagnostic override only — leave false. true restores full masked-body JSON
+    # logging (higher CPU/allocation on large lesson/material payloads); revert
+    # after troubleshooting.
+    log-bodies: ${LOGBOOK_LOG_BODIES:false}
+    censored-replacement: XXX
+    headers-to-censor: [ Authorization, Cookie, Set-Cookie, X-API-Key, AccessKey, Proxy-Authorization ]
+    json-fields-to-censor: [ ".*password.*", ".*token.*", ".*secret.*", ".*key.*", ".*credential.*", ".*authorization.*", privateKey, clientSecret, serviceAccount ]
+    excluded:
+      "/**/actuator/**": [ GET ]
+      "/**/swagger-ui/**": [ GET ]
+      "/**/specs/**": [ GET ]
+      "/health": [ GET ]
+      "/**": [ OPTIONS ]
+  usage-logging:
+    enabled: ${USAGE_LOGGING_ENABLED:true}
+    # service-name MUST be non-empty when enabled=true. Default falls back
+    # to spring.application.name so a generated project doesn't silently
+    # bind NoOpUsageLogger because of an unset env var (past sessions
+    # spent hours wondering "why zero usage events?"). Override per-app via
+    # USAGE_LOG_SERVICE_NAME env var with the real stable identifier
+    # (e.g. `employee-directory`, NOT `replit-mvp-template`).
+    service-name: ${USAGE_LOG_SERVICE_NAME:${spring.application.name}}
+    environment: ${USAGE_LOG_ENVIRONMENT:dev}
+    executor-core-pool-size: ${USAGE_LOG_EXECUTOR_CORE_POOL_SIZE:1}
+    executor-max-pool-size: ${USAGE_LOG_EXECUTOR_MAX_POOL_SIZE:2}
+    executor-queue-capacity: ${USAGE_LOG_EXECUTOR_QUEUE_CAPACITY:200}
+    max-error-message-length: ${USAGE_LOG_MAX_ERROR_MESSAGE_LENGTH:500}
+    max-user-agent-length: ${USAGE_LOG_MAX_USER_AGENT_LENGTH:500}
+  lessongen:
+    activity-model: ${OPENAI_ACTIVITY_MODEL:${OPENAI_MINI_MODEL:${OPENAI_MODEL:gpt-4o-mini}}}
+    mini-model: ${OPENAI_MINI_MODEL:gpt-4o-mini}
+    transcript-compression-model: ${OPENAI_TRANSCRIPT_COMPRESSION_MODEL:${OPENAI_NANO_MODEL:${OPENAI_MINI_MODEL:gpt-4o-mini}}}
+    revision-planner-model: ${OPENAI_REVISION_PLANNER_MODEL:${OPENAI_MINI_MODEL:gpt-4o-mini}}
+    model: ${OPENAI_LESSON_MODEL:${OPENAI_MINI_MODEL:gpt-4o-mini}}
+  # Integration pack: app.external.http
+  external:
+    http:
+      connect-timeout: ${APP_EXTERNAL_HTTP_CONNECT_TIMEOUT:5s}
+      response-timeout: ${APP_EXTERNAL_HTTP_RESPONSE_TIMEOUT:30s}
+      connection-request-timeout: ${APP_EXTERNAL_HTTP_CONNECTION_REQUEST_TIMEOUT:5s}
+      max-total-connections: ${APP_EXTERNAL_HTTP_MAX_TOTAL_CONNECTIONS:50}
+      max-connections-per-route: ${APP_EXTERNAL_HTTP_MAX_CONNECTIONS_PER_ROUTE:10}
+      keep-alive-duration: 60s
+      idle-eviction-duration: 30s
+    # Integration pack: app.external.openai
+    openai:
+      enabled: ${OPENAI_ENABLED:false}
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+      api-key: ${OPENAI_API_KEY:}
+      api-mode: ${OPENAI_API_MODE:responses}
+      model: ${OPENAI_MODEL:gpt-4o}
+      max-tokens: ${OPENAI_MAX_TOKENS:1024}
+    # Integration pack: app.external.storage
+    storage:
+      enabled: ${STORAGE_ENABLED:false}
+      region: ${REGION:${AWS_REGION:${S3_REGION:${RAILWAY_BUCKET_REGION:us-east-1}}}}
+      endpoint: ${ENDPOINT:${AWS_ENDPOINT:${S3_ENDPOINT:${RAILWAY_BUCKET_ENDPOINT:}}}}
+      access-key-id: ${ACCESS_KEY_ID:${AWS_ACCESS_KEY_ID:${S3_ACCESS_KEY_ID:${RAILWAY_BUCKET_ACCESS_KEY_ID:}}}}
+      secret-access-key: ${SECRET_ACCESS_KEY:${AWS_SECRET_ACCESS_KEY:${S3_SECRET_ACCESS_KEY:${RAILWAY_BUCKET_SECRET_ACCESS_KEY:}}}}
+      bucket: ${BUCKET:${AWS_BUCKET:${S3_BUCKET:${RAILWAY_BUCKET_BUCKET:}}}}
+      force-path-style: ${STORAGE_FORCE_PATH_STYLE:true}
+      presign-get-expires-seconds: ${STORAGE_PRESIGN_GET_EXPIRES_SECONDS:86400}
+      cloud-front-enabled: ${CLOUDFRONT_ENABLED:false}
+      cloud-front-signed-url-enabled: ${CLOUDFRONT_SIGNED_URL_ENABLED:true}
+      cloud-front-domain: ${CLOUDFRONT_DOMAIN:}
+      cloud-front-key-pair-id: ${CLOUDFRONT_KEY_PAIR_ID:}
+      cloud-front-private-key: ${CLOUDFRONT_PRIVATE_KEY:}
+    # Integration pack: app.external.heygen
+    heygen:
+      enabled: ${HEYGEN_ENABLED:false}
+      base-url: ${HEYGEN_BASE_URL:https://api.heygen.com}
+      api-key: ${HEYGEN_API_KEY:}
+      avatar-id: ${HEYGEN_TEACHER_AVATAR_ID:${HEYGEN_AVATAR_ID:${HEYGEN_AVATAR_LOOK_ID:}}}
+      voice-id: ${HEYGEN_TEACHER_VOICE_ID:${HEYGEN_VOICE_ID:}}
+    # Integration pack: app.external.youtube
+    youtube:
+      enabled: ${YOUTUBE_ENABLED:true}
+      transcript-lang: ${YOUTUBE_TRANSCRIPT_LANG:}
+      transcript-debug: ${YOUTUBE_TRANSCRIPT_DEBUG:false}
+    # Integration pack: app.external.link-fetch
+    link-fetch:
+      enabled: ${LINK_FETCH_ENABLED:true}
+      max-redirects: ${LINK_FETCH_MAX_REDIRECTS:5}
+      max-response-bytes: ${LINK_FETCH_MAX_RESPONSE_BYTES:2000000}
+  lesson:
+    openai:
+      revision-planner-model: ${OPENAI_REVISION_PLANNER_MODEL:${OPENAI_MINI_MODEL:gpt-4o-mini}}
+      lesson-assistant-model: ${OPENAI_LESSON_ASSISTANT_MODEL:${OPENAI_NANO_MODEL:${OPENAI_MINI_MODEL:gpt-4o-mini}}}
+      mini-model: ${OPENAI_MINI_MODEL:gpt-4o-mini}
+      nano-model: ${OPENAI_NANO_MODEL:gpt-4o-mini}

@@ -1,0 +1,40 @@
+# SPA + reverse proxy for /api/* to the backend service.
+# APP_CONTEXT_PATH is substituted at container start (empty by default).
+# Used by frontend/Dockerfile in local-dev / handoff.
+
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Text-only, matches the backend's server.compression.mime-types
+    # so images/fonts (already-compressed formats) are never re-compressed.
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/json application/xml image/svg+xml;
+
+    # Vite's content-hashed build output — a new deploy always ships new
+    # filenames, so the old cached copy is simply never requested again.
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+    }
+
+    # index.html (and the SPA fallback below) must revalidate every time so a
+    # deploy's new hashed asset references take effect on the next reload.
+    location / {
+        try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-cache, must-revalidate" always;
+    }
+
+    location /api/ {
+        proxy_pass http://backend:8080${APP_CONTEXT_PATH}/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
