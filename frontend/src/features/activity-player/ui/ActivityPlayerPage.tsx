@@ -22,7 +22,7 @@ export function ActivityPlayerPage() {
         );
     }
 
-    const { lesson, activity, attempts, lessonActivities } = data;
+    const { lesson, activity, attempts, lessonActivities, roadmapContext } = data;
 
     return (
         <div className="activity-player-page">
@@ -32,9 +32,15 @@ export function ActivityPlayerPage() {
                     activity={activity}
                     initialAttempts={attempts}
                     lessonActivities={lessonActivities}
+                    roadmapContext={roadmapContext}
                 />
             ) : (
-                <FlashcardsActivityPlayer lesson={lesson} activity={activity} lessonActivities={lessonActivities} />
+                <FlashcardsActivityPlayer
+                    lesson={lesson}
+                    activity={activity}
+                    lessonActivities={lessonActivities}
+                    roadmapContext={roadmapContext}
+                />
             )}
         </div>
     );

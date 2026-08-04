@@ -384,6 +384,14 @@
     color: #fff;
 }
 
+/* Occupies the "next lesson" slot on the final lesson of a roadmap. Carries the same accent as the
+   activity player's completion action so the end of a roadmap reads the same on both surfaces. */
+.lesson-reading-chrome__nav-btn--complete {
+    border: 0;
+    background: #aef33e;
+    color: #33344a;
+}
+
 .lesson-reading-chrome__nav-btn:disabled {
     background: #f2f1f3;
     color: #80808e;

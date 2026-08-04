@@ -1,6 +1,16 @@
 import type { LessonActivityV1 } from "@/features/lessons/api/types";
 
-export const PASSING_SCORE = 80;
+// Continue-path resolution is shared with the lesson page, so it lives in features/lessons.
+// Re-exported here to keep the activity player's existing import surface unchanged.
+export {
+    COMPLETE_ROADMAP_LABEL,
+    CONTINUE_PATH_LABEL,
+    PASSING_SCORE,
+    ROADMAPS_HREF,
+    getContinuePathTarget,
+    isActivityComplete,
+} from "@/features/lessons/lib/continuePath";
+export type { ContinuePathTarget, ContinueRoadmapContext } from "@/features/lessons/lib/continuePath";
 
 export interface QuizQuestion {
     type?: string;
@@ -73,29 +83,6 @@ export function buildInitialQuestions(questions: QuizQuestion[]): QuizQuestion[]
         ...question,
         options: Array.isArray(question.options) ? question.options : [],
     }));
-}
-
-export function isActivityComplete(activity: LessonActivityV1): boolean {
-    if (activity.type === "quiz") {
-        return Boolean(activity.progress?.completedAt) && Number(activity.progress?.score || 0) >= PASSING_SCORE;
-    }
-    return Boolean(activity.progress?.isCompleted);
-}
-
-export function getContinuePathHref(
-    lessonId: number,
-    activities: LessonActivityV1[],
-    currentActivityId: number,
-): string {
-    const currentIndex = activities.findIndex((item) => item.id === currentActivityId);
-    const followingActivities = currentIndex >= 0 ? activities.slice(currentIndex + 1) : activities;
-    const nextIncompleteActivity = followingActivities.find((item) => !isActivityComplete(item));
-
-    if (nextIncompleteActivity) {
-        return `/lessons/${lessonId}/activities/${nextIncompleteActivity.id}`;
-    }
-
-    return `/lessons/${lessonId}`;
 }
 
 export function formatAttemptDate(value?: string): string {

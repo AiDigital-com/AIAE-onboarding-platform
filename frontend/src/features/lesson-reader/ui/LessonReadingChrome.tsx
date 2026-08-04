@@ -8,6 +8,7 @@ import NotesOutlinedIcon from "@mui/icons-material/NotesOutlined";
 import OndemandVideoOutlinedIcon from "@mui/icons-material/OndemandVideoOutlined";
 import { UserAvatar } from "@/shared/ui/UserAvatar";
 import type { LessonNavigation, RoadmapLessonContext, TeacherVideoView } from "@/features/lessons/api/types";
+import { COMPLETE_ROADMAP_LABEL } from "@/features/lessons/lib/continuePath";
 import "./lesson-reading-chrome.css";
 
 interface LessonChromeModel {
@@ -41,6 +42,8 @@ interface Props {
     lesson: LessonChromeModel;
     roadmapContext?: RoadmapLessonContext | null;
     lessonNavigation?: LessonNavigation;
+    /** Set only on the final lesson of an enrolled roadmap once every activity is complete. */
+    completeRoadmapHref?: string | null;
     initialIsCompleted?: boolean;
     onReadingCompleted?: () => void;
     children: ReactNode;
@@ -74,6 +77,7 @@ export function LessonReadingChrome({
     lesson,
     roadmapContext,
     lessonNavigation,
+    completeRoadmapHref = null,
     initialIsCompleted = false,
     onReadingCompleted,
     children,
@@ -416,6 +420,15 @@ export function LessonReadingChrome({
                                 to={`/lessons/${lessonNavigation.next.id}`}
                             >
                                 Next lesson <ArrowForwardOutlinedIcon />
+                            </Link>
+                        ) : completeRoadmapHref ? (
+                            // Final lesson of a finished roadmap: the dead "Next lesson" slot becomes
+                            // the way out to the roadmap overview.
+                            <Link
+                                className="lesson-reading-chrome__nav-btn lesson-reading-chrome__nav-btn--complete"
+                                to={completeRoadmapHref}
+                            >
+                                {COMPLETE_ROADMAP_LABEL} <ArrowForwardOutlinedIcon />
                             </Link>
                         ) : (
                             <button
