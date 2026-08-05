@@ -7,6 +7,7 @@ export {
     CONTINUE_PATH_LABEL,
     PASSING_SCORE,
     ROADMAPS_HREF,
+    getContinueButtonLabel,
     getContinuePathTarget,
     isActivityComplete,
 } from "@/features/lessons/lib/continuePath";

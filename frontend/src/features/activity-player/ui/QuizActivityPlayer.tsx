@@ -24,6 +24,7 @@ import {
     buildAttemptQuestions,
     buildInitialQuestions,
     formatAttemptDate,
+    getContinueButtonLabel,
     getContinuePathTarget,
     getCorrectAnswers,
     getOptionState,
@@ -80,6 +81,7 @@ export function QuizActivityPlayer({
     const isPassed = isSubmitted && Number(score || 0) >= PASSING_SCORE;
     const canSubmit = questions.length > 0 && answeredCount === questions.length && !submitMutation.isPending;
     const continuePathTarget = getContinuePathTarget(lesson.id, activities, activity.id, roadmapContext);
+    const continueButtonLabel = getContinueButtonLabel(isPassed, continuePathTarget);
     const isSaving = submitMutation.isPending || resetMutation.isPending;
 
     useEffect(() => {
@@ -378,11 +380,11 @@ export function QuizActivityPlayer({
                             <div className="quiz-player__score-actions">
                                 {isPassed ? (
                                     <Link className="quiz-player__continue" to={continuePathTarget.href}>
-                                        {continuePathTarget.label}
+                                        {continueButtonLabel}
                                     </Link>
                                 ) : (
                                     <button type="button" className="quiz-player__continue" disabled>
-                                        {continuePathTarget.label}
+                                        {continueButtonLabel}
                                     </button>
                                 )}
                                 <button

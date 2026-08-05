@@ -5,6 +5,7 @@ import {
     CONTINUE_PATH_LABEL,
     ROADMAPS_HREF,
     canCompleteRoadmap,
+    getContinueButtonLabel,
     getContinuePathTarget,
 } from "./continuePath";
 
@@ -120,5 +121,20 @@ describe("canCompleteRoadmap", () => {
     it("falls back to the reading flag for a lesson with no activities", () => {
         expect(canCompleteRoadmap(true, false, [], true)).toBe(true);
         expect(canCompleteRoadmap(true, false, [], false)).toBe(false);
+    });
+});
+
+describe("getContinueButtonLabel", () => {
+    const completeRoadmap = { href: ROADMAPS_HREF, label: COMPLETE_ROADMAP_LABEL };
+    const nextLesson = { href: "/lessons/99", label: CONTINUE_PATH_LABEL };
+
+    it("advertises the resolved target once the move is earned", () => {
+        expect(getContinueButtonLabel(true, completeRoadmap)).toBe(COMPLETE_ROADMAP_LABEL);
+        expect(getContinueButtonLabel(true, nextLesson)).toBe(CONTINUE_PATH_LABEL);
+    });
+
+    it("stays neutral while the attempt is unpassed, never promising roadmap completion", () => {
+        expect(getContinueButtonLabel(false, completeRoadmap)).toBe(CONTINUE_PATH_LABEL);
+        expect(getContinueButtonLabel(false, nextLesson)).toBe(CONTINUE_PATH_LABEL);
     });
 });

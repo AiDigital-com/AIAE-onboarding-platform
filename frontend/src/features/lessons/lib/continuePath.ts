@@ -34,8 +34,13 @@ export function isActivityComplete(activity: LessonActivityV1): boolean {
  * be played out of order: without it, finishing the last activity while an earlier one is still
  * incomplete would advance past the unfinished activity.
  *
+ * <p><b>The current activity is never inspected.</b> It has just been submitted, so the progress in
+ * the props may lag the server. The caller decides whether the learner earned the move — see
+ * {@link getContinueButtonLabel}, which keeps a neutral label while an attempt is unpassed. Without
+ * that guard the resolver would skip straight past a failed quiz to the roadmap-completion branch.
+ *
  * <p>Pass `currentActivityId = null` from the lesson page, where no single activity is "current" —
- * the search then simply runs over the whole list in order.
+ * the search then simply runs over the whole list in order, current-activity caveat included.
  */
 function findNextIncompleteActivity(
     activities: LessonActivityV1[],
@@ -52,9 +57,24 @@ function findNextIncompleteActivity(
 }
 
 /**
- * Decides whether the lesson page may offer roadmap completion. True only on the last lesson of an
- * enrolled roadmap once the lesson itself is finished — otherwise a learner could leave the roadmap
- * with unfinished work behind them.
+ * Label for the activity player's continue button.
+ *
+ * <p>Only an earned move advertises the resolved target. While an attempt is unpassed the button is
+ * disabled and stays neutral: {@link getContinuePathTarget} ignores the current activity, so on a
+ * roadmap's last lesson it would otherwise promise "Complete roadmap" for a failed quiz.
+ */
+export function getContinueButtonLabel(hasEarnedContinue: boolean, target: ContinuePathTarget): string {
+    return hasEarnedContinue ? target.label : CONTINUE_PATH_LABEL;
+}
+
+/**
+ * Whether the lesson page may offer roadmap completion: the viewer is on the last lesson of an
+ * enrolled roadmap and has finished *that lesson*.
+ *
+ * <p>Lesson-scoped only — the lesson-detail contract carries no roadmap-wide progress, so a learner
+ * who skipped an earlier lesson still sees the action. The link goes to the roadmap overview, which
+ * reports real progress, so this is a misleading label rather than a data problem. Gating on the
+ * whole roadmap needs a new field on the API contract.
  *
  * @param isInRoadmap  viewer is enrolled in a roadmap containing this lesson
  * @param hasNextLesson a further lesson exists in that roadmap
