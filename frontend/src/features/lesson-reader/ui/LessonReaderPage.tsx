@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { ErrorAlert } from "@/shared/ui/ErrorAlert";
 import { LoadingBlock } from "@/shared/ui/LoadingBlock";
 import { markdownToHtml } from "@/shared/lib/lessonContent";
+import { ROADMAPS_HREF, canCompleteRoadmap } from "@/features/lessons/lib/continuePath";
 import { useLessonReaderQuery } from "../api/useLessonReaderQuery";
 import { useSetLessonCompletionMutation } from "../api/useSetLessonCompletionMutation";
 import { LessonActivityGate } from "./LessonActivityGate";
@@ -51,6 +52,15 @@ export function LessonReaderPage() {
         lesson.contentHtml ||
         markdownToHtml(lesson.contentMarkdown || "");
 
+    const completeRoadmapHref = canCompleteRoadmap(
+        Boolean(roadmapContext),
+        Boolean(lessonNavigation.next),
+        activities,
+        initialIsCompleted,
+    )
+        ? ROADMAPS_HREF
+        : null;
+
     return (
         <div className="lesson-reader-page">
             <LessonReadingChrome
@@ -66,6 +76,7 @@ export function LessonReaderPage() {
                 }}
                 roadmapContext={roadmapContext}
                 lessonNavigation={lessonNavigation}
+                completeRoadmapHref={completeRoadmapHref}
                 initialIsCompleted={initialIsCompleted}
                 onReadingCompleted={handleReadingCompleted}
             >

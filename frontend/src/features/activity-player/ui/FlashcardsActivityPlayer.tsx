@@ -18,7 +18,7 @@ import {
     useResetActivityProgressMutation,
     useSubmitActivityProgressMutation,
 } from "../api/useActivityProgressMutations";
-import { getContinuePathHref } from "../lib/quizHelpers";
+import { getContinuePathTarget, type ContinueRoadmapContext } from "../lib/quizHelpers";
 import { getCards } from "../lib/flashcardsHelpers";
 import { ScrollableCardText } from "./ScrollableCardText";
 import "./flashcards-activity-player.css";
@@ -27,9 +27,15 @@ interface Props {
     lesson: LessonV1;
     activity: LessonActivityV1;
     lessonActivities?: LessonActivityV1[];
+    roadmapContext?: ContinueRoadmapContext | null;
 }
 
-export function FlashcardsActivityPlayer({ lesson, activity, lessonActivities = [] }: Props) {
+export function FlashcardsActivityPlayer({
+    lesson,
+    activity,
+    lessonActivities = [],
+    roadmapContext = null,
+}: Props) {
     const submitMutation = useSubmitActivityProgressMutation();
     const resetMutation = useResetActivityProgressMutation();
     const cards = useMemo(() => getCards(activity), [activity]);
@@ -55,7 +61,12 @@ export function FlashcardsActivityPlayer({ lesson, activity, lessonActivities = 
     const progressValue = cards.length ? Math.round((reviewedCount / cards.length) * 100) : 0;
     const allCardsSeen = cards.length > 0 && reviewedCount === cards.length;
     const isSaving = submitMutation.isPending || resetMutation.isPending;
-    const continuePathHref = getContinuePathHref(lesson.id, lessonActivities, activity.id);
+    const continuePathTarget = getContinuePathTarget(
+        lesson.id,
+        lessonActivities,
+        activity.id,
+        roadmapContext,
+    );
 
     useEffect(() => {
         setIsFlipped(false);
@@ -263,8 +274,8 @@ export function FlashcardsActivityPlayer({ lesson, activity, lessonActivities = 
                                     : "Reveal all cards first"}
                         </button>
                         {isCompleted && (
-                            <Link className="flashcards-player__continue" to={continuePathHref}>
-                                Continue path
+                            <Link className="flashcards-player__continue" to={continuePathTarget.href}>
+                                {continuePathTarget.label}
                             </Link>
                         )}
                     </div>

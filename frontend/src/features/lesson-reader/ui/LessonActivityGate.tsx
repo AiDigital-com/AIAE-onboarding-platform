@@ -2,10 +2,9 @@ import { Link } from "react-router-dom";
 import QuizOutlinedIcon from "@mui/icons-material/QuizOutlined";
 import StyleOutlinedIcon from "@mui/icons-material/StyleOutlined";
 import type { LessonActivityV1 } from "@/features/lessons/api/types";
+import { PASSING_SCORE, isActivityComplete } from "@/features/lessons/lib/continuePath";
 import { LessonCompletionButton } from "./LessonCompletionButton";
 import "./lesson-activity-gate.css";
-
-const PASSING_SCORE = 80;
 
 function getActivityLabel(activity: LessonActivityV1): string {
     if (activity.type === "quiz") {
@@ -17,12 +16,9 @@ function getActivityLabel(activity: LessonActivityV1): string {
     return "Unsupported activity";
 }
 
-function isActivityPassed(activity: LessonActivityV1): boolean {
-    if (activity.type === "quiz") {
-        return Boolean(activity.progress?.isCompleted) && Number(activity.progress?.score || 0) >= PASSING_SCORE;
-    }
-    return Boolean(activity.progress?.isCompleted);
-}
+// Shared with the activity player. The backend derives `isCompleted` as `completedAt != null`
+// (LessonActivityRecordAssembler), so the two criteria are equivalent — one is enough.
+const isActivityPassed = isActivityComplete;
 
 function getActivitySortWeight(activity: LessonActivityV1): number {
     if (activity.type === "flashcards") {

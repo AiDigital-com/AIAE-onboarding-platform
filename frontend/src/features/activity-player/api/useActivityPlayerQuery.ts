@@ -9,12 +9,15 @@ import type {
 import { activityPlayerKeys } from "@/features/lessons/api/queryKeys";
 import { lessonDetailQueryOptions } from "@/features/lessons/api/lessonDetailQueryOptions";
 import { DETAIL_QUERY_OPTIONS } from "@/shared/api/queryPolicies";
+import type { ContinueRoadmapContext } from "../lib/quizHelpers";
 
 export interface ActivityPlayerData {
     lesson: LessonV1;
     activity: LessonActivityV1;
     attempts: ActivityAttemptV1[];
     lessonActivities: LessonActivityV1[];
+    /** Roadmap the lesson belongs to, or null when the lesson was assigned standalone. */
+    roadmapContext: ContinueRoadmapContext | null;
 }
 
 export function useActivityPlayerQuery(lessonId: string, activityId: string) {
@@ -57,6 +60,9 @@ export function useActivityPlayerQuery(lessonId: string, activityId: string) {
                   lessonActivities: (lessonData.activities ?? []) as LessonActivityV1[],
                   activity: activityData.activity as LessonActivityV1,
                   attempts: (activityData.attempts ?? []) as ActivityAttemptV1[],
+                  roadmapContext: lessonData.roadmapContext
+                      ? { nextLessonId: lessonData.roadmapContext.nextLessonId ?? null }
+                      : null,
               }
             : null;
 

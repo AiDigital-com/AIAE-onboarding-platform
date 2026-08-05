@@ -24,12 +24,14 @@ import {
     buildAttemptQuestions,
     buildInitialQuestions,
     formatAttemptDate,
-    getContinuePathHref,
+    getContinueButtonLabel,
+    getContinuePathTarget,
     getCorrectAnswers,
     getOptionState,
     getQuestions,
     getQuizQuestionTypeLabel,
     getSavedResults,
+    type ContinueRoadmapContext,
 } from "../lib/quizHelpers";
 import "./quiz-activity-player.css";
 
@@ -38,6 +40,7 @@ interface Props {
     activity: LessonActivityV1;
     initialAttempts?: ActivityAttemptV1[];
     lessonActivities?: LessonActivityV1[];
+    roadmapContext?: ContinueRoadmapContext | null;
 }
 
 export function QuizActivityPlayer({
@@ -45,6 +48,7 @@ export function QuizActivityPlayer({
     activity,
     initialAttempts = [],
     lessonActivities = [],
+    roadmapContext = null,
 }: Props) {
     const submitMutation = useSubmitActivityProgressMutation();
     const resetMutation = useResetActivityProgressMutation();
@@ -76,7 +80,8 @@ export function QuizActivityPlayer({
     const isSubmitted = Array.isArray(results);
     const isPassed = isSubmitted && Number(score || 0) >= PASSING_SCORE;
     const canSubmit = questions.length > 0 && answeredCount === questions.length && !submitMutation.isPending;
-    const continuePathHref = getContinuePathHref(lesson.id, activities, activity.id);
+    const continuePathTarget = getContinuePathTarget(lesson.id, activities, activity.id, roadmapContext);
+    const continueButtonLabel = getContinueButtonLabel(isPassed, continuePathTarget);
     const isSaving = submitMutation.isPending || resetMutation.isPending;
 
     useEffect(() => {
@@ -374,12 +379,12 @@ export function QuizActivityPlayer({
                             </p>
                             <div className="quiz-player__score-actions">
                                 {isPassed ? (
-                                    <Link className="quiz-player__continue" to={continuePathHref}>
-                                        Continue path
+                                    <Link className="quiz-player__continue" to={continuePathTarget.href}>
+                                        {continueButtonLabel}
                                     </Link>
                                 ) : (
                                     <button type="button" className="quiz-player__continue" disabled>
-                                        Continue path
+                                        {continueButtonLabel}
                                     </button>
                                 )}
                                 <button
