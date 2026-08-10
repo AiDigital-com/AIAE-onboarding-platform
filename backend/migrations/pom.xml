@@ -13,8 +13,8 @@
         <version>1.0.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
-    <artifactId>db</artifactId>
-    <name>AIAE Onboarding Platform — db</name>
+    <artifactId>migrations</artifactId>
+    <name>AIAE Onboarding Platform — migrations</name>
 
     <dependencies>
         <dependency>

@@ -26,10 +26,10 @@ violations, not raw scanner matches.
    - one entity, one repository, one paired entity service;
    - controllers and orchestrators do not inject repositories;
    - controllers implement generated `*Api` interfaces and stay thin;
-   - outbound integrations, `ExternalClientMetricsInterceptor`, and
-     `ExternalCallTimer` stay in `backend/external-services`, while Logbook
+   - outbound integrations stay in `backend/external-services`;
+   - reusable external metrics stay in `backend/observability` while Logbook
      and inbound application observability stay application-owned;
-   - third-party Spring HTTP uses the shared pooled client factory with
+   - third-party Spring HTTP uses `PooledRestClientFactory` with
      `LogbookClientHttpRequestInterceptor`;
    - database transactions do not span external HTTP/SDK/storage/AI I/O;
    - service/application mappers remain narrow and aggregate-specific.

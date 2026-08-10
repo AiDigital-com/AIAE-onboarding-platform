@@ -6,8 +6,8 @@
   module so *ServiceImpl classes can carry @LogUsage; `application` picks
   it up transitively through the service edge.
 
-  Database migrations live in the `db` module — NOT here. Migrations are
-  intentionally single-sourced: `backend/db/src/main/resources/db/changelog/`
+  Database migrations live in the `migrations` module — NOT here. Migrations are
+  intentionally single-sourced: `backend/migrations/src/main/resources/db/changelog/`
   is the ONE place Liquibase changelogs sit, regardless of which feature
   module owns the corresponding @Entity. Splitting changelogs across modules
   hides the table-creation contract from the migration owner and makes
