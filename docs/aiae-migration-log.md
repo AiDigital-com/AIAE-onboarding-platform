@@ -223,6 +223,106 @@ point until they decide.
 
 ---
 
+## P1 — Agent surface · **BLOCKED at step 0a — no file changes made**
+
+Attempted 2026-08-10 on branch `mig/p01-agent-surface` (from `migration` @ `cb7e61a`).
+
+### Step 0a — fixture-manifest validation: 79 of 80 match, not 80 of 80
+
+Every `path<TAB>sha256` line in `.claude/.aiae-fixtures-manifest` was hashed against the file
+on disk (`python3 -c` sha256, real interpreter shimmed onto `PATH` first — see P0 environment
+notes). **79 of 80 matched. `CLAUDE.md` did not:**
+
+```
+expected (manifest): f65b04a7125c5a8fd94c02d2f99af2066d57ec5e5eeea4161807b7f791423fd8
+actual (on disk)   : d4ba51af8106a9ce9a76166d19e24dd0d564bb5ee183024b202fe8464cbbc7a3
+```
+
+Per the plan's own instruction, this is where the phase must stop: *"If any do not [match],
+stop — step 1 will abort with 'managed fixture was edited locally', and that message will
+point you at the wrong cause."* It does. But the plan's diagnosis of the likely wrong cause
+("the usual real cause is line-ending normalisation") is itself not what is happening here,
+and that distinction matters enough to record.
+
+### Root cause — not §2.8, a different and more basic problem
+
+1. **`CLAUDE.md` is a manifest-checked fixture even though §2.8 says the manifest covers
+   "every file under `.claude/`."** It does not, and the code proves it:
+   `install-managed-claude-fixtures.py`'s `managed_root_files` set is
+   `{AI-DEVELOPMENT-GUIDE.md, CLAUDE.md, GDS-WORKFLOW-README.md, agent-payload.skills}` —
+   four **root-level** files, none of them under `.claude/`. `.claude/.aiae-fixtures-manifest`
+   lists `CLAUDE.md` explicitly (confirmed by `grep`), and the installer's first loop
+   (`install-managed-claude-fixtures.py:134-142`) checks it exactly like any `.claude/**`
+   entry: any hash mismatch on any managed root file aborts the whole run with the same
+   `SystemExit`, before a single file is written. §2.8 undercounts the manifest's scope by
+   four files; this is now filed alongside the other corrections in §2.
+
+2. **The actual mismatch is content, not line endings.** Tested directly: the current
+   `CLAUDE.md`, LF-normalized, hashes to `30c26e7c…` — matching neither the manifest's
+   `f65b04a7…` nor the raw-on-disk `d4ba51af…`. Line endings were checked too and are a real,
+   separate, non-blocking oddity (`core.autocrlf=true` on this machine checks the file out as
+   CRLF while the git blob and `.gitattributes`'s `eol=lf` both say LF — `git ls-files --eol`
+   shows `i/lf w/crlf`), but forcing every candidate rendering of the *current* content
+   through LF, CRLF, and raw-as-read produces three different hashes and **none of them is
+   the manifest's expected value.** The manifest's hash matches exactly one thing: the
+   **pre-guardrails** `CLAUDE.md` from baseline commit `c53a76d`, rendered CRLF —
+   i.e. the file as `install-claude-fixtures.sh` originally installed it from the standard
+   checkout, before P0 touched it.
+3. **P0 step 1a added the "Migration Guardrails" block to `CLAUDE.md` (commit `c5cb107`) and
+   nothing re-derived the manifest's `CLAUDE.md` entry afterward.** There is no supported way
+   to update one entry — the manifest header reads "Managed by
+   `scripts/install-claude-fixtures.sh`. Do not edit," and regenerating it means re-running
+   that exact installer, which is the thing that now refuses to run because of this mismatch.
+
+### This is a contradiction in the plan, not a mistake in this run
+
+P0 step 1a requires editing `CLAUDE.md` — a file the installer treats as a managed root
+fixture — *before* the first agent runs, i.e. before P1. P1 step 0a requires 80/80 of the
+manifest to match before proceeding, and P1 step 1 assumes re-running the installer "just"
+overwrites `CLAUDE.md` (plan line 469: *"P1 step 1 overwrites `CLAUDE.md`"*). It does not:
+`install-managed-claude-fixtures.py` checks every previously-owned path against the manifest
+**before** writing anything, and aborts on the first mismatch — which, given P0's edit, is
+now `CLAUDE.md` itself. The three instructions cannot all be satisfied in the order the plan
+gives them. Nothing in P0 or P1 tells anyone to regenerate the manifest's `CLAUDE.md` entry,
+and hand-editing the manifest or reverting the guardrails block are both excluded by this
+same step 0a ("do not try to 'fix' the files") and by the manifest's own "do not edit" header.
+
+**Per the plan's explicit instruction, this phase stops here.** No file in the working tree
+was changed — `.gitignore` was read but not edited, no fixture was copied, `AGENTS.md` /
+`replit.md` / `.agents/**` were not created. `git status --porcelain` is empty on this branch
+except for this log entry.
+
+### What was safe to measure anyway (read-only, no fixture involved)
+
+Run against this project's tree with the standard's scanners (`cc64e49`, scratch invocation,
+real `python3` on `PATH`) to record the "before" state for whoever unblocks this:
+
+| Gate | Result |
+|---|---|
+| `check-agent-surfaces.sh` | `handoff` — `AGENTS.md`/`replit.md`/`.agents` all absent, consistent with P0's baseline |
+| `check-installed-documentation-links.py` | **FAIL, 6** broken references — identical set to P0's baseline |
+
+Both are unchanged from P0, as expected: nothing that would move them ran.
+
+**Build** n/a — P1 has none in the plan; also moot, no code changed.
+**Test** n/a — P1 has none in the plan; also moot, no code changed.
+**Review** not run — `aiae-rule-compliance-audit` reviews a diff, and there is none.
+**Verification** `check-agent-surfaces.sh`: `handoff` → `handoff` (no movement);
+`check-installed-documentation-links.py`: 6 → 6 (no movement). Both gates stay exactly where
+P0 measured them, which is the expected/correct outcome for a phase that made no changes.
+**Rollback** n/a — nothing was changed; the branch `mig/p01-agent-surface` holds only this
+log entry.
+
+**Unblocking this requires a decision outside this phase's authority**: whether to
+(a) accept `CLAUDE.md`'s guardrails-block content as the new baseline and regenerate
+`.claude/.aiae-fixtures-manifest`'s `CLAUDE.md` entry to match it (mechanically correct, but
+"do not edit" is written into the file for a reason and no tooling exists to do this
+partially), (b) special-case `CLAUDE.md` out of the managed-root-files check upstream, or
+(c) re-order P0/P1 so the guardrails block is added *after* P1's fixture sync instead of
+before it. This is recorded as a plan defect for the technical owner, not fixed here.
+
+---
+
 ## Carried red assertions
 
 Every phase's evidence must show these unchanged. A count that moves without a decision
