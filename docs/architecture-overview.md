@@ -33,7 +33,7 @@ Platform** and must not be copied into the rule tree.
 
 Liquibase changelogs live at
 `backend/migrations/src/main/resources/db/changelog/`. The Spring property is
-`classpath:db/changelog/db.root-master.xml` — a classpath resource, so it is
+`classpath:db/changelog/db.changelog-master.xml` — a classpath resource, so it is
 unaffected by the module directory name. All 14 changeSets in
 `1.0.0/db.version-master.xml` declare `preConditions` with `onFail="MARK_RAN"`.
 
@@ -209,7 +209,7 @@ Two scheduled jobs run outside any request: `MaterialYoutubeBackfillJob`
 - PostgreSQL is the system of record.
 - `backend/migrations` owns the Liquibase changelogs at
   `backend/migrations/src/main/resources/db/changelog/`. The Spring property
-  `spring.liquibase.change-log: classpath:db/changelog/db.root-master.xml`
+  `spring.liquibase.change-log: classpath:db/changelog/db.changelog-master.xml`
   resolves from the classpath root, not the Maven module directory, so the
   `backend/db` → `backend/migrations` rename did not change the filename
   Liquibase records (§2.1 of the migration plan; confirmed against production
