@@ -140,18 +140,37 @@ Two notes for later, neither blocking:
 - The build emits a **662 kB** `SimpleEditor` chunk (tiptap), over Vite's 500 kB warning
   threshold. Record it as the bundle baseline in P12.
 
+### Frontend product baseline — and the cost of the downgrade
+
+`npm ci && npm test` on the tree as it stands, and the same on the spike copy:
+
+| Toolchain | Tests | Duration |
+|---|---|---|
+| **current** — vite 8.1.4 / vitest 4.1.10 | **22 files, 78 tests, all pass** | **5.6s** |
+| after P12 — vite 5.4.21 / vitest 3.2.7 | 22 files, 78 tests, all pass | **52.1s** |
+
+**Zero test regression** from the downgrade — the same 78 tests pass on both. But the suite
+runs roughly **nine times slower** on the pinned toolchain. Neither source document mentions
+this, and it is a real recurring cost: every phase after P12 pays it on every run, and with
+no CI the local suite is the only thing that runs at all.
+
+Not a reason to reverse the decision — the `vitest ^3.2.6` pin is gate-enforced and the
+template is read-only. It is a reason to raise it upstream: CR-6 was written for a
+compatibility deadlock that did not materialise, and can be **repurposed** to report the
+performance cost of the mandated pin instead of withdrawn outright.
+
 ### Still outstanding in P0
 
 | Step | Status |
 |---|---|
 | 1 — branch `migration` from `1.0.0` | done — `c53a76d`, `adc9f49`, `4d9b187` |
-| 1a — `CLAUDE.md` guardrails | outstanding |
-| 1b — commit-message template | outstanding |
+| 1a — `CLAUDE.md` guardrails | done — `c5cb107` |
+| 1b — commit-message template | outstanding — the evidence-contract trailer is not yet written down |
 | 1c — this log | done |
 | 2 — working-tree state confirmed | done — `backend/db` gone, `backend/migrations` present, Lombok still absent from its POM |
 | 3 — gate baseline | done, above |
 | 3a — R1 query | done, above |
-| 4 — product baseline (`mvn verify`, `npm test`) | **blocked — Maven not installed** |
+| 4 — product baseline | frontend **done** (78/78, above); backend **blocked — Maven not installed** |
 | 5 — send change requests upstream | outstanding — owner's action |
 | 6 — standard checkout reachable at `cc64e49` | done — all required paths present |
 | 7 — R5 spike | **done — variant A passes; CR-6 withdrawn** |
