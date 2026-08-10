@@ -1,0 +1,18 @@
+# Line endings are normalised to LF, in the repository and in the working tree.
+#
+# This is not a style preference. Two things here break under CRLF:
+#
+#   - `.claude/` fixtures are checksummed in `.claude/.aiae-fixtures-manifest`.
+#     CRLF changes the sha256, and `install-managed-claude-fixtures.py` then
+#     aborts with "managed fixture was edited locally; refusing overwrite" —
+#     a message that misdescribes the cause, since git rewrote the files, not
+#     a person. That would block `install-claude-fixtures.sh` permanently.
+#
+#   - `scripts/*.sh` fail on Linux with "bad interpreter" when they carry CRLF.
+#     The AIAE harness adds 22 runtime scripts and 28 checkers to that directory.
+#
+# `core.autocrlf` is true on at least one machine working on this repository,
+# so without this file the next checkout — a branch switch, a `git revert`, a
+# fresh clone — silently converts both sets and breaks them.
+
+* text=auto eol=lf
