@@ -1142,12 +1142,12 @@ splits
 
 ---
 
-### P12 — Frontend tooling and dependency cleanup · **read this before scheduling it**
+### P12 — Frontend tooling and dependency cleanup · *risk retired 2026-08-10*
 
-**This is not a low-risk phase.** The v1 plan labelled it *"low risk, guards the rest"*
-while asking for a three-major-version downgrade. Audit §R5 rates it correctly: a
-**compatibility risk** and a possible *"third deadlock"*, and the one item where *"the
-project may be genuinely ahead of the standard rather than behind it."*
+The v1 plan labelled this "low risk" while asking for a three-major-version downgrade, and
+audit §R5 rated it a **compatibility risk** and possible *"third deadlock"*. **The spike
+settled it: the downgrade works.** Install, build and the full test suite are green on
+`vite 5.4.21` / `vitest 3.2.7`. What remains is ordinary work.
 
 **Measured today:**
 
@@ -1159,11 +1159,14 @@ project may be genuinely ahead of the standard rather than behind it."*
 
 **Steps.**
 
-1. **Apply P0 step 7's answer.** Only the `vitest` pin is gate-enforced. If variant B
-   (`vitest@^3.2.6` + `vite@^6`) passed, take it — the drift on `vite`/`plugin-react` is not
-   gate-enforced and a smaller downgrade is a smaller risk. If only variant A passed, take
-   A. **If both failed, this step stops and CR-6 escalates.** Do not fork the pin locally —
-   that re-creates exactly the drift this migration exists to remove.
+1. **ANSWERED 2026-08-10 — take the standard's pins as written.** The spike ran variant A
+   (`vitest@^3.2.6` + `vite@^5.4` + `@vitejs/plugin-react@^4.3.4`) against a scratch copy of
+   the frontend: install clean, `npm run build` green in 10.2s, **78 tests passing**. Tiptap
+   3.22, `@base-ui/react` and `@tsparticles/confetti` all survive Vite 5. There is no
+   deadlock and **CR-6 is withdrawn**. Variant B was the fallback and was not needed.
+   Run `npm run generate:api` before `npm run build` — the generated schema is gitignored,
+   and without it the build fails with `TS2307` plus a cascade of `TS7006` that looks like a
+   toolchain problem and is not.
 2. ESLint flat config, the `eslint-rules/import-section-order.mjs` rule, a `lint` npm
    script, `scripts/prepare-husky.mjs`, `.husky/pre-commit`. **There is no linting in this
    project at all today** — no `eslint` dependency, no `lint` script, no husky.

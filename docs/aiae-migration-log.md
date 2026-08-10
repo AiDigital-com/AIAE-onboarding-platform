@@ -110,6 +110,36 @@ Running the scanners bare from a scratch directory makes them print
 `verify-gates.sh` — or with explicit source roots, as above — they behave correctly. Do not
 "fix" this.
 
+### R5 spike — answered, and it is not a deadlock
+
+Run 2026-08-10 in a scratch copy of `frontend/`, variant A only.
+
+```
+vitest  ^3.2.6  -> resolved 3.2.7
+vite    ^5.4    -> resolved 5.4.21
+@vitejs/plugin-react ^4.3.4
+```
+
+| Step | Result |
+|---|---|
+| `npm install` | **430 packages, no peer conflicts** |
+| `npm run generate:api` | ok |
+| `npm run build` | **✓ built in 10.23s** |
+| `npm test` | **22 files, 78 tests, all passed** |
+
+Tiptap 3.22, `@base-ui/react` and `@tsparticles/confetti` all work under Vite 5.
+**CR-6 is not needed and should be withdrawn.** P12 takes the standard's pins as written.
+
+Variant B (`vite ^6`) was designed as the fallback if A failed. A did not fail, so B was not
+run — it could only have produced a smaller downgrade nobody now needs.
+
+Two notes for later, neither blocking:
+- The first build attempt failed with `TS2307: Cannot find module './generated/schema'` and a
+  cascade of `TS7006`. That is the gitignored OpenAPI output, not a Vite problem —
+  `npm run generate:api` must precede `npm run build` on any clean tree.
+- The build emits a **662 kB** `SimpleEditor` chunk (tiptap), over Vite's 500 kB warning
+  threshold. Record it as the bundle baseline in P12.
+
 ### Still outstanding in P0
 
 | Step | Status |
@@ -124,7 +154,7 @@ Running the scanners bare from a scratch directory makes them print
 | 4 — product baseline (`mvn verify`, `npm test`) | **blocked — Maven not installed** |
 | 5 — send change requests upstream | outstanding — owner's action |
 | 6 — standard checkout reachable at `cc64e49` | done — all required paths present |
-| 7 — R5 spike, both variants | outstanding |
+| 7 — R5 spike | **done — variant A passes; CR-6 withdrawn** |
 
 ---
 
