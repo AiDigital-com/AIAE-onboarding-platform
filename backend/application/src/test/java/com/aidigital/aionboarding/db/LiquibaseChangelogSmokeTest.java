@@ -9,7 +9,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Smoke-checks that {@code db.root-master.xml} applies cleanly against
+ * Smoke-checks that {@code db.changelog-master.xml} applies cleanly against
  * a real Postgres (Testcontainers). Catches Liquibase XML syntax errors,
  * tier-mismatched constraints, and missing column types BEFORE the migration
  * runs in Replit deployment.

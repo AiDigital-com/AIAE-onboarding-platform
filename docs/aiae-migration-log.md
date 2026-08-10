@@ -1284,6 +1284,269 @@ and `10-architecture.md`: read, confirmed already correct, not edited.
 
 ---
 
+## P5 — `backend/migrations` completion · **COMPLETE**
+
+Completed 2026-08-10 on branch `mig/p05-migrations` (from `migration` @ `4789d1d`).
+
+### Environment
+
+Same shims as P0–P4: `python3` resolved to a real 3.14.5 via a copy on `PATH` ahead of the
+Windows Store stub (`python3 -c "import sys; print(sys.version)"` → `3.14.5`);
+`JAVA_HOME=/c/Users/Admin/.jdks/corretto-21.0.12` and
+`/c/Users/Admin/tools/apache-maven-3.9.16/bin` prepended (`mvn -v` → Java `21.0.12`). Fixture
+manifest re-validated **80/80** before any change and again immediately before this commit.
+
+### Preconditions re-confirmed, not re-litigated
+
+P0 step 3a's production query (§2.1) already returned `db/changelog/1.0.0/db.version-master.xml`
+— the classpath path, carrying neither `backend/db` nor `backend/migrations`. R1 does not exist.
+This phase treats that as settled and does no further production access, per D-B. What follows
+is the mechanical work §2.1/§2.7 describe as safe.
+
+### Step 1 — Lombok added to `backend/migrations/pom.xml`
+
+Added the managed `org.projectlombok:lombok` dependency, unversioned, matching the exact
+pattern already used by `domain` and `event-logging-to-db-feature` (both declare it the same
+way, version resolved from the parent's `dependencyManagement`). This was `structure-lint`'s
+assertion 3 and `verify-gates`'s assertion 9 (see Verification below) — the one genuine defect
+left over from the module rename, exactly as the plan states.
+
+### Step 2 — stale POM header comment fixed
+
+`backend/migrations/pom.xml`'s header comment read *"`application` depends on `db` so
+changelogs land on the classpath..."* — corrected to `migrations`, matching the module's actual
+`artifactId` (unchanged since before P0).
+
+### Step 3 — `.claude/rules/12-database.md` verified, not written
+
+Read in full before touching anything, per the trap. It already reads
+*"New schema changes go through Liquibase under `backend/migrations/src/main/resources/db/changelog`"*
+in its rule body, and its own `paths:` frontmatter scopes to `backend/migrations/**/*` — not
+`backend/db/**`. The fixture install had already restored the AIAE text, exactly as P4's
+equivalent step found for the observability rule files. **Not edited.** `git diff` for this
+commit shows zero lines touched in this file.
+
+### Step 4 — warning comment added to the root changelog
+
+Added an XML comment at the top of (the then-still-named) `db.root-master.xml` stating: filename
+recorded by Liquibase is the classpath path from `spring.liquibase.change-log`; renaming the
+`db/changelog/` **directory** re-runs all 14 changesets against a populated schema; the Maven
+module name is not part of that path; this **file** may be renamed safely because it declares
+zero changesets. Added before the rename in step 5, per the plan's own order.
+
+### Step 5 — the file renamed, the directory untouched, every reference updated
+
+`git mv backend/migrations/src/main/resources/db/changelog/db.root-master.xml
+backend/migrations/src/main/resources/db/changelog/db.changelog-master.xml`. The `db/changelog/`
+**directory** was not touched — confirmed by `git status --porcelain`, which shows exactly one
+`R` (rename) and no directory-level change. `backend/migrations/src/main/resources/db/changelog/1.0.0/`
+and every `sqlFile` path inside it are untouched (confirmed by `git diff` — zero lines in that
+subtree).
+
+Grepped `db.root-master` across the whole repository before and after. Two references sit
+inside `backend/**` and are load-bearing:
+
+| Reference | Action |
+|---|---|
+| `backend/application/src/main/resources/application.yml:75` — `spring.liquibase.change-log: classpath:db/changelog/db.root-master.xml` | Updated to `db.changelog-master.xml` |
+| `backend/application/src/test/java/.../db/LiquibaseChangelogSmokeTest.java:12` — Javadoc `{@code db.root-master.xml}` | Updated to `db.changelog-master.xml` (comment only, no behavior change) |
+
+**Scope gap found and resolved in favor of correctness, not silently.** P5's own Scope block
+lists only `backend/migrations/pom.xml`, `.claude/rules/12-database.md`, and
+`backend/migrations/src/main/resources/db/changelog/` (comment only) — it does not name
+`application.yml` or the test file. But step 5's own instruction text is explicit and
+unconditional: *"update `spring.liquibase.change-log` in
+`backend/application/src/main/resources/application.yml:75` to match. Grep for `db.root-master`
+across the repository first and update every reference."* Leaving `application.yml` unchanged
+would not merely miss a citation — it would break Liquibase resolution outright (verified: see
+the first, failed boot attempt below). Both edits were made; this is the same class of
+Scope-list omission P3 and P4 each found and reported once. Test-file comment included because
+"every reference" does not carve out test sources, and leaving a stale filename in a Javadoc that
+exists specifically to describe this changelog would misinform the next reader.
+
+**Left untouched, and reported rather than silently expanded to cover:** four remaining
+`db.root-master` references, all in documentation outside P5's Scope grant and each covering a
+different kind of drift now introduced by this rename:
+
+| File | Nature |
+|---|---|
+| `docs/architecture-overview.md:36,212` | States the classpath value as current fact; now stale. P3's file, not P5's; not fixed here. |
+| `docs/aiae-migration-plan.md` (multiple) | The plan's own narrative describing the rename it instructs; historical/authoritative text, not this phase's to rewrite. |
+| `docs/aiae-audit.md:124` | Historical audit snapshot of the pre-migration state; correctly still describes what was true then. |
+| `docs/aiae-template-change-requests.md:356` | CR text already sent upstream describing the same layout; not retroactively edited. |
+
+`docs/architecture-overview.md`'s drift is a real, reportable consequence of this phase and is
+flagged here for whoever next opens that file (no phase currently owns re-touching it).
+
+Confirmed separately: none of the 22 runtime scripts or 28 `scripts/lib/` checkers needed any
+change — `structure-lint.sh`, `remove-cache-management.py`, `remove-usage-logging.py`,
+`strip-scaffold-samples.sh`, and the two `test-*.sh` harnesses already hardcode
+`db.changelog-master.xml` (confirmed by grep, none reference `db.root-master`). This is §2.7's
+premise made visible: the harness was already written assuming this rename would happen.
+
+### An environment trap found while proving step 5, not caused by it
+
+The first attempt to boot the app against a live Postgres (`mvn -f backend/application/pom.xml
+spring-boot:run`, no `-am`) failed with `liquibase.exception.ChangeLogParseException: ERROR:
+The file 'classpath:db/changelog/db.changelog-master.xml' was not found.` — not because the
+rename was wrong, but because that single-module invocation resolves the `migrations` module
+dependency from `~/.m2/repository`, which still held the **pre-rename** jar (`db.root-master.xml`
+inside it, timestamped from an earlier phase's `install`). `mvn -f backend/pom.xml clean verify`
+(the phase's own Build/Test command) never touches `~/.m2` — it builds the reactor in place —
+so this trap is specific to any *out-of-reactor* smoke test, not to the phase's required build.
+Fixed by `mvn -f backend/pom.xml clean install -DskipTests` to refresh the local repository with
+the renamed module's jar (confirmed by `unzip -l` before/after: `db.root-master.xml` →
+`db.changelog-master.xml` inside the cached jar), then re-running the single-module boot. Not a
+defect in this phase's change; recorded so the next person proving a resource-path rename this
+way does not lose time to a stale `~/.m2` cache.
+
+### Step 6 — verified against the P0 R1 result, plus an independent green-field apply
+
+**Comparison the plan asks for.** P0's production query (§2.1, confirmed 2026-08-10) returned
+all 14 rows with `filename = db/changelog/1.0.0/db.version-master.xml`. This phase does not
+re-run that query against production (D-B: no deploy, no restore) — it instead booted the
+renamed module against a fresh, empty local Postgres (`docker compose -f docker-compose.yml up
+-d postgres`, confirmed empty via `psql -c '\dt'` → "Did not find any relations" before the app
+started) and read the same table directly:
+
+```
+SELECT orderexecuted, id, author, filename, exectype FROM databasechangelog ORDER BY orderexecuted;
+```
+
+All 14 rows: `filename = db/changelog/1.0.0/db.version-master.xml`, `exectype = EXECUTED`,
+`author = aionboarding`, ids `1.0.0-usage-events` through `1.0.0-pending-uploads` in the same
+order as `1.0.0/db.version-master.xml`'s own changeset order. **Byte-identical to the production
+value P0 recorded.** Neither `backend/db`, `backend/migrations`, `db.root-master`, nor
+`db.changelog-master` appears anywhere in the `filename` column — confirming §2.1/§2.7
+empirically on the post-rename module, not merely by re-reading the same production row P0
+already read.
+
+**Green-field apply (Build/Test block's Testcontainers requirement, executed a different way and
+reported honestly).** `LiquibaseChangelogSmokeTest`'s own Testcontainers instance could not reach
+Docker in this sandbox — `DockerClientFactory`/`NpipeSocketClientProviderStrategy` failed with a
+400 from the named pipe, even though the Docker CLI itself works fine (`docker ps`, `docker
+compose up` both succeed) — so the test **skipped**, not passed (`Tests run: 1, Skipped: 1`, both
+in the full `clean verify` run and in an isolated re-run). This is not the same thing as proof,
+and is reported as such rather than counted as one. Independent proof was gathered instead: with
+the same empty Postgres, `mvn -f backend/application/pom.xml spring-boot:run` (after the `~/.m2`
+fix above) produced
+
+```
+Run:                          14
+Previously run:               0
+Total change sets:           14
+Liquibase: Update has been successful. Rows affected: 41
+```
+
+— a real green-field apply against the renamed classpath resource, from an empty schema, outside
+any test framework. A second boot against the now-migrated schema showed the idempotent path:
+`Run: 0 / Previously run: 14`, `Started Application in 7.74 seconds`, and `curl` confirmed
+`/actuator/health` → 200, `/api/v1/specs/openapi.yaml` → 200, `/swagger-ui/index.html` → 200,
+`/` (SPA) → 200. Both Java processes were killed by image name afterward and
+`docker compose -f docker-compose.yml down -v` removed the container, network, and volume;
+`git status --porcelain` before and after this entire local run is identical except for the
+intended file changes (confirmed above) — no residue.
+
+### Step 6 (second item) — the one sensitive changeset, watched, not touched
+
+`1.0.0-jsonb-array-contains-ci-function` (lines 107–118 of `1.0.0/db.version-master.xml`) is the
+only changeset among the 14 that (a) uses an `sqlCheck` precondition rather than table-existence,
+and (b) carries an explicit `<rollback>`. Confirmed by direct read before and after this phase's
+edits: neither its content, its precondition, nor its rollback changed — `git diff` on
+`1.0.0/db.version-master.xml` is empty (zero lines), matching the plan's Do-not-touch instruction
+exactly.
+
+### Review — `backend-rule-review`
+
+Scope: this phase's diff only. Findings: none blocking. Confirmed: `backend/migrations/pom.xml`
+now declares Lombok, matching every other submodule's pattern (no explicit version, resolved from
+`dependencyManagement`); the changelog **directory** name is unchanged (`git status` shows only a
+file-level rename, `R`, never a directory move); the 14 changesets, their ids, authors, and
+`sqlFile` paths are byte-for-byte unchanged (`git diff` on `1.0.0/db.version-master.xml` and
+`1.0.0/sql/*.sql` is empty); the `.claude/rules/12-database.md` diff is empty. The two edits
+outside the literal Scope list (`application.yml`, the test Javadoc) were reviewed against step
+5's own explicit text and against the necessity that the build actually resolve the renamed
+resource — both are documented above rather than silently absorbed.
+
+### Verification
+
+**`bash scripts/structure-lint.sh`: 16 → 15.** Exactly the one predicted assertion cleared,
+confirmed item-by-item against the before/after failure lists (saved in full): assertion 3,
+`backend/migrations/pom.xml must declare Lombok`, **cleared**. All fifteen assertions the brief
+did not target (the carried `changes/0001-usage-events.xml` failure, the `ehcache.xml`/
+cache-management gap, the 55 thin-controller violations via `check-thin-controllers.py`, the 10
+manual-`new *V1()` mapper findings, and the `Map<String,Object>` service-interface finding)
+reconfirmed unchanged, item-by-item, before → after — no unrelated movement in either direction.
+
+**`bash scripts/verify-gates.sh`: 17 → 16.** Exactly the one predicted assertion cleared:
+`Every Maven submodule must declare Lombok: migrations`, **cleared**. All sixteen remaining
+assertions reconfirmed unchanged by direct comparison of the before/after failure lists,
+including the four carried red assertions: presigned-upload `await fetch(` count is exactly **1**
+per file (`useLessonMutations.ts`, `useMaterialMutations.ts`, reconfirmed by `grep -c`);
+`Frontend must not use a left side menu/sidebar` still fails (assertion 4 in the after-list);
+`check-frontend-ui-rules.sh` untouched by this backend-only phase (no frontend file in this
+diff); `structure-lint`'s `changes/0001-usage-events.xml` assertion still fails (assertion 1 in
+the after-list).
+
+**`check-liquibase-preconditions` (`.sh` + `.py`): 0 → 0, unchanged, as required.** Both report
+`passed` — all 14 changesets still comply; none was touched.
+
+**`mvn -f backend/pom.xml clean verify`: BUILD SUCCESS, 507 tests, 0 failures, 44 skipped**
+(`application` module) — identical to the P0/P2/P3/P4 baseline tracked since P0. Per-module
+reactor results, all green: `domain`, `migrations`, `event-logging-to-db-feature`,
+`observability`, `external-services`, `service`, `application` all `SUCCESS`; `jacoco-check`
+reports "All coverage checks have been met" for `application`. Total reactor time ~2m30s.
+
+**Green-field apply and idempotent re-apply, both independently confirmed** (see Step 6 above):
+14/14 changesets applied to an empty schema; 0/14 on the second boot against the same,
+now-migrated schema; all 14 recorded filenames byte-identical to P0's production R1 result.
+
+**Fixture manifest:** 80/80 before and after; `git diff` touches neither `.claude/**` nor any of
+the four managed root files.
+
+**Build** `mvn -f backend/pom.xml clean verify` → BUILD SUCCESS, 507 tests, 0 failures, 44
+skipped (application module, identical to baseline). Also `mvn -f backend/pom.xml clean install
+-DskipTests` → BUILD SUCCESS (needed only to refresh `~/.m2` for the out-of-reactor boot test,
+see the environment-trap note above; not part of the phase's required build).
+**Test** Full backend suite via `clean verify` (above), `LiquibaseChangelogSmokeTest` **skipped**
+(Testcontainers/Docker-npipe gap in this sandbox, reported honestly, not counted as a pass — see
+above). Independent proof gathered instead: green-field apply (14/0/14) and idempotent re-apply
+(0/14/14) against a real local Postgres via `docker compose` + `spring-boot:run`, both verified
+by direct `databasechangelog` query and by `curl` against four live endpoints (all 200).
+**Review** `backend-rule-review` — no blocking findings; the changelog directory, the 14
+changesets, and `12-database.md` all independently confirmed untouched by diff.
+**Verification** `structure-lint.sh`: **16 → 15** (exactly the one predicted assertion).
+`verify-gates.sh`: **17 → 16** (exactly the one predicted assertion). `check-liquibase-
+preconditions`: **0 → 0**, unchanged. The 14 production filenames from P0 step 3a
+(`db/changelog/1.0.0/db.version-master.xml`) match the post-rename classpath path exactly —
+confirmed against a live local database, not merely re-read from the plan. Fixture manifest:
+**80/80**, unchanged throughout.
+**Rollback** `git revert` on this phase's commit. No out-of-repo action — nothing was deployed;
+the local Postgres container, network, and volume created for the green-field/idempotent checks
+were removed (`docker compose down -v`) before this commit, confirmed by `git status --porcelain`
+showing no residue. Whoever eventually deploys this must still take a `DATABASECHANGELOG` backup
+first, per the plan's own Rollback note — recorded here so it survives to release day.
+
+### What was declined, and what is reported rather than fixed
+
+- **`docs/architecture-overview.md` was not updated**, even though it now states a stale fact
+  (`classpath:db/changelog/db.root-master.xml`). Outside P5's Scope grant (P3's file); flagged
+  above for whoever next opens it, not silently fixed or silently ignored — the same posture P3
+  itself took toward `backend/pom.xml` and `check-maven-dependency-analysis.py`.
+- **`docs/aiae-migration-plan.md`, `docs/aiae-audit.md`, and `docs/aiae-template-change-
+  requests.md` were not edited.** All three are migration-process documents (the plan's own
+  narrative, the pre-migration audit snapshot, and an upstream CR already describing this exact
+  layout) rather than facts about the implemented repository; rewriting them retroactively was
+  judged out of this phase's authority and is reported, not guessed at.
+- **The Testcontainers-based smoke test was not made to pass.** Its Docker-npipe failure is an
+  environment limitation of this sandbox, not a code defect this phase could fix without touching
+  test infrastructure outside its Scope; independent proof was gathered by another route instead
+  (see above) rather than the gap being silently absorbed into a claim that the test "passed."
+- **Movement was exactly the predicted one, in both gates.** No unexplained over- or under-shoot
+  in either `structure-lint.sh` or `verify-gates.sh`.
+
+---
+
 ## Carried red assertions
 
 Every phase's evidence must show these unchanged. A count that moves without a decision
