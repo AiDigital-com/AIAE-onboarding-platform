@@ -1,8 +1,7 @@
-package com.aidigital.aionboarding.external.common.http;
+package com.aidigital.aionboarding.observability.external;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpRequest;
 import org.springframework.http.HttpStatusCode;
@@ -19,8 +18,8 @@ import java.io.IOException;
  * and a coarse outcome so slow/failing downstream providers are visible in Prometheus without
  * per-request log inspection.
  */
-@RequiredArgsConstructor(access = AccessLevel.PACKAGE)
-class ExternalClientMetricsInterceptor implements ClientHttpRequestInterceptor {
+@RequiredArgsConstructor
+public class ExternalClientMetricsInterceptor implements ClientHttpRequestInterceptor {
 
 	private final String clientName;
 	private final MeterRegistry meterRegistry;

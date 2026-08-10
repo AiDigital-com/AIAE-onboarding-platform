@@ -1,10 +1,10 @@
 package com.aidigital.aionboarding.external.storage.config;
 
-import com.aidigital.aionboarding.external.common.http.ExternalCallTimer;
 import com.aidigital.aionboarding.external.storage.StorageClient;
 import com.aidigital.aionboarding.external.storage.impl.CloudFrontUrlSigner;
 import com.aidigital.aionboarding.external.storage.impl.StorageClientImpl;
 import com.aidigital.aionboarding.external.storage.impl.StubStorageClient;
+import com.aidigital.aionboarding.observability.external.ExternalCallTimer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

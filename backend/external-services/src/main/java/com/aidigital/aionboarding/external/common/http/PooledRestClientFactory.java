@@ -1,6 +1,7 @@
 package com.aidigital.aionboarding.external.common.http;
 
 import com.aidigital.aionboarding.external.common.http.config.PooledHttpClientProperties;
+import com.aidigital.aionboarding.observability.external.ExternalClientMetricsInterceptor;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;

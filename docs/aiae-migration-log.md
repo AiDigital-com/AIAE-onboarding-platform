@@ -1070,6 +1070,220 @@ local run were torn down (`docker compose down -v`) before commit.
 
 ---
 
+## P4 — `backend/observability` · **COMPLETE**
+
+Completed 2026-08-10 on branch `mig/p04-observability` (from `migration` @ `7924b8a`).
+
+### Environment
+
+Same shims as P0–P3: `python3` resolved to a real 3.14.5 via a copy on `PATH`
+ahead of the Windows Store stub; `JAVA_HOME=/c/Users/Admin/.jdks/corretto-21.0.12`
+and `/c/Users/Admin/tools/apache-maven-3.9.16/bin` prepended for Maven, both
+verified (`python3 -c "import sys; print(sys.version)"` → `3.14.5`; `mvn -v` →
+Java `21.0.12`). Fixture manifest re-validated **80/80** before any change and
+again immediately before this commit.
+
+### Step 5 checked first, per the brief — already done, verified by reading, not edited
+
+Read `.claude/rules/00-backend-hard-rules.md` and `.claude/rules/10-architecture.md`
+in full before touching anything. Both already state the target shape: the
+former reads *"Reusable outbound metrics live in `backend/observability`, which
+owns `ExternalClientMetricsInterceptor` and `ExternalCallTimer`"*; the latter
+reads *"SDK-managed calls use the reusable `ExternalCallTimer` from
+`backend/observability`."* Neither file was written to. `git diff` for this
+commit touches neither path, confirmed below.
+
+### Steps 1–4 — the module, the move, the dependency edges, the byte-identical registrations
+
+1. Created `backend/observability/pom.xml` (Lombok declared; deps: Lombok,
+   `spring-boot-starter`, `spring-web`, `micrometer-core`, test starter) and
+   added `<module>observability</module>` plus a `dependencyManagement` entry
+   to `backend/pom.xml`, matching the existing pattern for `external-services`.
+2. Moved (via `git mv`, history preserved) `ExternalCallTimer.java` and
+   `ExternalClientMetricsInterceptor.java` from
+   `backend/external-services/.../external/common/http/` to
+   `backend/observability/src/main/java/com/aidigital/aionboarding/observability/external/`.
+   Package declaration updated in both. `ExternalClientMetricsInterceptor` was
+   package-private (`class ExternalClientMetricsInterceptor`,
+   `@RequiredArgsConstructor(access = AccessLevel.PACKAGE)`) because its only
+   caller, `PooledRestClientFactory`, shared its package; now that the caller
+   is in a different module, both the class and its generated constructor
+   were widened to `public` (the minimum change needed to compile across the
+   module boundary) — no other visibility, field, or method changed.
+   `ExternalCallTimer` was already `public` and needed no visibility change.
+   `classifyOutcome` stays package-private per `.claude/rules/00-backend-hard-rules.md`'s
+   "no private methods" rule (unchanged from before the move).
+3. Added the `observability` dependency to `backend/external-services/pom.xml`
+   and `backend/application/pom.xml` (comment cites the hard rule). Updated
+   imports in the four call sites that reference the moved classes:
+   `PooledRestClientFactory.java` (new import for
+   `ExternalClientMetricsInterceptor`), `StorageClientImpl.java`,
+   `StorageConfig.java`, and the test `StorageClientImplTest.java` (all three
+   for `ExternalCallTimer`). Every edit is import-line-only, kept in
+   alphabetical position; no method body changed.
+4. **Verified the four `PooledRestClientFactory` registration expressions are
+   byte-identical**, at their original lines 68–69 and 113–114 (now 69–70 and
+   114–115, shifted by exactly the one inserted import line):
+   ```
+   .requestInterceptor(new ExternalClientMetricsInterceptor(name, meterRegistry))
+   .requestInterceptor(new LogbookClientHttpRequestInterceptor(logbook))
+   ```
+   (both factory methods). `git diff` on that file shows exactly one added
+   import line and nothing else.
+
+### Do-not-touch list confirmed undisturbed
+
+Grepped for all six do-not-move classes
+(`PerformanceMetricsFilter`, `RequestAuthenticationCacheFilter`,
+`IntegrationHealthIndicator`, `ByteCountingResponseWrapper`,
+`CountingServletOutputStream`, `MetadataOnlyHttpLogFormatter`): all six remain
+under `backend/application`, none touched. `git status --porcelain` for this
+commit lists exactly: `backend/pom.xml`, `backend/application/pom.xml`,
+`backend/external-services/pom.xml`, `backend/observability/pom.xml` (new),
+the two moved files (renamed, tracked by git as `R`), and the four import-only
+edits (`PooledRestClientFactory.java`, `StorageClientImpl.java`,
+`StorageConfig.java`, `StorageClientImplTest.java`). Nothing under
+`.claude/**` or the four managed root files appears in the diff.
+
+### Metric names — confirmed unchanged by reading, not by a live `/actuator/prometheus`
+
+No `/actuator/prometheus` endpoint was reachable in this environment, so the
+before/after comparison below is a direct code diff, not a live scrape — recorded
+honestly rather than claimed as verified in production. `git diff` on both moved
+files shows only the package line, `ExternalClientMetricsInterceptor`'s
+visibility, and (for the interceptor) the removed unused `AccessLevel` import —
+no change to any string literal. Both emitted timer names, tag keys, and tag
+values are identical before → after:
+
+| Class | Timer name | Tags |
+|---|---|---|
+| `ExternalClientMetricsInterceptor` | `external.client.requests` | `client`, `outcome` (`success`/`client_error`/`server_error`/`io_error`) |
+| `ExternalCallTimer` | `external.client.requests` | `client`, `operation`, `outcome` (`success`/`error`) |
+
+**Gap found, not fixed, reported instead of silently absorbed:** neither class
+had a dedicated unit test before this phase (their only exercise was indirect —
+`PooledRestClientFactoryTest` constructs `ExternalClientMetricsInterceptor` via
+`factory.createClient(...)` but never issues a request through it, and
+`StorageClientImplTest` mocks `ExternalCallTimer` — so `intercept()`,
+`classifyOutcome()`, and `record()` had no line coverage from either test
+before or after the move). This phase did not add one — writing new tests
+purely to raise coverage is P9/P15's assigned ground (D-C), and inventing an
+assertion here to "prove" the metric name would be exactly the
+assertion-for-its-own-sake pattern the guardrails forbid. So the claim above is
+a code-diff comparison, stated as such, not a test-backed one.
+
+**A related side effect, also found and reported, not fixed:** with zero test
+classes under `backend/observability/src/test`, `jacoco:check` printed
+*"Skipping JaCoCo execution due to missing execution data file"* for that
+module and passed — not because 0.80 LINE was met, but because the JaCoCo
+Maven plugin no-ops entirely when no `jacoco.exec` exists. This is a
+pre-existing behavior of the plugin, not something this phase introduced, and
+the two moved classes had the same effectively-uncovered status inside the
+37-class `external-services` bundle before the move (masked by that module's
+aggregate 0.8066 LINE ratio, per the P0 baseline). Isolating them into their
+own module made the gap visible instead of averaged away, but did not create
+it. Filed here for whichever phase next touches coverage (P9/P15); not acted
+on, per this phase's Scope.
+
+### Review — `backend-rule-review`
+
+Scope: this phase's diff only. Findings: none blocking. Confirmed against
+`.claude/rules/00-backend-hard-rules.md` and `10-architecture.md`: the new
+module declares Lombok (hard rule for every submodule); the four registration
+literals are untouched; `ExternalClientMetricsInterceptor`/`ExternalCallTimer`
+now exist only under `backend/observability` (grep across
+`backend/{application,service,domain,external-services}/src/main/java`
+returns zero matches for `class\s+(ExternalClientMetricsInterceptor|ExternalCallTimer)\b`);
+`backend/observability/pom.xml` declares no dependency on
+`application`/`service`/`domain`/`migrations`/`external-services` (confirmed by
+grep — it depends only on Spring Boot/Micrometer/Lombok), keeping it a true
+leaf module as `structure-lint.sh`'s own reusability assertion requires.
+
+### Verification
+
+**`bash scripts/structure-lint.sh`: 23 → 16.** Exactly the seven predicted
+assertions cleared, confirmed item-by-item against the before/after failure
+lists:
+
+| # (before) | Assertion | After |
+|---|---|---|
+| 1 | `backend/observability/` missing | **cleared** |
+| 2 | `backend/observability/pom.xml` missing | **cleared** |
+| 3 | `backend/pom.xml` must list required module: observability | **cleared** |
+| 6 | `application/pom.xml` must attach the reusable external metrics module | **cleared** |
+| 7 | observability must own `ExternalClientMetricsInterceptor` | **cleared** |
+| 8 | observability must own `ExternalCallTimer` | **cleared** |
+| 9 | `ExternalClientMetricsInterceptor`/`ExternalCallTimer` belong only in `backend/observability` | **cleared** |
+
+All sixteen assertions the brief did not target (the `event-logging`/usage-events
+carried failure, `ehcache.xml`/cache-management, `migrations` Lombok, the 55
+thin-controller violations, the 10 manual-`new *V1()` mapper findings, and the
+`Map<String,Object>` service-interface finding) reconfirmed unchanged,
+item-by-item, before → after — no unrelated movement in either direction.
+
+**`bash scripts/verify-gates.sh`: 17 → 17, unchanged, as required.** The two
+assertions concerning the interceptor registrations
+(`grep -Fq 'new ExternalClientMetricsInterceptor(name, meterRegistry)'` and
+`grep -Fq 'new LogbookClientHttpRequestInterceptor(logbook)'` against
+`PooledRestClientFactory.java`) were passing before this phase and confirmed
+still passing after — neither appears in the 17-item failure list, before or
+after. All four carried red assertions reconfirmed unchanged: presigned-upload
+`await fetch(` count is exactly **1** per file
+(`useLessonMutations.ts`, `useMaterialMutations.ts`); the sidebar assertion
+still fails; `check-frontend-ui-rules.sh` untouched by this backend-only phase
+(not re-run — no frontend file in this diff); `structure-lint`'s
+`changes/0001-usage-events.xml` assertion still fails (item 1 in the post-move
+16-failure list).
+
+**`mvn -f backend/pom.xml clean verify`: BUILD SUCCESS, 507 tests, 0 failures,
+44 skipped** — identical to the P0/P2/P3 baseline (`application` module, the
+figure this log has tracked since P0). Per-module reactor results, all green,
+none regressed: `domain` 2/0/0, `event-logging-to-db-feature` 48/0/0,
+`observability` 0 tests (new, empty — see the coverage-gap note above),
+`external-services` **174/0/0** (down from 37 to 35 analyzed classes —
+consistent with exactly the two moved classes leaving; `jacoco-check` still
+reports "All coverage checks have been met"), `service` 1131/0/0, `application`
+507/0/44 (`jacoco-check`: "All coverage checks have been met", 118 classes).
+Total wall time 2m35s.
+
+**Fixture manifest:** 80/80 before and after; `git diff` touches neither
+`.claude/**` nor any of the four managed root files.
+
+**Build** `mvn -f backend/pom.xml clean install -DskipTests` → BUILD SUCCESS
+(compile-only check run first); `mvn -f backend/pom.xml clean verify` → BUILD
+SUCCESS, 507 tests, 0 failures, 44 skipped (application module, matching
+baseline exactly); no other module regressed (all green, counts above).
+**Test** Full backend suite via `clean verify` (above). No
+`/actuator/prometheus` scrape was possible in this environment — metric-name
+equivalence is a code-diff comparison, stated as such (see above), not a live
+verification.
+**Review** `backend-rule-review` — no blocking findings; leaf-module dependency
+shape and the four registration literals independently confirmed by grep (see
+above).
+**Verification** `structure-lint.sh`: **23 → 16** (exactly the seven predicted
+assertions, confirmed item-by-item). `verify-gates.sh`: **17 → 17**, unchanged,
+including the two interceptor-registration assertions, which continue to pass.
+Fixture manifest: **80/80**, unchanged throughout. `.claude/rules/00-backend-hard-rules.md`
+and `10-architecture.md`: read, confirmed already correct, not edited.
+**Rollback** `git revert` on this phase's commit. No out-of-repo action.
+
+### What was declined, and what is reported rather than fixed
+
+- **No unit test was added for `ExternalCallTimer`/`ExternalClientMetricsInterceptor`.**
+  Neither had one before this phase; adding one now would be coverage work
+  reserved for P9/P15 under D-C, and an assertion added only to justify a
+  claim in this log would be the exact "assertion-free/gap-filling" pattern
+  `.claude/rules/20-tests.md` and the guardrails forbid. Reported as a gap
+  instead (see "Metric names" above), not silently fixed or silently ignored.
+- **The `jacoco:check` no-op on a zero-test module was not worked around.**
+  It is a pre-existing plugin behavior, not introduced by this phase, and
+  "fixing" it (e.g. by adding a throwaway test) would be the same
+  assertion-for-its-own-sake problem. Filed for a future coverage phase.
+- **Movement was exactly the predicted seven, in both gates.** No unexplained
+  over- or under-shoot to account for.
+
+---
+
 ## Carried red assertions
 
 Every phase's evidence must show these unchanged. A count that moves without a decision

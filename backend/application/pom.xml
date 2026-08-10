@@ -42,6 +42,13 @@
 			<artifactId>migrations</artifactId>
 		</dependency>
 
+		<!-- Reusable outbound metrics: ExternalClientMetricsInterceptor,
+			 ExternalCallTimer (see .claude/rules/00-backend-hard-rules.md). -->
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>observability</artifactId>
+		</dependency>
+
 		<!-- Web + security + AOP + actuator -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

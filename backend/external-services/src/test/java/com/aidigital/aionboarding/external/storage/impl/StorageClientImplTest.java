@@ -1,9 +1,9 @@
 package com.aidigital.aionboarding.external.storage.impl;
 
-import com.aidigital.aionboarding.external.common.http.ExternalCallTimer;
 import com.aidigital.aionboarding.external.storage.StorageExternalException;
 import com.aidigital.aionboarding.external.storage.config.StorageProperties;
 import com.aidigital.aionboarding.external.storage.models.ObjectMetadataRecord;
+import com.aidigital.aionboarding.observability.external.ExternalCallTimer;
 import org.instancio.Instancio;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

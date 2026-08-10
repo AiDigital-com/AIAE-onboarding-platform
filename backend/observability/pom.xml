@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Reusable outbound-observability module. Owns ExternalClientMetricsInterceptor
+  and ExternalCallTimer — the two classes that record the shared
+  `external.client.requests` timer for every outbound HTTP client and SDK call.
+
+  Leaf module, by design: it must stay dependency-free of every other internal
+  module (domain/service/application/migrations/external-services) so both
+  `external-services` (Spring HTTP clients) and `application` (SDK-managed
+  calls, e.g. AWS S3) can depend on it without a cycle.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>com.aidigital.aionboarding</groupId>
+		<artifactId>app-parent</artifactId>
+		<version>1.0.0</version>
+		<relativePath>../pom.xml</relativePath>
+	</parent>
+	<artifactId>observability</artifactId>
+	<name>AIAE Onboarding Platform — observability</name>
+
+	<!-- Leaf module. Depends on Spring web/context + Micrometer only. NO other
+		 internal module (see structure-lint.sh). -->
+	<dependencies>
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-web</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-core</artifactId>
+		</dependency>
+
+		<!-- Test scope -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+</project>
