@@ -16,7 +16,7 @@ log.
 | | Decision | Settled as |
 |---|---|---|
 | **D-A** | Scope | Converge the engineering contract. **Do not touch how the product looks or navigates** — MUI/Emotion, the CSS, the left sidebar and all 12 routes stay. Four gates therefore stay red permanently, annotated, never silenced |
-| **D-B** | Production access | No deploy, no restore. **One read query** against `databasechangelog` (§2.1), run in P0 step 3a, settles P5 |
+| **D-B** | Production access | No deploy, no restore. One read query against `databasechangelog` — **run 2026-08-10, R1 disproved, P5 cleared** (§2.1) |
 | **D-C** | Coverage | Target **0.80 LINE / 0.70 BRANCH is fixed** and is a hard P15 exit condition. Only the path is relaxed: `mvp` 0.30/0.25 between P9 and P15 |
 | **D-D** | Usage telemetry | **Kept.** `backend/event-logging-to-db-feature` stays; `prepare-engineering-handoff.sh` is never run (P15 step 3a); `.template-phase` still reaches `engineering` |
 | **D-E** | Multi-node | Planned, not live. P6 and P7 are **preparation**, and their tests are the only proof they work |
@@ -152,7 +152,12 @@ after the rename.
 `changelogSync` decision in v1 §7 item 7 is withdrawn — it chose between two mitigations
 for a non-risk.
 
-**Confirm it empirically before P5 — one query, no restore needed.** Against production:
+**CONFIRMED EMPIRICALLY 2026-08-10.** The query below was run against production and
+returned `db/changelog/1.0.0/db.version-master.xml` — the classpath path, carrying neither
+`backend/db` nor `backend/migrations`. **R1 does not exist. P5 is cleared to proceed, with
+no `logicalFilePath` pin and no `changelogSync`.**
+
+The query, kept for the record and for re-running before P5 lands:
 
 ```sql
 SELECT orderexecuted, id, author, filename, exectype
@@ -160,10 +165,10 @@ FROM databasechangelog
 ORDER BY orderexecuted;
 ```
 
-Expect **14 rows**, and the `filename` column to read `db/changelog/1.0.0/db.version-master.xml`
-— the classpath path, with no `backend/db` or `backend/migrations` in it. That result proves
-this section. If instead the filenames contain a module directory, **§2.1 is wrong, R1 is
-real, and P5 stops** until the mitigation is redesigned. P0 step 3a runs it.
+Expected — and observed — 14 rows all carrying
+`filename = db/changelog/1.0.0/db.version-master.xml`. Had the filenames contained a module
+directory, §2.1 would have been wrong, R1 real, and P5 stopped until the mitigation was
+redesigned. They did not.
 
 **What is actually dangerous, and is not in either source document:** renaming the
 *resource* directory `src/main/resources/db/changelog/`. That changes the classpath path
@@ -356,6 +361,41 @@ lists it, `service/pom.xml` attaches it, `UsageEventPersistenceService` carries
 `UsageLoggingAspect` has no `@Transactional`, and `UsageEventEntity.attributes` is
 `@JdbcTypeCode(SqlTypes.JSON) Map<String, Object>` (lines 77-78).
 
+### 2.8 `.claude/**` must never be line-ending normalised
+
+Found 2026-08-10 by breaking it. Recorded so the next person does not repeat it.
+
+Every file under `.claude/` is checksummed in `.claude/.aiae-fixtures-manifest`, and
+`scripts/lib/install-managed-claude-fixtures.py:141` aborts the entire install with
+
+> `managed fixture was edited locally; refusing overwrite: <path>`
+
+on any hash mismatch. **There is no override flag** — it is a bare `SystemExit`. And the
+message misdescribes the cause when git did the rewriting rather than a person.
+
+**The manifest is mixed, and this is not a defect you can fix locally.** The standard
+checkout on a Windows machine carries CRLF. `install-claude-fixtures.sh` copies most
+fixtures verbatim — those arrive CRLF and are hashed CRLF — while the files it passes
+through `rewrite-installed-documentation-paths.py` are written by Python and come out LF.
+Measured here: **50 entries hashed as CRLF, 30 as LF**. No single line-ending policy
+satisfies that, so git must apply none.
+
+`.gitattributes` therefore reads:
+
+```
+* text=auto eol=lf
+.claude/** -text
+```
+
+The default is deliberate — `scripts/*.sh` fail on Linux with `bad interpreter` under CRLF,
+and P2 adds 50 more shell files there. The exemption is equally deliberate: `-text` stores
+and restores `.claude/**` byte-for-byte as the installer wrote it.
+
+**Do not "tidy" the exemption.** Normalising `.claude/**` in either direction breaks the
+manifest and blocks `install-claude-fixtures.sh` permanently — which P1 step 1 depends on.
+Anyone who runs `git add --renormalize .` across the whole tree, or drops the second line
+while cleaning up, reproduces this.
+
 ## 3. Ground rules
 
 **Evidence contract.** Every phase appends a row to `docs/aiae-migration-log.md` in the
@@ -429,6 +469,10 @@ of the plan depends on (the R5 spike).
    P1 step 1 overwrites `CLAUDE.md` and already instructs re-applying the project
    paragraphs — this block is one of them.
 
+   **Include the line-ending guardrail:** never normalise `.claude/**`, never run
+   `git add --renormalize` across the whole tree, and never remove `.claude/** -text` from
+   `.gitattributes` — §2.8 explains what breaks and how the failure misreports itself.
+
    **Include the task-artifact override.** `.claude/tasks/README.md` documents the workflow
    artifacts as `review-report.md` and `test-report.md`; the `task-workflow` skill actually
    writes `review.md` and `verification.md`. Both files ship from the template, so this is an
@@ -451,13 +495,17 @@ of the plan depends on (the R5 spike).
    Verify only that `backend/migrations/pom.xml` still lacks Lombok (it does — it declares
    `liquibase-core` alone); P5 adds it.
 3. Copy the gate suite from the standard into a scratch directory and run it against the
-   tree unmodified. Record every count in `docs/aiae-migration-log.md` as the **tracking
+   tree unmodified. **First make `python3` resolve to a real Python** — see the environment
+   section of the log. Ten checkers and `verify-gates.sh` invoke `python3` internally, so
+   this cannot be fixed from the call site, and without it they exit 0 having read nothing.
+   Pass explicit source roots to the production scanners, as `verify-gates.sh` does; bare
+   invocation makes them scan the scaffold they live in, not this project. Record every count in `docs/aiae-migration-log.md` as the **tracking
    baseline**. Use an explicit interpreter for the Python gates — `python3` here resolves
    to the Windows Store stub and silently no-ops.
-3a. **Settle R1 with one query against production** — the `databasechangelog` statement in
-   §2.1. Record all 14 `filename` values in the log verbatim. This is the single highest-value
-   measurement in P0: it either proves §2.1 and clears P5, or it invalidates §2.1 and stops
-   P5 before any module work begins. It needs read access to production, nothing more.
+3a. **DONE 2026-08-10 — R1 settled.** The `databasechangelog` query in §2.1 was run against
+   production and returned `db/changelog/1.0.0/db.version-master.xml`. §2.1 is confirmed and
+   P5 is cleared. Copy the result into the log verbatim; the only thing left to note is the
+   row count, which should read 14 and is a secondary check, not a gate.
 4. Record the product baseline: `mvn -f backend/pom.xml -Phandoff verify` and
    `cd frontend && npm test`, with counts. Note that `-Phandoff` is inert (§2.3) and the
    effective floor is the hardcoded 0.80 LINE — **record that it currently passes**.
@@ -501,6 +549,13 @@ of the plan depends on (the R5 spike).
    `.agents/`, `AGENTS.md`, `replit.md`; restore the two deleted header sentences; add
    `.claude/tasks/*` + `!.claude/tasks/README.md`. Leave `templates/` and
    `custom_instruction/` alone — already correct.
+0a. **Validate the fixture manifest before touching anything.** For every
+   `path<TAB>sha256` line in `.claude/.aiae-fixtures-manifest`, hash the file on disk and
+   compare. **80 of 80 must match.** If any do not, stop — step 1 will abort with
+   *"managed fixture was edited locally"*, and that message will point you at the wrong
+   cause. The usual real cause is line-ending normalisation; see §2.8 before doing anything
+   else, and check `git check-attr text eol -- .claude/agent_docs/agent-operating-model.md`
+   reports `-text`.
 1. Re-run `bash scripts/install-claude-fixtures.sh <project>` from the standard checkout
    to bring the installed fixtures to `cc64e49` and let it rewrite doc citations.
    **It overwrites `CLAUDE.md`** — re-apply the project-specific paragraphs afterwards.
@@ -711,9 +766,9 @@ before → after.
 
 ### P5 — `backend/migrations` completion · *data risk, disproved but verified* · **human**
 
-**Preconditions.** P4 merged. **P0 step 3a's `databasechangelog` query returned
-classpath-form filenames** — if it did not, §2.1 is invalid, R1 is real, and this phase does
-not start.
+**Preconditions.** P4 merged. P0 step 3a is **already satisfied**: the production
+`databasechangelog` query returned `db/changelog/1.0.0/db.version-master.xml` on 2026-08-10,
+so §2.1 holds and this phase is cleared.
 
 **Nothing is deployed here**, and no database restore is required (§6.1 D-B). The phase
 produces a commit on `migration` like any other; what made it look dangerous — R1 — was
@@ -918,7 +973,12 @@ or YouTube call (`14-performance.md`).
    plus `error/mapper/GlobalExceptionResponseHelper` and its `Impl`, so the handler holds
    no private helpers. The scaffold files are drop-in references.
 2. Split `service/common/time/CurrentTime` — currently a single file with no `Impl` — into
-   an interface plus `CurrentTimeImpl` that owns the `now()` calls.
+   an interface plus `CurrentTimeImpl` that owns the `now()` calls. That clears the two
+   violations at `CurrentTime.java:21` and `:30`.
+2a. **Third violation, in a file the v1 plan never mentioned.**
+   `external/storage/impl/CloudFrontUrlSigner.java:56` calls
+   `Instant.now().plus(expiresIn)` directly. Inject `CurrentTime` and use it. Measured
+   2026-08-10: the gate reports **3**, not the 2 both source documents claimed.
 3. Move the `MultipartFile` import out of `UploadValidator` — the only place a service
    imports a web API.
 4. **Upload content verification — read §2.4 first. The v1 instruction was wrong, and this
@@ -953,7 +1013,7 @@ or YouTube call (`14-performance.md`).
 upload declared as `image/png` is either rejected at presign or not served as
 `image/svg+xml`.
 **Review** `backend-rule-review`
-**Verification** `check-production-current-time.sh` 2 → 0; the handler contains no private
+**Verification** `check-production-current-time.sh` **3** → 0 (measured, see log); the handler contains no private
 methods; the SVG test fails before the change and passes after.
 **Rollback** `git revert`.
 
@@ -974,7 +1034,9 @@ live, not dead.**
 1. **Measure first**, with the seven hand-written excludes removed and the check skipped.
    `**/models/**`, `**/entities/**`, `**/repositories/**`, `**/config/**`,
    `**/*Entity.class`, `**/*Exception.class`, `**/*_.class` have never been counted.
-   Record line and branch coverage against the new denominator.
+   Record line and branch coverage against the new denominator. **Blocked until Maven is
+   available** — it is not installed on the machine that produced the P0 baseline, so this
+   measurement is still outstanding and P9 cannot start without it.
 2. **Record in the log, explicitly:** the effective floor today is a hardcoded
    `0.80` LINE (`pom.xml:308`), CI runs it, and it passes. Moving to `mvp` (0.30/0.25)
    **lowers a floor the project currently clears**, deliberately and temporarily — see
