@@ -1043,16 +1043,26 @@ live, not dead.**
    §6.1 D-C. Write down both numbers: the measured coverage against the new wide
    denominator, and the gap to 0.80/0.70. That gap is the size of the P15 job, and knowing
    it here is what stops P15 from being a surprise.
-3. Move `0.80` / `0.70` into `<properties>`; wire **both** limits to those properties;
-   **add the missing BRANCH limit**.
+3. Move `0.80` / `0.70` into the parent `<properties>`; wire **both** limits to those
+   properties; **add the missing BRANCH limit**. These are the strict values and they apply
+   to every module by default — see §6.1 D-C.
 4. Delete the seven hand-written excludes, keeping only the three `**/api/v1/**` generated
    ones. Delete from **both** the `report` and `check` blocks — the duplication is why the
    gate reports more problems than there are excludes.
-5. Replace the `handoff` profile with `mvp` (0.30/0.25). Note `-Phandoff` is currently a
-   no-op: it sets two properties nothing reads.
-6. **Same commit**: commit `.template-phase` = `mvp` and drop `-Phandoff` from CI, so the
-   relaxed floor applies the moment the properties become live (R2). Splitting these turns
-   CI red between merges.
+5. **Override the floor in exactly two places, not globally.** `-Phandoff` is currently a
+   no-op — it sets two properties nothing reads — so replacing it wholesale is not needed.
+   Instead, in `backend/domain/pom.xml` and `backend/external-services/pom.xml`, override
+   `jacoco.branch.coverage` (and for `domain`, `jacoco.line.coverage`) to the measured
+   current values, with a comment naming this decision and the date. Every other module runs
+   strict from this commit.
+
+   Measured starting points, for the comments: `domain` 0.0236 / 0.0714;
+   `external-services` branch 0.6978. Set the floors at those values, so the modules cannot
+   regress further while their gap is being closed.
+6. **Same commit**: commit `.template-phase` (`check-coverage-integrity.sh` requires the
+   file to exist and hold a known value) and drop `-Phandoff` from the CI invocation, so the
+   new floors apply the moment the properties become live. Splitting these leaves the build
+   red between commits.
 
 **Build** `mvn -f backend/pom.xml clean verify` with no flags
 **Test** Full suite; record real line and branch coverage against the new denominator.
@@ -1061,9 +1071,10 @@ live, not dead.**
 under `-Pmvp`; the log carries the step-2 note.
 **Rollback** `git revert` restores `handoff`.
 
-> **Exit** — coverage integrity zero, the real coverage number is known and written down,
-> and the log states plainly that the LINE floor was temporarily lowered from a level the
-> project already met.
+> **Exit** — coverage integrity zero; three of five modules enforced at the full 0.80/0.70
+> from this commit; `domain` and `external-services` pinned at their measured values so they
+> cannot regress; and the log names the two overrides, their reason and their removal
+> condition.
 
 ---
 
@@ -1317,70 +1328,46 @@ additionally prove the app starts clean against live data. If the query returns 
 form the marginal value is low, and the log records that this second-order check was skipped
 deliberately rather than forgotten.
 
-**D-C — The path to coverage, not the target.**
+**D-C — The path to coverage: relax per module, not globally.** *(revised 2026-08-10 on
+measured data)*
 
-**The target is fixed and not in question: 0.80 LINE / 0.70 BRANCH, enforced, with the seven
-hand-written excludes gone and BRANCH gated for the first time.** That is a hard P15 exit
-condition — P15 does not close below it. What is being decided here is only how to get
-there.
+**The target is fixed: 0.80 LINE / 0.70 BRANCH, with the seven hand-written excludes gone
+and BRANCH gated for the first time.** Hard P15 exit condition. What is decided here is only
+how the tree gets there.
 
-Two paths:
+The original decision was to drop every module to `mvp` 0.30/0.25 between P9 and P15,
+because the climb was assumed to be large. **Measurement showed it is not.** With the
+excludes removed:
 
-| | Hold 0.80 throughout | Relax to 0.30/0.25, climb back in P15 |
-|---|---|---|
-| Denominator widens in P9 | Every phase after P9 must carry the new, larger denominator at 0.80 | Widened immediately, floor climbs later |
-| P10 / P11 | Each refactor blocked until tests cover code that is about to move again | Refactor first, cover the settled shape once |
-| Risk | Slower, and encourages tests written to pass a gate rather than to catch defects | If the migration stalls mid-way, the enforced floor sits at 0.30 until it resumes |
+| Module | LINE | BRANCH | |
+|---|---|---|---|
+| `application` | 0.8626 | 0.7110 | already passes |
+| `event-logging-to-db-feature` | 0.9526 | 0.7778 | already passes |
+| `service` | 0.8420 | 0.7075 | already passes |
+| `external-services` | 0.8066 | **0.6978** | branch short by 0.0022 |
+| `domain` | **0.0236** | **0.0714** | untested |
 
-**Decision: relax during the migration.** P11 alone splits 5 oversized services and moves 55
-controller violations; writing coverage for that code before it settles means writing it
-twice. Note this cuts the other way too — today's 0.80 is measured against a *narrow*
-denominator that hides `models`, `entities`, `repositories` and `config`, so it is not the
-same 0.80 the target means.
+**Decision: hold 0.80/0.70 everywhere it already holds; relax only where it does not.**
+`domain` and `external-services`' branch limit get scoped, temporary floors with the reason
+recorded in their own POMs. Everything else is strict from P9 onward.
 
-*What you are accepting:* an exposure window, not a lower outcome. Between P9 and P15 the
-enforced line floor is 0.30. P9 step 2 and the P15 exit both record the real number so the
-window is visible and bounded.
+*Why the original shape was wrong:* a global 0.30 would have let the three passing modules
+regress by fifty points across P10 and P11 — the largest refactors in the plan — with no
+gate objecting. That is the exact risk D-C existed to manage, and the global relaxation
+created it rather than containing it.
 
-**D-D — Usage telemetry stays.**
+*What this costs:* it **diverges from the standard's phase model**, which expects one
+project-wide flag (`.template-phase` plus `-Pmvp` = 0.30/0.25 for everything). Per-module
+floors are not something that model expresses. Record the divergence in the log, and raise
+it upstream: a brownfield project with one weak module should not have to choose between
+lying about four healthy ones and blocking on the fifth.
 
-`backend/event-logging-to-db-feature` is fully implemented — `UsageEventEntity`,
-`PostgresUsageLogger`, `UsageEventPersistenceService`, a PostgreSQL sink. **Decided
-2026-08-10: it is kept.**
-
-`CLAUDE.md` says the module is intentionally absent after engineering handoff *"unless the
-project explicitly chooses a production analytics design"* — this decision is that explicit
-choice, and it is recorded here for the same reason D1's navigation sign-off was recorded:
-so the compliance argument survives with the code.
-
-*The consequence, which is not obvious:* the standard **couples** the engineering phase to
-removing telemetry. `prepare-engineering-handoff.sh` deletes the module at line 174 and
-then hard-fails at line 282 if it survives. So that script can never pass on this project
-and **is never run** (P15 step 3a). `.template-phase` still moves to `engineering`, because
-that is what enforces the 0.80/0.70 floor and is independent of the script.
-
-**Second consequence, found on inspection:** the gates check a *present* telemetry module
-against a changelog layout this project does not use. Five of six requirements already pass;
-the sixth — `db/changelog/changes/0001-usage-events.xml` — cannot be satisfied without
-re-declaring an already-applied changeset, so it becomes the fourth carried red assertion
-(§2.7). The engineering *phase* itself is unaffected: `.template-phase` is read only by the
-coverage tooling, and no gate ties it to telemetry.
-
-This coupling is worth reporting upstream: a project that wants production analytics is
-forced to either stay at `mvp` forever or diverge from the handoff path. It is the same
-shape as CR-1 and CR-2 — a tool encoding a default the rules themselves allow you to
-decline.
-
-**D-E — Multi-node is planned, not live.**
-
-The deployment runs a single node today; more are expected. **Decided 2026-08-10: build for
-it now.** P6 (cross-node cache invalidation) and P7 (job coordination) are therefore
-*preparation*, and both phases now say so rather than implying a live defect.
-
-*What this buys:* adding the second node becomes a deployment decision instead of a
-correctness event — no duplicated YouTube quota spend, no duplicated S3 deletes, no stale
-L2 reads. *What you are accepting:* the work lands before anything depends on it, and its
-tests are the only proof it works, since a single node cannot exercise it.
+*Still open, and it belongs before P9 rather than inside P15:* what happens to `domain`.
+Three shapes — write real tests (entity `equals`/`hashCode` contracts and Testcontainers
+repository tests, both already achievable here); keep the `entities`/`repositories` excludes
+and diverge deliberately with a CR; or give `domain` a permanent lower floor with a recorded
+reason. The scoped relaxation above makes this a P15 question instead of a P9 blocker, but
+it does not answer it.
 
 ### 6.2 What this does not ask you for
 
