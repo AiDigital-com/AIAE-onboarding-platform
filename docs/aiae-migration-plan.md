@@ -1066,6 +1066,26 @@ live, not dead.**
 
 **Steps.**
 
+0a. **Find every module that passes by not being measured.** `jacoco:check` does not fail a
+   module with no execution data — it logs "missing execution data file" and no-ops. A module
+   with zero tests therefore clears any floor for free, and D-C's per-module model silently
+   inherits that. Known case: `backend/observability`, created in P4 with no tests. Check the
+   rest; `migrations` carries no Java at all and is legitimately exempt.
+
+0b. **Write the `observability` tests before setting its floor, not after.** Two classes with
+   clear contracts, both testable on a `SimpleMeterRegistry`:
+   `ExternalCallTimer` — metric name and the `client`/`operation`/`outcome` tags, including
+   that a thrown exception still records `outcome=failure`; and
+   `ExternalClientMetricsInterceptor` — `external.client.requests` with `client`/`outcome`.
+
+   This is not coverage for its own sake: P4's exit criterion was "metric names unchanged",
+   and it is currently backed only by reading a diff. A test makes it survive the next person
+   who touches those classes.
+
+   **Order matters.** Adding the first test switches the module from unmeasured to measured.
+   Do it before step 3 sets strict defaults, or the build fails at the moment someone does the
+   right thing.
+
 1. **Measure first**, with the seven hand-written excludes removed and the check skipped.
    `**/models/**`, `**/entities/**`, `**/repositories/**`, `**/config/**`,
    `**/*Entity.class`, `**/*Exception.class`, `**/*_.class` have never been counted.
