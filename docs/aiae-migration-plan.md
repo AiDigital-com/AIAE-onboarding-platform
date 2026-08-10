@@ -546,9 +546,21 @@ of the plan depends on (the R5 spike).
 **Goal.** Make the dual-agent runtime real and committable.
 
 **Scope.** `.gitignore`, `.claude/**`, `AGENTS.md`, `replit.md`, `.agents/**`,
-`llm-aux.lock`, `.template-version`, `.template-phase`, `CLAUDE.md`.
+`llm-aux.lock`, `.template-version`, `.template-phase`, and — for step 6 only — these six
+files, no others:
 
-**Do not touch.** `backend/**`, `frontend/**`, `.github/**`, `scripts/**`.
+```
+backend/event-logging-to-db-feature/.../usagelogging/UsageLoggingAspect.java:29
+backend/application/.../config/LogbookConfig.java:2
+backend/application/.../config/MetadataOnlyHttpLogFormatter.java:2
+backend/application/.../config/OpenApiSpecConfig.java:6
+frontend/vite.config.ts:12
+frontend/src/features/_template/README.md:20
+```
+
+**Do not touch.** `CLAUDE.md` — it is a managed fixture and must still match its manifest
+hash when this phase ends (§2.8). Any other file under `backend/**`, `frontend/**`,
+`.github/**` or `scripts/**`.
 
 **Steps.**
 
@@ -578,7 +590,17 @@ of the plan depends on (the R5 spike).
    `.claude/agent_docs/` carries 29 files; `.aiae-fixtures-manifest` is present.
 5. **Leave `CLAUDE.md` alone.** Project rules live in `docs/migration-guardrails.md` (§2.8).
    Nothing is re-applied here, and the file must still match its manifest hash when this
-   phase ends.
+   phase ends. Re-validate the manifest at 80/80 before committing.
+6. **Fix the six documentation citations by hand** — the gate requires it and the standard's
+   own rewriter cannot. In each of the six files listed under Scope, replace the prefix
+   `templates/generated-project/` with `.claude/agent_docs/`. The targets exist; e.g.
+   `templates/generated-project/observability/usage-logging-rules.md` becomes
+   `.claude/agent_docs/observability/usage-logging-rules.md`.
+
+   These are comment lines only — **no executable code changes.** Five of the six are `.java`
+   and `.ts`, which is why the scope names them individually:
+   `rewrite-installed-documentation-paths.py` iterates `*.md` only, so
+   `install-claude-fixtures.sh` can fix at most one of the six. Filed upstream as CR-10.
 
 **Build** n/a **Test** n/a
 **Review** `aiae-rule-compliance-audit`
