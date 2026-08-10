@@ -14,8 +14,37 @@ spec_path="${1:-backend/application/src/main/resources/api/v1/specs/openapi.yaml
 ts_schema_path="${2:-frontend/src/shared/api/generated/schema.d.ts}"
 dynamic_allow_re="${OPENAPI_DYNAMIC_SCHEMA_ALLOW_RE:-^(JsonMetadata|JsonPayload|ProviderPayload|WebhookPayload|JwtClaims)V[0-9]+$}"
 
+# AIAE convergence (P3 follow-up): collect failures instead of aborting on the
+# first one. Same reasoning as scripts/verify-gates.sh — fail-fast is right for a
+# generated MVP, wrong for a brownfield adoption that carries decided exceptions,
+# and it silently turns every "N violations" number into a floor rather than a
+# count. This script reported 1; see the migration log for what it reports now.
+#
+# No assertion was removed, reordered or weakened. `fatal` keeps fail-fast for
+# conditions where continuing is meaningless.
+LINT_FAILURES=()
+
 fail() {
+  LINT_FAILURES+=("$*")
+  echo "check-openapi-strict-schemas: FAIL - $*" >&2
+}
+
+fatal() {
   echo "check-openapi-strict-schemas: $*" >&2
+  exit 1
+}
+
+report_failures() {
+  if [ "${#LINT_FAILURES[@]}" -eq 0 ]; then
+    return 0
+  fi
+  echo "" >&2
+  echo "==> check-openapi-strict-schemas: ${#LINT_FAILURES[@]} assertion(s) failed" >&2
+  local i=1
+  for failure in "${LINT_FAILURES[@]}"; do
+    echo "  ${i}. ${failure}" >&2
+    i=$((i + 1))
+  done
   exit 1
 }
 
@@ -100,5 +129,7 @@ if [ -f "${ts_schema_path}" ]; then
   END { exit found ? 1 : 0 }
   ' "${ts_schema_path}" || fail "generated frontend types contain unknown index signatures for non-allowlisted schemas"
 fi
+
+report_failures
 
 echo "check-openapi-strict-schemas: passed"

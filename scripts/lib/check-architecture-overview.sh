@@ -6,8 +6,37 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="${VERIFY_ROOT:-$(cd "${SCRIPT_DIR}/../.." && pwd)}"
 DOC="${ROOT}/docs/architecture-overview.md"
 
+# AIAE convergence (P3 follow-up): collect failures instead of aborting on the
+# first one. Same reasoning as scripts/verify-gates.sh — fail-fast is right for a
+# generated MVP, wrong for a brownfield adoption that carries decided exceptions,
+# and it silently turns every "N violations" number into a floor rather than a
+# count. This script reported 1; see the migration log for what it reports now.
+#
+# No assertion was removed, reordered or weakened. `fatal` keeps fail-fast for
+# conditions where continuing is meaningless.
+LINT_FAILURES=()
+
 fail() {
+  LINT_FAILURES+=("$*")
+  echo "check-architecture-overview: FAIL - $*" >&2
+}
+
+fatal() {
   echo "check-architecture-overview: $*" >&2
+  exit 1
+}
+
+report_failures() {
+  if [ "${#LINT_FAILURES[@]}" -eq 0 ]; then
+    return 0
+  fi
+  echo "" >&2
+  echo "==> check-architecture-overview: ${#LINT_FAILURES[@]} assertion(s) failed" >&2
+  local i=1
+  for failure in "${LINT_FAILURES[@]}"; do
+    echo "  ${i}. ${failure}" >&2
+    i=$((i + 1))
+  done
   exit 1
 }
 
@@ -230,5 +259,7 @@ else
     echo "check-architecture-overview: MVP draft contains unresolved markers; finalize them before engineering handoff"
   fi
 fi
+
+report_failures
 
 echo "check-architecture-overview: passed (${phase})"

@@ -43,8 +43,37 @@ if [ -f backend/pom.xml ]; then
   fi
 fi
 
+# AIAE convergence (P3 follow-up): collect failures instead of aborting on the
+# first one. Same reasoning as scripts/verify-gates.sh — fail-fast is right for a
+# generated MVP, wrong for a brownfield adoption that carries decided exceptions,
+# and it silently turns every "N violations" number into a floor rather than a
+# count. This script reported 1; see the migration log for what it reports now.
+#
+# No assertion was removed, reordered or weakened. `fatal` keeps fail-fast for
+# conditions where continuing is meaningless.
+LINT_FAILURES=()
+
 fail() {
+  LINT_FAILURES+=("$*")
+  echo "structure-lint: FAIL - $*" >&2
+}
+
+fatal() {
   echo "structure-lint: $*" >&2
+  exit 1
+}
+
+report_failures() {
+  if [ "${#LINT_FAILURES[@]}" -eq 0 ]; then
+    return 0
+  fi
+  echo "" >&2
+  echo "==> structure-lint: ${#LINT_FAILURES[@]} assertion(s) failed" >&2
+  local i=1
+  for failure in "${LINT_FAILURES[@]}"; do
+    echo "  ${i}. ${failure}" >&2
+    i=$((i + 1))
+  done
   exit 1
 }
 
@@ -227,7 +256,7 @@ fi
 # infrastructure web package out of this check: SpaFallbackController has
 # HTTP-specific routing behavior and is intentionally not an API controller.
 if [ -f "${SCRIPT_DIR}/lib/check-thin-controllers.py" ]; then
-  python3 "${SCRIPT_DIR}/lib/check-thin-controllers.py" backend/application/src/main/java
+  python3 "${SCRIPT_DIR}/lib/check-thin-controllers.py" backend/application/src/main/java \n    || fail "check-thin-controllers.py reported violations"
 fi
 
 
@@ -358,5 +387,7 @@ if [ -d frontend/src ]; then
     fail "frontend/src/features/_template/ missing during MVP phase — copy for new features"
   fi
 fi
+
+report_failures
 
 echo "==> structure-lint: passed"

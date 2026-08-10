@@ -787,7 +787,11 @@ and must be checked by whoever deploys next; record that explicitly in the log.
 **Test** Full backend suite; assert outbound metrics still appear on
 `/actuator/prometheus` after one real external call.
 **Review** `backend-rule-review`
-**Verification** structure-lint's 4 observability assertions pass; metric names identical
+**Verification** structure-lint's **7** observability assertions pass — measured, not the 4
+both source documents claimed; that number came from a fail-fast run that stopped at the
+first. They are: `backend/observability/` exists, its `pom.xml` exists, the parent POM lists
+it, `application/pom.xml` attaches it, it owns `ExternalClientMetricsInterceptor`, it owns
+`ExternalCallTimer`, and neither class remains anywhere else. Metric names identical
 before → after.
 **Rollback** `git revert`.
 
