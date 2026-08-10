@@ -159,6 +159,52 @@ template is read-only. It is a reason to raise it upstream: CR-6 was written for
 compatibility deadlock that did not materialise, and can be **repurposed** to report the
 performance cost of the mandated pin instead of withdrawn outright.
 
+### Backend product baseline — and the real coverage number
+
+`mvn -f backend/pom.xml -Phandoff verify` on JDK 21.0.12 / Maven 3.9.16:
+**BUILD SUCCESS, 507 tests, 0 failures, 44 skipped, 4m02s.** `jacoco-check` passed —
+confirming §2.3 empirically: the hardcoded 0.80 LINE gate is live and the project meets it.
+
+**Coverage, measured both ways.** The second row is P9 step 1's answer: the seven
+hand-written excludes removed from the `report` block, `jacoco:report` re-run against the
+same `jacoco.exec`, POM reverted afterwards.
+
+| Denominator | LINE | BRANCH |
+|---|---|---|
+| current — 7 hand-written excludes in place | **0.8517** | **0.7183** |
+| **real — excludes removed** | **0.8284** | **0.6946** |
+
+Per module, which is what matters because `jacoco-check` uses `<element>BUNDLE</element>`
+and each module is graded on its own:
+
+| Module | LINE | | BRANCH | |
+|---|---|---|---|---|
+| `application` | 0.8626 | ok | 0.7110 | ok |
+| `event-logging-to-db-feature` | 0.9526 | ok | 0.7778 | ok |
+| `service` | 0.8420 | ok | 0.7075 | ok |
+| `external-services` | 0.8066 | ok | **0.6978** | short by 0.0022 |
+| **`domain`** | **0.0236** | **miss** | **0.0714** | **miss** |
+
+**Four of five modules already clear 0.80 / 0.70 on the honest denominator.** The entire gap
+is `backend/domain` — the entities and repositories the `**/entities/**` and
+`**/repositories/**` excludes were hiding — plus a rounding-margin miss on
+`external-services` branch coverage.
+
+### This undercuts the premise of D-C
+
+D-C chose to relax to `mvp` 0.30/0.25 between P9 and P15 because the climb to 0.80/0.70 was
+assumed to be large. It is not. It is one untested module and two-tenths of a percent
+elsewhere.
+
+Dropping every module to 0.30/0.25 would let the four that already pass **regress by fifty
+points** during P10 and P11 without any gate objecting — which is the opposite of the risk
+D-C was written to manage. Worth re-deciding with these numbers in hand. A shape that fits
+the measurement better: hold 0.80/0.70 where it already holds, and give `domain` alone a
+temporary floor with the reason recorded, raised when its tests land.
+
+**This is the technical owner's call**, since D-C was. The plan is not changed on this
+point until they decide.
+
 ### Still outstanding in P0
 
 | Step | Status |
@@ -170,7 +216,7 @@ performance cost of the mandated pin instead of withdrawn outright.
 | 2 — working-tree state confirmed | done — `backend/db` gone, `backend/migrations` present, Lombok still absent from its POM |
 | 3 — gate baseline | done, above |
 | 3a — R1 query | done, above |
-| 4 — product baseline | frontend **done** (78/78, above); backend **blocked — Maven not installed** |
+| 4 — product baseline | **done** — frontend 78/78, backend 507 tests green, real coverage measured |
 | 5 — send change requests upstream | outstanding — owner's action |
 | 6 — standard checkout reachable at `cc64e49` | done — all required paths present |
 | 7 — R5 spike | **done — variant A passes; CR-6 withdrawn** |
