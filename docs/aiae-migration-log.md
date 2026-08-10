@@ -488,6 +488,247 @@ text — fixing `.agents/skills/**/*.md` citations — was necessary to meet the
 Verification target and stayed inside the general Scope grant; it is documented above rather
 than silently absorbed.
 
+## P2 — Harness and the local runner · **COMPLETE**
+
+Completed 2026-08-10 on branch `mig/p02-harness-ci` (from `migration` @ `7f156cd`).
+
+### Environment
+
+Same shims as P0/P1: `python3` resolved to a real 3.14.5 via a copy on `PATH` ahead of the
+Windows Store stub; `JAVA_HOME=/c/Users/Admin/.jdks/corretto-21.0.12` and
+`/c/Users/Admin/tools/apache-maven-3.9.16/bin` prepended for Maven. `rsync` was not needed
+this phase (nothing in P2 calls it). **One new environment trap, found running this phase's
+own deliverable, not in the plan or prior logs:** Python's `subprocess.run(["bash", ...])`
+on this Windows machine resolves `bash` through Windows' own `CreateProcess` search order,
+which can hit the WSL launcher stub at `C:\Windows\System32\bash.exe` instead of the
+`PATH`-order git-bash that an interactive shell would find, and did so for the *first* such
+call in a loop while later identical calls resolved correctly — non-deterministic per call,
+not merely "wrong once". Symptom: a checker invoked this way returns the literal text
+`<3>WSL (498 - Relay) ERROR: CreateProcessCommon:800: execvpe(/bin/bash) failed: No such
+file or directory` as if it were the checker's own output. Fixed in
+`scripts/local-verify.sh`'s new report section by resolving `bash`/`python3` once via
+`shutil.which` (a pure `PATH`-walk, not `CreateProcess`) and always invoking the absolute
+path. Recorded here so the next phase that shells out to `bash`/`python3` from *Python* on
+this machine does not lose time to it — invocations from *bash itself* (structure-lint.sh,
+verify-gates.sh, every checker's own internal calls) are unaffected; this is specific to
+Python's `subprocess` module resolving a bare command name on Windows.
+
+### Steps 1–4 — harness copy, ci.yml, checkstyle-test-fields.xml, mechanical CR-1
+
+Copied all 28 files under `scaffold/scripts/lib/` (`cc64e49`) into a newly created
+`scripts/lib/` — byte-identical, verified by `diff -q` against the standard checkout for
+every file. Copied 18 of the standard's 22 runtime scripts into `scripts/` — also
+byte-identical. **The other 4 needed a decision the plan states but does not spell out
+mechanically:** the standard's `scripts/local-verify.sh`, `replit-build.sh`, `replit-env.sh`
+and `replit-run.sh` share filenames with 3 of the 9 Do-not-touch project scripts (plus
+`local-verify.sh`, the one deliberate exception). Copying all 22 as literally instructed
+would have overwritten those 3 Do-not-touch files — confirmed they are not accidentally
+identical: `diff` shows all three genuinely differ from the standard's versions. Resolved
+per the Do-not-touch block's own instruction ("added alongside them, never over them"):
+skipped copying the standard's `replit-build.sh` / `replit-env.sh` / `replit-run.sh`,
+keeping the project's own; installed the standard's `local-verify.sh` separately in step 5
+per its explicit exception. Net result directly under `scripts/` (not counting the new
+`scripts/lib/` subdirectory): the original 9 Do-not-touch scripts (untouched) + 1 rewritten
+`local-verify.sh` + 18 newly added scripts = 28 files, up from P0's baseline of 10.
+
+Replaced `.github/workflows/ci.yml` with the standard's 5-job workflow (`static-checks`,
+`unit-tests`, `integration-tests`, `frontend-checks`, `local-dev-dry-run`) verbatim, adding
+only `continue-on-error: true` plus an explanatory comment on `static-checks`. Diffed against
+`templates/generated-project/.github/workflows/ci.yml` (`cc64e49`): the *only* difference is
+that one added block. **Nothing executes this file** — confirmed no CI service, no remote,
+no runner is configured anywhere in this environment; it is installed and verified by
+inspection only, per the plan.
+
+Added `backend/config/checkstyle-test-fields.xml` — byte-identical to the standard's copy,
+unwired (not yet referenced from any `pom.xml` or `checkstyle.xml`), matching the plan's
+literal "Add" instruction with no wiring step.
+
+**Step 4 — made the CR-1 exception mechanical.** The previous check in
+`scripts/verify-gates.sh` was a blanket boolean: `! grep -RInE 'fetch(|axios|XMLHttpRequest'
+frontend/src ... || fail ...` — true/false over the whole tree, blind to *which* file
+triggered it and blind to a second violation appearing in an already-exempted file. Replaced
+it with two explicit per-file assertions over the two named exemption files
+(`useLessonMutations.ts`, `useMaterialMutations.ts`), each asserting
+`grep -c 'await fetch(' <file> -eq 1`, plus an unchanged zero-tolerance scan over the rest of
+`frontend/src` (now excluding just those two files) for any other raw
+`fetch`/`axios`/`XMLHttpRequest`. Verified directly against fixture copies: count 1 → passes
+silently; count 0 (fetch call deleted) → fails; count 2 (fetch call duplicated) → fails. Both
+real call sites measured today: `useLessonMutations.ts` → 1, `useMaterialMutations.ts` → 1 —
+matching the audit's "raw `fetch()` ×2" exactly (2 files, 1 call site each, not 2 in one
+file). No other raw `fetch`/`axios`/`XMLHttpRequest` exists anywhere else in `frontend/src`
+(confirmed by the same scan with both files excluded — zero matches).
+
+### Step 5 — `local-verify.sh`, installed in report-only mode
+
+Installed the standard's `scripts/local-verify.sh` (all its steps: Java version check,
+`structure-lint.sh`, `verify-gates.sh`, coverage-phase announce, `mvn clean verify`,
+frontend `lint && test && build`, `docker-compose.yml` config check), with a header comment
+naming this a deliberate, temporary override, pointing at `docs/aiae-migration-plan.md` P15
+step 5 (which removes it) and instructing "search for REPORT-ONLY" to find every changed
+line. Every step now runs through a `run_step`/`record_step` wrapper that captures and
+reports PASS/FAIL/SKIP instead of aborting (`set -uo pipefail`, no `-e`), and the script
+always `exit 0`.
+
+**Added, beyond the plan's literal text:** a new itemized report section that runs each of
+the 28 `scripts/lib/` files independently (with the same explicit source-root arguments
+`structure-lint.sh`/`verify-gates.sh` already use internally) and prints a count for each.
+This was necessary, not optional — `structure-lint.sh` and `verify-gates.sh` both call a
+`fail()` that does `exit 1` on the *first* violation, so run alone they can only ever report
+one failing assertion per invocation (confirmed: this run's `structure-lint.sh` stopped at
+"`backend/observability/` missing" — P4's job — and `verify-gates.sh` stopped at "README
+must describe the app" — P3's job; neither reached anywhere near the presigned-upload check
+or the other 26 checkers). Without the itemized section, "prints a count for each" of the 28
+checkers would have been unmet by construction.
+
+### Full 28-checker count table — the new working baseline
+
+Measured by running `bash scripts/local-verify.sh` end to end (see Verification below). All
+28 files under `scripts/lib/` are accounted for; 2 `.sh`+`.py` pairs share a row (matching
+the P0 baseline table's own convention), giving 26 rows for 28 files.
+
+| Checker | P0 baseline | P2 measured | |
+|---|---|---|---|
+| `check-thin-controllers.py` | 55 | **55** | ✅ |
+| `check-api-validation-tests.py` | 91 constrained, 0 `isBadRequest` | **91, 0** | ✅ |
+| `check-openapi-input-constraints.py` | 82 | **82** | ✅ |
+| `check-openapi-documentation.sh` | 4 | **4** | ✅ |
+| `check-service-contract-quality` (.sh+.py) | 25 | **25** | ✅ |
+| `check-coverage-integrity.sh` | 15 | **14** | ❌ **differs — explained below** |
+| `check-installed-documentation-links.py` | 6 (P0) / 0 (post-P1) | **0** | ✅ matches post-P1 |
+| `check-frontend-ui-rules.sh` | 2222 | **2222** | ✅ |
+| `check-production-static-methods.sh` | 8 | **8** | ✅ |
+| `check-production-current-time.sh` | 3 | **3** | ✅ |
+| `check-production-magic-values.sh` | 0 | **0** | ✅ |
+| `check-production-manual-mapping.sh` | 0 | **0** | ✅ |
+| `check-api-client-paths.sh` | 0 | **0 (pass)** | ✅ |
+| `check-liquibase-preconditions` (.sh+.py) | 0 | **0 (pass)** | ✅ |
+| `check-openapi-enums.sh` | 0 | **0** | ✅ |
+| `check-openapi-strict-schemas.sh` | 0 | **0 (pass)** | ✅ |
+| `check-architecture-overview.sh` | 1 — missing `Document status` | **1 (fail)** | ✅ unchanged — P3's job |
+| `check-agent-surfaces.sh` | `handoff` (P0) / `active` (post-P1) | **`active`** | ✅ matches post-P1 |
+| `check-maven-dependency-analysis.py` | invocation-dependent; "resolve in P2" | **1 (fail)** | **RESOLVED — see below** |
+| `coverage-phase.sh` | — | n/a (library, not executed) | — |
+| `liquibase_dependency_guard.py` | — | n/a (library, not executed) | — |
+| `removal_transaction.py` | — | n/a (library, not executed) | — |
+| `remove-cache-management.py` | — | n/a (mutation tool, **not executed**) | — |
+| `remove-usage-logging.py` | — | n/a (mutation tool, **not executed**) | — |
+| `rewrite-installed-documentation-paths.py` | — | n/a (utility, not executed) | — |
+| `scan-production-java.py` | — | n/a (shared library, invoked by the `check-production-*` rows above, not run standalone) | — |
+
+`remove-cache-management.py`/`remove-usage-logging.py` are destructive (they delete a
+module) and were deliberately never executed, matching the guardrails' "Never run
+`prepare-engineering-handoff.sh`" spirit — D-D keeps the telemetry module, and nothing in P2
+runs a removal script against it.
+
+**`check-coverage-integrity.sh`: 15 → 14, explained, not a regression.** Reproduced directly:
+temporarily removing `.template-phase` and re-running the checker returns it to **15**;
+restoring the file returns it to **14**. The 15th violation at P0 was
+"`.template-phase` is missing" — true at P0 (before P1 created the file) and false now
+(P1 created it with `mvp`). The other 14 are unchanged: the same 7 hand-written `jacoco`
+excludes (`**/entities/**`, `**/*Entity.class`, `**/models/**`, `**/*Exception.class`,
+`**/repositories/**`, `**/config/**`, `**/*_.class`), counted once in the `report` block and
+once in the `check` block (§2.3's "both blocks carry the same 10 excludes"). This is an
+already-logged P1 side effect surfacing for the first time because P2 is the first phase to
+run this checker against the real tree; it is not something P2 changed.
+
+**`check-maven-dependency-analysis.py` resolved, per P0's "resolve in P2" flag.** P0 found it
+"invocation-dependent — reports 'no backend pom' when given `.`". Root cause: its `sys.argv[1]`
+is the *backend directory*, not the repo root — `python3 check-maven-dependency-analysis.py .`
+resolves to `./pom.xml` (no such file at repo root) and false-negatives to "passed (no
+backend pom)". The correct invocation is `backend` as arg1 (exactly what
+`verify-gates.sh:227` already does) or bare with `cwd` at the repo root. With the correct
+invocation it fails honestly: `missing policy: backend/DEPENDENCY-ANALYSIS.md` — that file is
+P3 step 2's deliverable, not P2's; this is an expected, correctly-surfaced gap, not a defect.
+
+### `verify-gates.sh` / `structure-lint.sh` end-to-end (fail-fast, by design)
+
+Both run as part of `local-verify.sh` and both fail — expected, and neither failure is new:
+
+- `structure-lint.sh` stops at `backend/observability/ missing — copy canonical backend
+  scaffold` (P4's job).
+- `verify-gates.sh` stops at `README must describe the app and include API, Swagger UI, and
+  OpenAPI YAML links` (P3's job) — it never reaches the presigned-upload check in this run,
+  which is exactly why step 5 added the itemized per-checker report above.
+
+### Product baseline re-confirmed (incidental to running `local-verify.sh`, not a new build step)
+
+`mvn -f backend/pom.xml clean verify` (no `-Phandoff` — `.template-phase=mvp` from P1, but no
+`mvp` Maven profile exists yet, so Maven printed `[WARNING] The requested profile "mvp" could
+not be activated` and fell through to the same hardcoded 0.80 LINE default P0 measured):
+**BUILD SUCCESS**, application module **507 tests, 0 failures, 44 skipped** — identical to
+P0's baseline. `npm test`: **22 files, 78 tests, all pass** — identical to P0. `npm run
+build`: succeeds, same ~674 kB `SimpleEditor` chunk warning P0 recorded. `local-verify.sh`'s
+own frontend step reports **FAIL** because `frontend/package.json` defines no `"lint"`
+script yet (`npm error Missing script: "lint"`) — a real, pre-existing gap
+(`verify-gates.sh:124-125` already asserts one must exist), not introduced by P2 and not
+closed by it; the plan's living-list table (§P3 step 1a) assigns ESLint/import-ordering work
+to P12. Confirmed independently that `npm test` and `npm run build` both still pass when run
+directly, since the `&&`-chained `lint` failure inside `local-verify.sh` prevented them from
+running in that one combined step.
+
+### Fixture manifest and scope
+
+`.claude/.aiae-fixtures-manifest`: **80/80** matched before any change and again immediately
+before this commit. Nothing under `.claude/**` or the four managed root files was touched.
+`git status --porcelain` after staging shows exactly: 1 modified (`.github/workflows/ci.yml`),
+1 rewritten (`scripts/local-verify.sh`), 1 new config file
+(`backend/config/checkstyle-test-fields.xml`), 18 new runtime scripts directly under
+`scripts/`, and 28 new files under the new `scripts/lib/` — 49 paths touched in total,
+matching this commit's diffstat. The 9 Do-not-touch project scripts
+(`backend-jacoco-coverage-targets.sh`, `local-dev-backend.sh`, `local-dev-frontend.sh`,
+`replit-build.sh`, `replit-dev-backend.sh`, `replit-dev-frontend.sh`, `replit-env.sh`,
+`replit-run.sh`, `report-bundle-size.sh`) show **zero** diff.
+
+### Review — `production-code-review`
+
+Scope: this phase's diff (`git diff migration...mig/p02-harness-ci`). Findings applied before
+this commit rather than left open: removed a dead-code round-trip (a `mktemp`/JSON-write in
+the new report section that was written but never read — deleted, the printed table is the
+only output). No blocking or important findings remain. Evidence: every copied file
+diffed byte-identical against the standard except the two files the plan names for
+modification (`verify-gates.sh`, `local-verify.sh`); the presigned-upload mechanism tested at
+counts 0/1/2 against fixture copies; the Windows `subprocess`/`bash` resolution defect found
+and fixed with an explicit absolute-path resolution, verified by an isolated before/after run.
+
+**Build** unchanged, per plan — no new build step introduced. Incidentally re-confirmed via
+`local-verify.sh`: `mvn -f backend/pom.xml clean verify` → BUILD SUCCESS.
+**Test** unchanged, per plan. Incidentally re-confirmed: backend 507/0/44 (application
+module), frontend 78/78 — both identical to P0.
+**Review** `production-code-review` — no blocking findings; one dead-code cleanup applied
+pre-commit (see above).
+**Verification** `bash scripts/local-verify.sh` runs end to end, prints a count/status for
+all 28 `scripts/lib/` files plus `structure-lint.sh`/`verify-gates.sh`/backend/frontend/
+docker-compose, and exits **0** (report-only, by design). Presigned-upload assertion: **1**
+per exempted file (2 files), mechanically fails at 0 and at 2 (verified against fixture
+copies). `ci.yml` diffed against the standard's file: identical except the one added
+`continue-on-error: true` block. Fixture manifest: **80/80**, unchanged throughout.
+**Rollback** `git revert` restores the 2-job workflow and the project's original
+`local-verify.sh`; the 3 Do-not-touch replit scripts were never modified so nothing to
+restore there.
+
+### Things the plan did not spell out, resolved here
+
+- The Do-not-touch block names 4 files that collide by filename with 4 of the 22 scaffold
+  scripts step 1 says to copy (`local-verify.sh`, `replit-build.sh`, `replit-env.sh`,
+  `replit-run.sh`). The block's own "added alongside them, never over them" phrasing is the
+  resolution — skip copying the 3 replit-* collisions from the standard, keep the project's
+  (confirmed genuinely different by `diff`, not accidentally identical), and handle
+  `local-verify.sh` via its named step-5 exception. Not a plan defect once read this way, but
+  worth recording since a literal "copy all 22" reading would have violated Do-not-touch.
+- P0 flagged `check-maven-dependency-analysis.py` as "resolve in P2" without saying how.
+  Resolved: pass `backend` as the explicit argument (matching `verify-gates.sh`'s own call),
+  not the repo root.
+
+### Nothing was declined in this phase
+
+Every plan step (1–5) was executed, including the presigned-upload mechanical conversion and
+the report-only `local-verify.sh`. The one addition beyond the literal text — the itemized
+per-checker report section — was necessary to meet the phase's own stated Verification target
+("prints a count for each" of the 28 checkers), for the fail-fast reason explained above, and
+is documented rather than silently absorbed.
+
+---
+
 ## Carried red assertions
 
 Every phase's evidence must show these unchanged. A count that moves without a decision
