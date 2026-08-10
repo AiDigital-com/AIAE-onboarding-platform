@@ -205,6 +205,38 @@ this into a ratchet rather than an escape hatch.
 
 ---
 
+### Measured consequence: one accepted exception blinds the rest of the run
+
+`verify-gates.sh`'s `fail()` is `echo` + `exit 1`. That is correct for a generated MVP,
+where the first failure is a defect to fix and re-run. For a brownfield adoption carrying
+decided exceptions it is not: **the earliest accepted exception hides every assertion after
+it.**
+
+Measured on this project. Before the change, the run stopped at the README assertion on
+line 78 and reported one failure. After making `fail()` collect and continue, the same tree
+reports **22** — including assertions the migration actively depends on:
+
+- `Every Maven submodule must declare Lombok: migrations` — the entire purpose of one phase
+- `Third-party PooledRestClientFactory must register ExternalClientMetricsInterceptor` —
+  another phase's exit criterion
+- `Logbook DefaultSink must be built with formatter + writer` — see CR-5
+- five `.replit` and `docker-compose` assertions
+- `service source must not import web/security/JWT/servlet APIs`
+
+Twenty-one of twenty-two were invisible. Every one maps to real, known work; none was a
+false positive. A project could have closed phase after phase believing the gate had
+checked them.
+
+We patched our copy to record and continue, then print the full list and exit non-zero. No
+assertion was removed, reordered or weakened. But it is a local fork of a template script,
+which is what CR-4 exists to make unnecessary.
+
+**This raises CR-4 from convenience to blocking:** without an exemption mechanism, a
+brownfield project cannot use `verify-gates.sh` at all — the first thing it legitimately
+declines to fix silences the remainder of the file.
+
+---
+
 ## CR-5 — the Logbook gate tests for an expression, not for the property
 
 **Severity: low. Cosmetic for us, but the gate currently rejects a stricter implementation.**
@@ -418,7 +450,7 @@ Either makes the pair self-consistent.
 | CR-1 | `verify-gates.sh` — raw `fetch` | Blocking | **Yes** | An exemption path; the rule as written is unsatisfiable alongside `14-performance.md` |
 | CR-2 | `verify-gates.sh` — sidebar tokens | **Blocking** | **Yes** | A declared navigation model instead of token matching |
 | CR-3 | `check-frontend-ui-rules.sh` — scan path | Medium | No | Confirmation that relocating vendored code is the intended pattern |
-| CR-4 | Cross-cutting | — | — | One exemption mechanism resolving CR-1 to CR-3 |
+| CR-4 | Cross-cutting | **Blocking** | **Yes** | An exemption mechanism — without it one accepted exception hides 21 further assertions |
 | CR-5 | `verify-gates.sh` — Logbook literals | Low | No | A property check rather than a string match |
 | CR-6 | `verify-gates.sh` — `vitest` pin | TBD | TBD | Advance notice; spike result to follow |
 | CR-7 | `.claude/tasks/README.md` vs `task-workflow` | Low | No | The two to agree on artifact names |

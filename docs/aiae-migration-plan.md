@@ -1239,10 +1239,18 @@ assertion passes; bundle size recorded via `report-bundle-size.sh` before → af
 
 **Steps.**
 
-1. Flip `static-checks` to blocking in `ci.yml` (remove `continue-on-error`), with **all
-   four** carried assertions explicitly allow-listed and **annotated** — not silenced:
-   CR-1 presigned upload, `check-frontend-ui-rules.sh`, the `verify-gates.sh` sidebar
-   assertion, and `structure-lint`'s `changes/0001-usage-events.xml`. Each annotation names the rule the gate conflicts with and the CR tracking
+1. **Make `local-verify.sh` blocking, and treat `ci.yml` as documentation.** Flip
+   `static-checks` in `ci.yml` (remove `continue-on-error`) for convergence, but nothing
+   executes that file — the enforcement that bites is step 5.
+
+   **There is no allow-list mechanism.** An earlier revision of this step said the four
+   carried assertions would be "explicitly allow-listed and annotated". `verify-gates.sh`
+   has no such feature — no allow-list, no annotations, no exemptions. What exists after
+   the P2 follow-up is that it now *reports every* failure instead of aborting on the
+   first, so the carried ones are visible alongside everything else and can be compared
+   against the log's expected set. Blocking therefore means: the failure list must equal
+   the carried set exactly — no additions, no disappearances. That comparison is manual
+   until CR-4 lands upstream. Each annotation names the rule the gate conflicts with and the CR tracking
    it. The `== 1` form from P2 stays for CR-1. **This file still executes nowhere** — it is
    converged for a future remote; the enforcement that actually bites is step 5.
 2. Confirm the AIAE `local-verify.sh` installed in P2 still runs gates, `mvn clean verify`,

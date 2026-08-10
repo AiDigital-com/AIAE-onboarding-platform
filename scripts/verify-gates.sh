@@ -37,8 +37,46 @@ if [ "${SCAFFOLD_SOURCE}" -eq 1 ]; then
   ALLOW_PLACEHOLDER=1
 fi
 
+# AIAE convergence (P2 follow-up): collect failures instead of aborting on the
+# first one.
+#
+# Upstream this was `echo; exit 1`, which is right for a generated MVP: the
+# first failure is a defect, you fix it, you re-run. It is wrong for a
+# brownfield adoption that carries decided, permanent exceptions. This project
+# carries four (see docs/migration-guardrails.md and the migration log), and
+# fail-fast meant the earliest of them hid every assertion after it — measured
+# at 56 unreachable checks, including the Lombok-per-module assertion that is
+# P5's entire purpose and the interceptor-registration assertions that are P4's
+# exit criteria. Red for one known reason, and blind to everything downstream.
+#
+# Now: record and continue, print the whole list at the end, exit non-zero if
+# it is non-empty. No assertion was removed, reordered, or weakened.
+#
+# `fatal` stays fail-fast for conditions where continuing is meaningless
+# (missing root, unreadable inputs), so a broken invocation still stops loudly.
+VERIFY_FAILURES=()
+
 fail() {
+  VERIFY_FAILURES+=("$*")
+  echo "verify-gates: FAIL - $*" >&2
+}
+
+fatal() {
   echo "verify-gates: $*" >&2
+  exit 1
+}
+
+report_failures() {
+  if [ "${#VERIFY_FAILURES[@]}" -eq 0 ]; then
+    return 0
+  fi
+  echo "" >&2
+  echo "==> verify-gates: ${#VERIFY_FAILURES[@]} assertion(s) failed" >&2
+  local i=1
+  for failure in "${VERIFY_FAILURES[@]}"; do
+    echo "  ${i}. ${failure}" >&2
+    i=$((i + 1))
+  done
   exit 1
 }
 
@@ -82,7 +120,8 @@ fi
 if [ "${SCAFFOLD_SOURCE}" -eq 0 ]; then
   [ -x "${SCRIPT_DIR}/lib/check-architecture-overview.sh" ] \
     || fail "Missing executable scripts/lib/check-architecture-overview.sh"
-  VERIFY_ROOT="${ROOT}" bash "${SCRIPT_DIR}/lib/check-architecture-overview.sh"
+  VERIFY_ROOT="${ROOT}" bash "${SCRIPT_DIR}/lib/check-architecture-overview.sh" \
+    || fail "check-architecture-overview.sh reported violations"
 fi
 
 # The shipped payload manifest is the exact active-project skill contract.
@@ -194,41 +233,50 @@ fi
 if [ -f backend/application/src/main/resources/api/v1/specs/openapi.yaml ] && [ -d frontend/src ]; then
   bash "${SCRIPT_DIR}/lib/check-api-client-paths.sh" \
     "backend/application/src/main/resources/api/v1/specs/openapi.yaml" \
-    "frontend/src"
+    "frontend/src" \
+    || fail "check-api-client-paths.sh reported violations"
   if [ -f "${SCRIPT_DIR}/lib/check-openapi-strict-schemas.sh" ]; then
     bash "${SCRIPT_DIR}/lib/check-openapi-strict-schemas.sh" \
       "backend/application/src/main/resources/api/v1/specs/openapi.yaml" \
-      "frontend/src/shared/api/generated/schema.d.ts"
+      "frontend/src/shared/api/generated/schema.d.ts" \
+      || fail "check-openapi-strict-schemas.sh reported violations"
   fi
   if [ -f "${SCRIPT_DIR}/lib/check-openapi-documentation.sh" ]; then
     bash "${SCRIPT_DIR}/lib/check-openapi-documentation.sh" \
-      "backend/application/src/main/resources/api/v1/specs/openapi.yaml"
+      "backend/application/src/main/resources/api/v1/specs/openapi.yaml" \
+      || fail "check-openapi-documentation.sh reported violations"
   fi
   if [ -f "${SCRIPT_DIR}/lib/check-openapi-enums.sh" ]; then
     bash "${SCRIPT_DIR}/lib/check-openapi-enums.sh" \
-      "backend/application/src/main/resources/api/v1/specs/openapi.yaml"
+      "backend/application/src/main/resources/api/v1/specs/openapi.yaml" \
+      || fail "check-openapi-enums.sh reported violations"
   fi
   if [ -f "${SCRIPT_DIR}/lib/check-openapi-input-constraints.py" ]; then
     python3 "${SCRIPT_DIR}/lib/check-openapi-input-constraints.py" \
-      "backend/application/src/main/resources/api/v1/specs/openapi.yaml"
+      "backend/application/src/main/resources/api/v1/specs/openapi.yaml" \
+      || fail "check-openapi-input-constraints.py reported violations"
   fi
 fi
 
 if [ "${SCAFFOLD_SOURCE}" -eq 0 ] \
     && [ -f "${SCRIPT_DIR}/lib/check-installed-documentation-links.py" ]; then
-  python3 "${SCRIPT_DIR}/lib/check-installed-documentation-links.py" .
+  python3 "${SCRIPT_DIR}/lib/check-installed-documentation-links.py" . \
+    || fail "check-installed-documentation-links.py reported violations"
 fi
 
 if [ -f "${SCRIPT_DIR}/lib/check-api-validation-tests.py" ]; then
-  python3 "${SCRIPT_DIR}/lib/check-api-validation-tests.py" .
+  python3 "${SCRIPT_DIR}/lib/check-api-validation-tests.py" . \
+    || fail "check-api-validation-tests.py reported violations"
 fi
 
 if [ -f "${SCRIPT_DIR}/lib/check-maven-dependency-analysis.py" ]; then
-  python3 "${SCRIPT_DIR}/lib/check-maven-dependency-analysis.py" backend
+  python3 "${SCRIPT_DIR}/lib/check-maven-dependency-analysis.py" backend \
+    || fail "check-maven-dependency-analysis.py reported violations"
 fi
 
 if [ -d backend/migrations/src/main/resources/db/changelog ] && [ -f "${SCRIPT_DIR}/lib/check-liquibase-preconditions.sh" ]; then
-  bash "${SCRIPT_DIR}/lib/check-liquibase-preconditions.sh"
+  bash "${SCRIPT_DIR}/lib/check-liquibase-preconditions.sh" \
+    || fail "check-liquibase-preconditions.sh reported violations"
 fi
 
 if [ -f frontend/vite.config.ts ] && grep -q '"@/\*"' frontend/tsconfig.json 2>/dev/null; then
@@ -422,35 +470,44 @@ if [ -d frontend/src ]; then
   done < <(find frontend/src -type f \( -name '*useDebounce*.ts' -o -name '*useDebounce*.tsx' \))
 
   if [ -f "${SCRIPT_DIR}/lib/check-frontend-ui-rules.sh" ]; then
-    bash "${SCRIPT_DIR}/lib/check-frontend-ui-rules.sh"
+    bash "${SCRIPT_DIR}/lib/check-frontend-ui-rules.sh" \
+      || fail "check-frontend-ui-rules.sh reported violations"
   fi
 fi
 
 if [ -d backend ] && [ -f "${SCRIPT_DIR}/lib/check-production-static-methods.sh" ]; then
-  bash "${SCRIPT_DIR}/lib/check-production-static-methods.sh"
+  bash "${SCRIPT_DIR}/lib/check-production-static-methods.sh" \
+    || fail "check-production-static-methods.sh reported violations"
 fi
 
 if [ -d backend ] && [ -f "${SCRIPT_DIR}/lib/check-production-magic-values.sh" ]; then
-  bash "${SCRIPT_DIR}/lib/check-production-magic-values.sh"
+  bash "${SCRIPT_DIR}/lib/check-production-magic-values.sh" \
+    || fail "check-production-magic-values.sh reported violations"
 fi
 
 if [ -d backend ] && [ -f "${SCRIPT_DIR}/lib/check-production-current-time.sh" ]; then
-  bash "${SCRIPT_DIR}/lib/check-production-current-time.sh"
+  bash "${SCRIPT_DIR}/lib/check-production-current-time.sh" \
+    || fail "check-production-current-time.sh reported violations"
 fi
 
 if [ -d backend ] && [ -f "${SCRIPT_DIR}/lib/check-production-manual-mapping.sh" ]; then
-  bash "${SCRIPT_DIR}/lib/check-production-manual-mapping.sh"
+  bash "${SCRIPT_DIR}/lib/check-production-manual-mapping.sh" \
+    || fail "check-production-manual-mapping.sh reported violations"
 fi
 
 if [ -d backend/service/src/main/java ] && [ -f "${SCRIPT_DIR}/lib/check-service-contract-quality.sh" ]; then
-  bash "${SCRIPT_DIR}/lib/check-service-contract-quality.sh"
+  bash "${SCRIPT_DIR}/lib/check-service-contract-quality.sh" \
+    || fail "check-service-contract-quality.sh reported violations"
 fi
 
 # Coverage integrity. Runs against a real project only: the scaffold source tree
 # has no committed .template-phase of its own and no git history to inspect.
 if [ "${SCAFFOLD_SOURCE}" -eq 0 ] && [ -f backend/pom.xml ] \
    && [ -f "${SCRIPT_DIR}/lib/check-coverage-integrity.sh" ]; then
-  VERIFY_ROOT="${ROOT}" bash "${SCRIPT_DIR}/lib/check-coverage-integrity.sh"
+  VERIFY_ROOT="${ROOT}" bash "${SCRIPT_DIR}/lib/check-coverage-integrity.sh" \
+    || fail "check-coverage-integrity.sh reported violations"
 fi
+
+report_failures
 
 echo "==> verify-gates: passed"
