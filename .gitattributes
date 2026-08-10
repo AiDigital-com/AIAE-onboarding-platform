@@ -23,3 +23,11 @@
 # breaks the manifest and blocks `install-claude-fixtures.sh` permanently,
 # which P1 step 1 depends on.
 .claude/** -text
+
+# The same applies to the four root-level files the installer also owns and
+# checksums (`managed_root_files` in install-managed-claude-fixtures.py:22).
+# They are listed in the manifest exactly like everything under .claude/.
+CLAUDE.md -text
+AI-DEVELOPMENT-GUIDE.md -text
+GDS-WORKFLOW-README.md -text
+agent-payload.skills -text

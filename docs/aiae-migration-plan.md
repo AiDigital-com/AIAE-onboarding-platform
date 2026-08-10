@@ -365,7 +365,20 @@ lists it, `service/pom.xml` attaches it, `UsageEventPersistenceService` carries
 
 Found 2026-08-10 by breaking it. Recorded so the next person does not repeat it.
 
-Every file under `.claude/` is checksummed in `.claude/.aiae-fixtures-manifest`, and
+**The manifest covers more than `.claude/`.** `install-managed-claude-fixtures.py:22` also
+owns four root-level files — `CLAUDE.md`, `AI-DEVELOPMENT-GUIDE.md`, `GDS-WORKFLOW-README.md`
+and `agent-payload.skills` — checksummed by the same logic. An earlier revision of this
+section said "every file under `.claude/`" and that was wrong; it cost a blocked P1 attempt on
+2026-08-10, when P0's guardrails edit to `CLAUDE.md` broke its hash.
+
+**Consequence, and it is permanent.** The standard instructs projects to adapt `CLAUDE.md`,
+then hash-protects it. A project that follows that instruction can never re-run
+`install-claude-fixtures.sh` — and P15 step 4 builds the template-upgrade path on that script.
+**So `CLAUDE.md` is kept byte-identical to its manifest entry here.** Project rules live in
+[`migration-guardrails.md`](./migration-guardrails.md), and every phase brief names it among
+the things to read first. Filed upstream as CR-9.
+
+Every one of those files is checksummed in `.claude/.aiae-fixtures-manifest`, and
 `scripts/lib/install-managed-claude-fixtures.py:141` aborts the entire install with
 
 > `managed fixture was edited locally; refusing overwrite: <path>`
@@ -463,15 +476,10 @@ of the plan depends on (the R5 spike).
 1. Create `migration` from `1.0.0`. `1.0.0` is not checked out again for the rest of the
    migration — there is no remote and no branch protection to lean on, so this is a rule
    rather than a setting.
-1a. **Add the migration guardrails block to `CLAUDE.md`** — the six rules from §3 plus the
-   two presigned-upload call sites. This must exist **before the first agent runs**, not in
-   P1: agents read `CLAUDE.md` on every turn, but read this plan only when handed it.
-   P1 step 1 overwrites `CLAUDE.md` and already instructs re-applying the project
-   paragraphs — this block is one of them.
-
-   **Include the line-ending guardrail:** never normalise `.claude/**`, never run
-   `git add --renormalize` across the whole tree, and never remove `.claude/** -text` from
-   `.gitattributes` — §2.8 explains what breaks and how the failure misreports itself.
+1a. **Write `docs/migration-guardrails.md`** — the rules from §3 plus the environment traps.
+   **Never put them in `CLAUDE.md`**: it is a manifest-managed fixture and editing it blocks
+   `install-claude-fixtures.sh` permanently (§2.8). Every phase brief must name this file
+   among the things the agent reads first. Done 2026-08-10.
 
    **Include the task-artifact override.** `.claude/tasks/README.md` documents the workflow
    artifacts as `review-report.md` and `test-report.md`; the `task-workflow` skill actually
@@ -568,8 +576,9 @@ of the plan depends on (the R5 spike).
 4. Confirm what is already correct and must survive step 1: `.claude/rules/README.md` is
    absent; `aiae-rule-compliance-audit` is present and `rule-compliance-audit` is not;
    `.claude/agent_docs/` carries 29 files; `.aiae-fixtures-manifest` is present.
-5. Re-apply the `CLAUDE.md` guardrails block added in P0 step 1a — step 1 above
-   overwrites the file.
+5. **Leave `CLAUDE.md` alone.** Project rules live in `docs/migration-guardrails.md` (§2.8).
+   Nothing is re-applied here, and the file must still match its manifest hash when this
+   phase ends.
 
 **Build** n/a **Test** n/a
 **Review** `aiae-rule-compliance-audit`

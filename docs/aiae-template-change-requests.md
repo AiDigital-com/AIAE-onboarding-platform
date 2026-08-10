@@ -352,6 +352,65 @@ allow a project to declare its changelog root and `changes/` equivalent.
 
 ---
 
+## CR-9 — `CLAUDE.md` is both "adapt this" and hash-protected
+
+**Severity: high. It blocks the upgrade path for any project that follows your own instruction.**
+
+`CLAUDE.md` ships saying: "Apply it to the current repository after discovering that
+repository's actual structure, package root, build commands, ports, and existing product
+decisions." A generated project is therefore expected to edit it.
+
+It is also a managed fixture. `install-managed-claude-fixtures.py:22` lists it in
+`managed_root_files`, its sha256 is recorded in `.claude/.aiae-fixtures-manifest`, and line 141
+aborts the whole install with "managed fixture was edited locally; refusing overwrite" on any
+mismatch. There is no override flag and no partial-update path; the manifest itself says
+"Managed... Do not edit."
+
+**The result: adapt `CLAUDE.md` as instructed, and `install-claude-fixtures.sh` can never run
+again.** Every later template revision has to be applied by hand. We hit this on the first
+phase, lost an attempt to it, and resolved it by keeping `CLAUDE.md` pristine and moving all
+project rules into a separate unmanaged file. That works — but it means the one file agents
+read automatically is the one file we may not put project rules in.
+
+The same trap applies to the other three root entries: `AI-DEVELOPMENT-GUIDE.md`,
+`GDS-WORKFLOW-README.md`, `agent-payload.skills`.
+
+### Proposed change
+
+Either drop `CLAUDE.md` from `managed_root_files` and treat it as seeded once, or add a
+supported way to re-adopt a locally modified fixture: an explicit `--accept-local` flag, or a
+marker region inside `CLAUDE.md` excluded from the hash, so projects have a sanctioned place
+for their own paragraphs.
+
+---
+
+## CR-10 — the link checker flags files its own rewriter cannot fix
+
+**Severity: low. Costs a manual step per install.**
+
+`check-installed-documentation-links.py` scans installed content for removed control-plane
+paths. On this project it reports six:
+
+```
+backend/.../UsageLoggingAspect.java:29            .../observability/usage-logging-rules.md
+backend/.../LogbookConfig.java:2                  .../observability/logbook-http-logging-rules.md
+backend/.../MetadataOnlyHttpLogFormatter.java:2   (same)
+backend/.../OpenApiSpecConfig.java:6              .../openapi/canonical-openapi-rules.md
+frontend/vite.config.ts:12                        .../frontend/canonical-react-frontend-rules.md
+frontend/src/features/_template/README.md:20      .../frontend/bem-naming-rules.md
+```
+
+`rewrite-installed-documentation-paths.py` applies exactly the right replacement — the target
+files do exist under `.claude/agent_docs/` — but it iterates `content_root.rglob("*.md")`.
+Five of the six are `.java` and `.ts`, so the rewriter can never fix what the checker reports.
+
+### Proposed change
+
+Widen the rewriter to the file set the checker inspects, or narrow the checker to `.md`.
+Either makes the pair self-consistent.
+
+---
+
 ## Summary
 
 | ID | Gate | Severity | Blocking us? | We need |
@@ -364,6 +423,8 @@ allow a project to declare its changelog root and `changes/` equivalent.
 | CR-6 | `verify-gates.sh` — `vitest` pin | TBD | TBD | Advance notice; spike result to follow |
 | CR-7 | `.claude/tasks/README.md` vs `task-workflow` | Low | No | The two to agree on artifact names |
 | CR-8 | `structure-lint.sh` — changelog paths | Medium | **Yes** | A property check instead of hardcoded paths |
+| CR-9 | `CLAUDE.md` managed *and* meant to be adapted | **High** | **Yes** | Seed-once, or a sanctioned unhashed region |
+| CR-10 | link checker vs path rewriter file sets | Low | No | The two to cover the same files |
 
 Everything else in our audit is our own work and is in progress. We are happy to supply the
 full audit, reproduction commands, or a patch for any of the above.
