@@ -729,6 +729,347 @@ is documented rather than silently absorbed.
 
 ---
 
+## P3 — Documentation, Replit contract, Context7 · **COMPLETE (five of six gates); one gate blocked by a Scope conflict, reported below**
+
+Completed 2026-08-10 on branch `mig/p03-docs-replit` (from `migration` @ `4be55ef`).
+
+### Environment
+
+Same shims as P0–P2: `python3` resolved to a real 3.14.5 via a copy on `PATH`
+ahead of the Windows Store stub; `JAVA_HOME=/c/Users/Admin/.jdks/corretto-21.0.12`
+and `/c/Users/Admin/tools/apache-maven-3.9.16/bin` prepended for Maven. `rsync`
+was not needed this phase.
+
+### Step 1 — `docs/architecture-overview.md`, ADD ONLY — and a plan gap found by reading the checker directly
+
+The plan states the checker's only violation is a missing `Document status`
+section. **Reading `scripts/lib/check-architecture-overview.sh` directly
+(as instructed) shows this is true only because the checker's
+`required_sections` loop calls `fail()`, which `exit 1`s on the *first*
+missing section** — the same fail-fast shape P2's own commentary on
+`verify-gates.sh`/`structure-lint.sh` already names ("Red for one known
+reason, and blind to everything downstream"). The loop actually requires
+**twelve** exact `## <name>` sections, none of which existed before this
+phase except by coincidence of wording:
+`Document status`, `Product and system context`, `Product-specific evidence`,
+`Runtime and deployment`, `Repository and module boundaries`,
+`Primary runtime flows`, `API and security boundaries`,
+`Data ownership and migrations`, `Caching and consistency`,
+`External integrations`, `Observability and operations`,
+`Decisions, constraints, and known risks`. Confirmed by running the checker
+after adding only `Document status`: it then failed on the next section, and
+so on. This is not a contradiction with **ADD ONLY** — every one of the
+twelve was added as a new section with project-true content (see the diff);
+nothing in `Identity`, `Backend modules`, `Deployment / runtime constraints`,
+`Adopted standards the code has not caught up to yet`, or
+`Known upstream defect` was removed, renamed, or overwritten. One collision
+was caught and fixed before commit: an initial draft's
+*Repository and module boundaries* table repeated the
+`` | `backend/event-logging-to-db-feature` | `` row already present in
+*Backend modules*, pushing `module_row_count` to 2 and failing the checker's
+`-eq 1` assertion — removed in favor of a cross-reference sentence.
+
+Facts added (all verified by direct file read, not carried from the plan or
+audit): the five outbound integrations with representative classes; the
+Clerk-only auth chain (`SecurityConfig`/`ClerkJwtClaimsValidator` — issuer,
+audience, `azp`) plus `CompanyEmailDomainAuthorizationManager`
+(`AUTH_ALLOWED_EMAIL_DOMAIN`) and `PermissionEvaluator`; the 18 Ehcache
+regions (8 entity + 8 query + 2 infrastructure), enumerated by name from
+`ehcache.xml`; the two scheduled jobs (`MaterialYoutubeBackfillJob`
+`fixedDelay=300_000`, `AbandonedUploadCleanupJob` `fixedDelay=900_000`); the
+presigned-upload path including the `.svg` content-type-override defect
+(audit §2.4) and the `CLOUDFRONT_ENABLED` default-`false` gate; the MVP
+usage-telemetry design (`UsageLoggingAspect` → `RoutingUsageEventSink` →
+`UsageEventPersistenceService`, D-D); and the required **S3 bucket CORS
+policy per environment** (audit §7.1.1). That policy could not be copied from
+anywhere — no source document states exact origins — so it was derived from
+the one piece of real evidence available: the app's own Spring CORS allow-list
+default in `SecurityProperties.Cors.allowedOrigins`
+(`https://*.replit.dev,https://*.repl.co,http://localhost:5173,http://localhost:5000`),
+on the reasoning that the browser performing the presigned PUT is the same
+origin already trusted for the API. Recorded as a reasoned derivation, not a
+guess, with the source line cited in the document itself.
+
+**Step 1a — the lag section made a living list, and one entry corrected
+against P2's actual result.** All five entries reviewed:
+- *Observability module* and *Distributed cache* — unchanged (P4, P6 not run).
+- *Coverage phase tooling* — the existing text said "`scripts/` has no
+  `lib/`"; that became false the moment P2 landed. Rewritten to state P2's
+  actual, verified result (`scripts/lib/` and `.template-phase=mvp` exist;
+  `check-coverage-integrity.sh` runs and reports 14) and what P9 still owes
+  (an actual `-Pmvp` Maven profile — today `mvp` is not a real profile and
+  Maven warns and falls through to the hardcoded 0.80 default).
+- *Import ordering* — unchanged (P12 not run).
+- *CSS tokens and units* — rewritten from "the code has not caught up" to a
+  recorded **declined, permanent divergence**, citing D-A and the measured
+  1499 raw `px` / 611 hex / 87 tokens, per the plan's explicit instruction.
+
+### Step 2 — `backend/DEPENDENCY-ANALYSIS.md` — created, and a second plan/reality gap found
+
+The plan and the audit both state the checker's only violation is the missing
+policy file. **Verified false by running the checker before and after
+creating an empty policy file:** before, it fails at
+`missing policy: backend/DEPENDENCY-ANALYSIS.md`; immediately after creating
+the file, it fails at a *different* check — `maven-dependency-plugin is
+required` — because **`maven-dependency-plugin` does not exist anywhere in
+`backend/pom.xml` or any child POM** (confirmed by `grep -rn
+"dependency-plugin" backend/`: zero matches). The checker requires the plugin
+activated in root `build/plugins` *and* an `analyze-only` execution bound to
+`verify` under `pluginManagement` with `failOnWarning=true` and
+`ignoreNonCompile=true` — none of which exists.
+
+**This is a genuine Scope conflict, not something resolved by writing more
+documentation.** P3's Scope lists `backend/DEPENDENCY-ANALYSIS.md` but not
+`backend/pom.xml` — the pom is explicitly reserved elsewhere (P4 adds
+`backend/observability` to it, P5 touches `backend/migrations/pom.xml`, P6
+adds `backend/cache-management`). Wiring the plugin is a `backend/pom.xml`
+edit, which this phase has no Scope grant to make. Per the task's own
+instruction ("If the plan contradicts what you find, stop and report rather
+than guessing") and the precedent already in this log (P1's first attempt
+stopped at a Scope-adjacent contradiction rather than improvising a fix), this
+was **not** done. `backend/DEPENDENCY-ANALYSIS.md` was still created and
+filled in honestly for this project's actual dependency set — confirmed by
+direct evidence that the scaffold's exact two-coordinate rationale applies
+here too: `backend/service/pom.xml` already carries the
+`event-logging-to-db-feature` dependency edge with a comment explaining why,
+and a repo-wide grep for `LogUsage`/`UsageAttributes` under
+`backend/service/src` and `backend/application/src` returns zero matches, so
+the edge is genuinely unused-today, exactly the scaffold's documented
+scenario. The document states plainly, in its own first paragraph, that the
+enforcement mechanism is not yet wired and why, so it cannot be mistaken for
+a claim that the gate is enforced. **This leaves gate #13 failing — expected,
+and explained in the Verification section below** — and is a decision for the
+technical owner: either widen P3's Scope to include this one plugin
+activation in `backend/pom.xml`, or accept the gate stays red until whichever
+phase next opens that file.
+
+### Step 3 — README
+
+Added `## What this is` (the checker's exact required heading — also
+undocumented in the plan's step-3 text, which only mentioned the API/Swagger/
+OpenAPI block; found the same way as the two gaps above, by reading
+`scripts/verify-gates.sh:111-118` directly) directly above the existing intro
+paragraph, and a new `## API` section with real, curl-verified links:
+the OpenAPI YAML path and its runtime URL, and the Swagger UI path
+(`springdoc.swagger-ui.url` in `application.yml:119-120`). Also fixed one
+pre-existing factual error while in the file: the Layout section's backend
+module list still read `` `domain`, `db`, ... `` — `backend/db` was renamed to
+`backend/migrations` before P0; corrected to match `backend/pom.xml`'s actual
+`<modules>` order. Left everything else exactly as it was, per the plan's
+"leave the rest" instruction.
+
+**Found but not fixed, reported instead of silently expanded:** the "Run
+locally" section instructs `cp .env.local.example .env.local`, but
+`.env.local.example` does not exist anywhere in the repository or its git
+history (`git log --all -- .env.local.example` returns nothing). This makes
+that quoted workflow non-functional as written. Creating the missing file is
+outside this phase's Scope (README.md only, not a new top-level file); left
+for a future phase or the technical owner to decide whether to add the file
+or repoint the instructions at `.env.example`.
+
+### Step 4 — `docker-compose.yaml` → `docker-compose.yml`
+
+`git mv`, zero content diff (confirmed: `git diff --stat -M` shows only the
+rename, no changed lines). Updated the three `docker-compose.yaml` references
+in `README.md` to `.yml` in the same commit (`scripts/local-verify.sh`,
+`scripts/materialize-project.sh`, and `scripts/test-materialize-project.sh`
+already expected `.yml` — P2 had already written a comment in
+`local-verify.sh` anticipating this exact rename, so no script needed
+touching). `docker compose -f docker-compose.yml config` parses cleanly.
+
+### Step 5 — `.replit` (C7)
+
+Adopted the scaffold's inline-workflow form: both `[[workflows.workflow.tasks]]`
+entries now embed the literal contract strings directly (`source
+scripts/replit-env.sh`, `mvn -f backend/application/pom.xml ...
+spring-boot:run`, `npm run generate:api` before `npm run dev`), and added
+`onBoot = "bash scripts/setup-project.sh"` (absent before). Verified every
+`verify_replit_file()` assertion individually by grep before running the full
+gate suite (all ten passed). Preserved, confirmed unchanged: `modules =
+["java-21", "nodejs-22", "postgresql-16"]`; `deploymentTarget = "gce"`; the
+5000→80 port mapping; `SPRING_PROFILES_ACTIVE = "replit"`; and — the one the
+brief called out by name — `VITE_CLERK_JWT_TEMPLATE = "aidigital-api"` in
+`[env]`. `[deployment].build`/`.run` were left pointing at the project's own
+`scripts/replit-build.sh`/`replit-run.sh` wrappers (Do-not-touch); the checker
+does not require those inlined, only the workflow tasks.
+
+**`onBoot` was not merely inspected — it was run locally, once, deliberately,
+to check it is safe.** `scripts/setup-project.sh`'s own logic resolves
+`SCAFFOLD` to an empty string whenever `backend/pom.xml` already exists
+("Already materialized — no scaffold needed for cleanup steps"), which gates
+every potentially destructive branch (`.gitignore` overwrite, runtime-script
+reinstall). Ran it against this tree with `git status --porcelain` compared
+before/after: **zero diff**, exit 0, logged only `cleaned .replit` (a no-op
+`sed` pass — this project has no `python-*` module or Flask/Django/FastAPI
+integration for it to strip) and `backend/ already present — skipping
+materialize`. This is real local verification of the boot hook, not
+inspection alone.
+
+### Step 6 — Context7
+
+`.mcp.json` present and unchanged, pointing at
+`https://mcp.context7.com/mcp/oauth` (HTTP OAuth, no key to manage) — matches
+the plan's description exactly. **Not verified reachable in this session**:
+no Context7 MCP tool was exposed to this agent (`ToolSearch` for "context7"
+returned no match), which reads as this session's own OAuth/MCP wiring, not a
+repository defect — nothing under `.mcp.json` or the repo was changed to
+cause it. Recorded as unverified rather than assumed working.
+
+### Local run — beyond inspection, matching the plan's Verification block
+
+Since P3 changes how Replit boots the app, more than a gate count was
+gathered. With Postgres up via `docker compose -f docker-compose.yml up -d
+postgres` (container reported `healthy`), ran the **exact commands now
+embedded in `.replit`** directly (not the wrapper scripts, to verify the
+literal contract strings themselves): `mvn -f backend/pom.xml -DskipTests
+-Dskip.frontend=true install` (BUILD SUCCESS, 25s) then `mvn -f
+backend/application/pom.xml ... spring-boot:run` in the background, with
+`AUTH_JWKS_URI` set to a syntactically-valid placeholder (never fetched
+unless a real token is decoded — no Clerk credential requested or used).
+Result: **`Started Application in 7.634 seconds`**, Liquibase reported `Run:
+0 / Previously run: 14` against the empty-then-migrated local DB, all 18
+Ehcache regions registered by name. Confirmed by `curl`:
+
+| Endpoint | HTTP status |
+|---|---|
+| `/actuator/health` | 200 |
+| `/api/v1/specs/openapi.yaml` | 200 |
+| `/swagger-ui/index.html` | 200 |
+| `/` (SPA welcome page) | 200 |
+
+Then `npm run generate:api` against the live backend (succeeded, 104.5ms,
+same command `.replit` now embeds) and `npm run dev -- --host 0.0.0.0 --port
+5173` in the background: Vite ready in 160ms, `curl http://localhost:5173/`
+returned 200 with `<title>AIAE Onboarding platform</title>` in the body —
+the real app shell, not a placeholder. Both processes stopped by PID
+afterward (`Stop-Process` on the PIDs bound to ports 5000/5173, confirmed no
+listener remained); `docker compose -f docker-compose.yml down -v` removed
+the container, network, and volume. `git status --porcelain` before and
+after this entire local run was compared and is identical except for the
+intended file changes below — the run left no residue.
+
+**What this does and does not prove.** It proves the backend boots, applies
+Liquibase idempotently against an already-migrated schema, serves the
+documented API/Swagger/OpenAPI endpoints, and that the frontend dev server
+serves the real SPA — using the literal command strings now embedded in
+`.replit`. It does **not** prove a Replit deploy boots from this contract:
+Replit's actual `onBoot`/build/run execution, its network/DNS environment,
+and Clerk token exchange against a real publishable key were never exercised,
+per the plan's own instruction that the deploy path stays unverified by this
+migration. That gap is explicit here, not silent.
+
+`bash scripts/local-verify.sh` was also run end-to-end (report-only, exits 0
+by design): `check-architecture-overview.sh` → `passed (mvp)`;
+`docker-compose.yml config` → PASS (previously SKIP, per P2's own comment
+anticipating this exact rename); backend `mvn clean verify` → BUILD SUCCESS,
+**507 tests, 0 failures, 44 skipped** — identical to the P0/P2 baseline, no
+regression; frontend step still fails on the pre-existing missing `"lint"`
+script (P12's job, unrelated to P3, unchanged from P2's baseline).
+
+### Fixture manifest and scope
+
+`.claude/.aiae-fixtures-manifest`: **80/80** matched, re-validated immediately
+before this commit. `git status --porcelain` shows exactly the Scope-listed
+paths and nothing else: `.replit` (M), `README.md` (M),
+`docker-compose.yaml` → `docker-compose.yml` (R, no content change),
+`docs/architecture-overview.md` (M), `backend/DEPENDENCY-ANALYSIS.md` (new).
+`backend/pom.xml` and every other backend/frontend source file: zero diff.
+
+### Review — `production-code-review`
+
+Scope: this phase's diff (`.replit` and the docs). No blocking findings. One
+finding applied before commit: an early draft of *Repository and module
+boundaries* duplicated the `event-logging-to-db-feature` module-table row,
+which would have made `check-architecture-overview.sh`'s
+`module_row_count` assertion fail at 2 — removed in favor of a
+cross-reference sentence (see Step 1 above). Confirmed by diff that no file
+outside Scope was touched and that `onBoot`'s local run left no residue.
+
+### Verification — gate movement, 22 → 17 (five of six intended, one explained)
+
+`bash scripts/verify-gates.sh`, full failure list, before (P2 baseline) →
+after:
+
+| # (before) | Assertion | After P3 |
+|---|---|---|
+| 1 | README must describe the app and include API, Swagger UI, and OpenAPI YAML links | **cleared** |
+| 2 | check-architecture-overview.sh reported violations | **cleared** — `passed (mvp)` |
+| 3 | .replit: backend workflow must use backend/application/pom.xml | **cleared** |
+| 4 | .replit: frontend workflow must run npm run generate:api before Vite | **cleared** |
+| 5 | .replit: workflows must source scripts/replit-env.sh | **cleared** |
+| 6 | frontend/package.json must pin firewall-approved vitest ^3.2.6 | unchanged (P0 baseline, not P3's job) |
+| 7 | frontend/package.json must define a "lint" script running eslint | unchanged (P12's job) |
+| 8 | frontend/eslint.config.js is required | unchanged (P12's job) |
+| 9 | Frontend must not use a left side menu/sidebar | unchanged — carried red, §6/CR-2 |
+| 10 | check-openapi-documentation.sh reported violations | unchanged |
+| 11 | check-openapi-input-constraints.py reported violations | unchanged |
+| 12 | check-api-validation-tests.py reported violations | unchanged |
+| 13 | **check-maven-dependency-analysis.py reported violations** | **NOT cleared — see Step 2 above; now fails at "maven-dependency-plugin is required" instead of "missing policy"** |
+| 14 | Every Maven submodule must declare Lombok: migrations | unchanged (P5's job) |
+| 15 | Logbook DefaultSink must be built with formatter + writer | unchanged |
+| 16 | Production/Replit Logbook must use metadata-only WithoutBodyStrategy | unchanged |
+| 17 | service source must not import web/security/JWT/servlet APIs | unchanged |
+| 18 | check-frontend-ui-rules.sh reported violations | unchanged — carried red, §6 |
+| 19 | check-production-static-methods.sh reported violations | unchanged |
+| 20 | check-production-current-time.sh reported violations | unchanged (P8's job) |
+| 21 | check-service-contract-quality.sh reported violations | unchanged |
+| 22 | check-coverage-integrity.sh reported violations | unchanged |
+
+**Result: 22 → 17, not the predicted 22 → 16.** The gap is exactly gate #13,
+explained in Step 2: closing it honestly requires an edit to
+`backend/pom.xml`, which is outside this phase's Scope. All sixteen gates the
+brief expected to stay untouched did stay untouched — confirmed by the
+before/after table above, item by item; nothing moved that was not supposed
+to. The four carried red assertions (presigned upload = 1,
+`check-frontend-ui-rules.sh` = 2222, sidebar fails, `structure-lint`
+`changes/0001-usage-events.xml` fails) were reconfirmed unchanged where this
+phase's tools touched them (`check-frontend-ui-rules.sh` still 2222 per
+`local-verify.sh`'s own run; presigned-upload count reconfirmed at exactly 1
+per file by direct grep).
+
+**Build** `mvn -f backend/pom.xml clean verify` → BUILD SUCCESS, 507 tests,
+0 failures, 44 skipped (via `local-verify.sh`, identical to P0/P2 baseline).
+Also `mvn -f backend/pom.xml -DskipTests install` + `mvn -f
+backend/application/pom.xml spring-boot:run` (the exact commands now in
+`.replit`) → app started in 7.634s, confirmed serving on `:5000`.
+**Test** `docker compose -f docker-compose.yml config` → parses (PASS).
+`npm run generate:api` against the live backend → succeeded, 104.5ms.
+`npm run dev -- --host 0.0.0.0 --port 5173` → Vite ready in 160ms, SPA served
+(curl-confirmed, real `<title>`, not a placeholder).
+**Review** `production-code-review` — no blocking findings; one draft-stage
+duplicate-row finding caught and fixed pre-commit (see above).
+**Verification** `verify-gates.sh`: **22 → 17** (five of the six targeted
+gates cleared; gate #13 blocked by a Scope conflict, reported above, not
+silently left unexplained). `check-architecture-overview.sh`: 1 → 0.
+`check-maven-dependency-analysis.py`: unchanged (still fails, different
+message). `verify_replit_file()`: all ten assertions individually confirmed
+passing by grep before the full-suite run. Fixture manifest: 80/80,
+unchanged throughout. **The Replit deploy path remains unverified by this
+migration** — everything above is a local run of the same literal commands,
+not an actual Replit boot; whoever deploys next must check it.
+**Rollback** `git revert` on this phase's commit. Out-of-repo: none —
+`onBoot`'s one local run left no residue (confirmed by `git status
+--porcelain` diff), and the Postgres container/volume/network created for the
+local run were torn down (`docker compose down -v`) before commit.
+
+### What was declined, and what remains a decision for the technical owner
+
+- **Gate #13 (`check-maven-dependency-analysis.py`) was not forced green.**
+  Wiring `maven-dependency-plugin` into `backend/pom.xml` would close it, but
+  that file is outside P3's Scope. `backend/DEPENDENCY-ANALYSIS.md` was still
+  written, honestly, as the policy the plugin will enforce once a future
+  phase (or an explicit Scope widening of this one) wires it.
+- **`.env.local.example` was not created.** README's "Run locally" section
+  references a file that has never existed in this repository. Creating it is
+  a new file outside README.md's Scope grant; flagged for the technical owner
+  instead of silently added.
+- Everything else the plan's Step 1–6 list asked for was done, including the
+  one-time local `onBoot` run and the full local backend+frontend serve,
+  which the plan's Verification block asks for but does not make mandatory
+  wording ("plus... a local run that serves the SPA").
+
+---
+
 ## Carried red assertions
 
 Every phase's evidence must show these unchanged. A count that moves without a decision
