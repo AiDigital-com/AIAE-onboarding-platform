@@ -1,5 +1,5 @@
 // MetadataOnlyHttpLogFormatter — bounded-metadata Logbook formatter for normal operation.
-// Canonical spec: templates/generated-project/observability/logbook-http-logging-rules.md.
+// Canonical spec: .claude/agent_docs/observability/logbook-http-logging-rules.md.
 // Never reads the request/response body, so large lesson/material payloads are never
 // parsed, masked, or serialized just to produce a log line. Paired with WithoutBodyStrategy
 // in LogbookConfig so the body is also never buffered in the first place.

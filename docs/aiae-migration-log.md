@@ -323,6 +323,171 @@ before it. This is recorded as a plan defect for the technical owner, not fixed 
 
 ---
 
+## P1 — Agent surface · **COMPLETE**
+
+Completed 2026-08-10 on branch `mig/p01-agent-surface` (from `migration` @ `cb5f57a`), after the
+blocked attempt above. **Unblocked by two fixes made before this run started** (not by this
+phase): `CLAUDE.md` was restored to be byte-identical to its manifest entry, with the
+guardrails block moved to `docs/migration-guardrails.md`; and `.gitattributes` gained the
+`-text` exemption for the four managed root files (`CLAUDE.md`, `AI-DEVELOPMENT-GUIDE.md`,
+`GDS-WORKFLOW-README.md`, `agent-payload.skills`), not only `.claude/**`. Both fixes are
+visible in the repository, not part of this phase's diff.
+
+### Step 0a — fixture manifest: 80 of 80 match
+
+Re-ran the same hash-comparison as the blocked attempt (real `python3` shimmed onto `PATH`
+first — see environment note below). **80 of 80 matched**, including `CLAUDE.md`. Cleared to
+proceed.
+
+### Step 0 — `.gitignore`, the four §2.6 changes
+
+Applied before creating any of the files below: un-ignored `.agents/`, `AGENTS.md`,
+`replit.md`; restored the two deleted header sentences ("The active dual-agent runtime is
+part of the app…" / "Both active agent surfaces are deliberately NOT ignored."); added
+`.claude/tasks/*` + `!.claude/tasks/README.md`. Left `templates/` and `custom_instruction/`
+ignored, unchanged.
+
+### Step 1 — re-ran `install-claude-fixtures.sh`
+
+**Environment gap not listed in the plan's traps: `rsync` is not installed in this shell.**
+The installer's only two `rsync` calls are always the shape `rsync -a SRC/ DST/` (copy tree
+contents). Installed a same-directory shim on `PATH` (ahead of the `python3` shim) that
+translates that exact call to `mkdir -p DST && cp -a SRC/. DST/` via GNU `cp`; verified against
+a throwaway directory pair before use. No project file or script was touched to work around
+this — the shim lives outside the repository, like the `python3` fix.
+
+Ran `bash scripts/install-claude-fixtures.sh <project>` from the standard checkout
+(`cc64e49`). It installed 80 files, removed 0, and exited **1** — but only at its own final
+`check-installed-documentation-links` step, which failed with exactly the 6 broken references
+named in Scope for step 6. All fixture copying had already completed by that point. Confirmed
+every changed file under `.claude/agent_docs/**`, `.claude/skills/**`, `AI-DEVELOPMENT-GUIDE.md`
+and `GDS-WORKFLOW-README.md` is byte-identical to the prior version once both are normalised to
+LF — i.e. every one of these diffs is a line-ending rewrite from the mixed-CRLF/LF manifest
+(§2.8), not a content change. `.mcp.json` had no diff at all (merge preserved it). Re-ran the
+80-entry manifest hash check immediately afterward: **80 of 80 still match**, `CLAUDE.md`
+included (`git diff --quiet -- CLAUDE.md` reports no difference from `HEAD`).
+
+### Steps 2–5 — AGENTS.md, replit.md, `.agents/skills/`, pins, and the "already correct" checks
+
+Copied `AGENTS.md` / `replit.md` verbatim from `scaffold/AGENTS.md.template` /
+`replit.md.template` (byte-identical, confirmed by `diff`). Mirrored `.agents/skills/` verbatim
+from the standard (`cp -a`, 24 files across 12 skill directories, including
+`.agents/skills/verification-gate/SKILL.md`). Added `llm-aux.lock` (verified its `revision=`
+line reads `690a9748657adf81d01702dafa2c7ecc8afcf5c5`, `version=0.2.0`, matching the plan's
+pin exactly), `.template-version=cc64e49`, `.template-phase=mvp`.
+
+Confirmed step 4's four "already correct" claims, all true: `.claude/rules/README.md` absent;
+`aiae-rule-compliance-audit` present and `rule-compliance-audit` absent from
+`.claude/skills/`; `.claude/agent_docs/` carries **29** top-level entries (11 directories + 18
+files — matches exactly); `.aiae-fixtures-manifest` present. Left `CLAUDE.md` untouched per
+step 5; re-validated the manifest at 80/80 immediately before committing (repeated below as the
+final count).
+
+### Step 6 — the six documentation citations, and a seventh place the plan did not anticipate
+
+Fixed the prefix `templates/generated-project/` → `.claude/agent_docs/` by hand in exactly the
+six files named in Scope, comment lines only, no executable code changed (each diff below is a
+single line):
+
+```
+backend/event-logging-to-db-feature/.../usagelogging/UsageLoggingAspect.java:29
+backend/application/.../config/LogbookConfig.java:2
+backend/application/.../config/MetadataOnlyHttpLogFormatter.java:2
+backend/application/.../config/OpenApiSpecConfig.java:6
+frontend/vite.config.ts:12
+frontend/src/features/_template/README.md:20
+```
+
+**Found beyond the plan, and fixed within the general `.agents/**` Scope grant (not a step-6
+file):** running `check-installed-documentation-links.py` after steps 0–5 but before any step-6
+fix reported **33** violations, not 6. The extra 27 were all inside `.agents/skills/**/*.md` —
+five skill files (`backend-java-feature/SKILL.md` and its `backend-workflow-details.md`,
+`frontend-react-feature/SKILL.md`, `openapi-contract-first/SKILL.md`,
+`mvp-safety-review/references/publish-gate-checks.md`) mirrored verbatim in step 3, still
+carrying the same `templates/generated-project/…` citations the six-file list was written to
+fix. `templates/` does not exist anywhere in this project (confirmed: `ls templates` →
+"No such file or directory"), so every one of those citations is genuinely dangling, exactly
+the class of defect the checker exists to catch — not a false positive.
+
+**Root cause:** `install-claude-fixtures.sh` runs `rewrite-installed-documentation-paths.py`
+against `.claude/agent_docs` and `.claude/skills` (lines 90 and 106 of the installer) but never
+against `.agents/skills` — the rewriter has no path into the Replit-facing skill mirror at all.
+The plan's step-6 rationale ("the standard's own rewriter cannot" fix five of the six because
+it only iterates `.claude/skills`'s `*.md`) is correct as far as it goes, but understates the
+gap: the same rewriter also cannot reach `.agents/skills`, and step 3's "mirror `.agents/skills`
+verbatim" instruction reintroduces the identical defect class 27 times over, unmentioned in
+either Scope's step-6 file list or the phase's Verification block ("6 → 0").
+
+**This is a plan gap, not a blocking contradiction**, because `.agents/**` is already listed in
+P1's general Scope (not restricted to the six named files — that restriction reads as scoped to
+`backend/`/`frontend/`, confirmed by the task framing given for this run), so fixing it stays
+inside this phase's authority. Ran the standard's own
+`rewrite-installed-documentation-paths.py` against `.agents/skills` (read-only tool invoked from
+the external standard checkout; nothing under this project's `scripts/**` was touched) — the
+exact same substitution the installer already trusts for `.claude/skills`. Re-ran the checker:
+**0** violations. Filed here for the technical owner as an extension of CR-10: step 3 needs
+either "run the rewriter against `.agents/skills` too" or "step 6 also covers every
+`templates/generated-project/` citation inside `.agents/skills/**/*.md`," not just the five
+originally named.
+
+### Environment note: `rsync` is a second missing tool, alongside the documented `python3` stub
+
+Not in the plan's environment-traps list. `which rsync` found nothing anywhere on `PATH`, and a
+search of common Windows install locations (`cwrsync`, `msys64/usr/bin`, `scoop/apps`) found
+nothing either. Worked around with a minimal shim (above) rather than skipping step 1 or hand-
+copying files outside the installer's own logic. Recording this so the next phase that needs
+`rsync` (none currently do) does not repeat the search.
+
+### Review — `aiae-rule-compliance-audit`
+
+Verdict: **COMPLIANT**. Scope: this phase's diff only. Evidence: `git diff --cached --stat`
+(52 files, all inside the Scope list); the six named files' diffs (each exactly one comment
+line); `git diff --cached --name-only | grep -E '^(backend|frontend)/'` returns exactly those
+six paths, nothing else; `.github/**` and `scripts/**` show zero touched files;
+`git diff --quiet -- CLAUDE.md` confirms no change. No blocking or important findings. One
+architecture concern recorded above (the `.agents/skills` citation gap) — resolved in this same
+commit, not left open.
+
+### Verification
+
+| Gate / check | Before | After |
+|---|---|---|
+| `check-agent-surfaces.sh` | `handoff` (mode; `AGENTS.md`/`replit.md`/`.agents` all absent) | `active`, exit 0 — all three present, `.agents/skills/verification-gate/SKILL.md` present |
+| `check-installed-documentation-links.py` | **6** broken references | **0** — plan's literal instruction alone would have left this at **27** (see step 6 above); fixing the discovered `.agents/skills` gap in the same commit reaches the plan's stated exit criterion |
+| `.claude/.aiae-fixtures-manifest` | 80/80 (validated at step 0a) | **80/80** (re-validated after step 1 and again before commit) — `CLAUDE.md` unchanged throughout |
+| `git ls-files` | — | `AGENTS.md`, `replit.md`, `.agents/skills/**`, `llm-aux.lock`, `.template-version`, `.template-phase` all tracked and not gitignored (`git check-ignore` confirms none are excluded) |
+
+**Build** n/a — P1 has no build step; the phase touches documentation, fixtures, and code
+comments only, and nothing under `backend/` or `frontend/` compiles differently (the six edits
+are comment-only, verified by diff).
+**Test** n/a — P1 has no test step for the same reason; no production logic changed.
+**Review** `aiae-rule-compliance-audit` — **COMPLIANT**, see above.
+**Verification** `check-agent-surfaces.sh`: `handoff` → `active` (exit 0);
+`check-installed-documentation-links.py`: **6 → 0** (via 33 at the midpoint, see step 6);
+fixture manifest: 80/80 throughout, `CLAUDE.md` byte-identical to its manifest entry both
+before and after; `git ls-files` reflects the §2.6 un-ignore decision exactly.
+**Rollback** `git revert` on this phase's commit; also revert the pre-existing `CLAUDE.md`/
+`.gitattributes` fixes if the intent is to reproduce the blocked state (not recommended — those
+fixes were correct). No out-of-repo action.
+
+### Things the plan got right this time, worth recording
+
+- §2.1/R1 and §2.8's core claim (the manifest covers `.claude/**` plus four root files) both
+  held exactly as documented.
+- The six-file Scope list for step 6 was accurate and complete for what it claimed to cover
+  (files where the installed rewriter cannot run) — it just did not anticipate step 3
+  introducing the same defect class through a different, unrewritten mirror.
+- `.claude/agent_docs/` — 29 entries, `aiae-rule-compliance-audit` present,
+  `rule-compliance-audit` absent, `.claude/rules/README.md` absent — every "already correct"
+  claim in step 4 was verified true.
+
+### Nothing was declined in this phase
+
+Every step in P1's Steps list (0, 0a, 1–6) was executed. The one thing done beyond the literal
+text — fixing `.agents/skills/**/*.md` citations — was necessary to meet the phase's own stated
+Verification target and stayed inside the general Scope grant; it is documented above rather
+than silently absorbed.
+
 ## Carried red assertions
 
 Every phase's evidence must show these unchanged. A count that moves without a decision
