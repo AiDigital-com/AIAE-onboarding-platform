@@ -1874,6 +1874,336 @@ residue.
 
 ---
 
+## P7 — Coordinate node-affine work · **COMPLETE**
+
+Completed 2026-08-11 on branch `mig/p07-concurrency` (from `migration` @ `8f186bf`, merged forward to
+include `c6f1f0d` — a docs-only CR-11 commit that touches no file this phase modifies).
+
+### Environment
+
+Same shims as P0–P6: `python3` resolved to a real 3.14.5 via a copy on `PATH` ahead of the
+Windows Store stub; `JAVA_HOME=/c/Users/Admin/.jdks/corretto-21.0.12` and
+`/c/Users/Admin/tools/apache-maven-3.9.16/bin` prepended for Maven. Fixture manifest
+re-validated **80/80** before any change and again immediately before this commit — P7's Scope
+never touches a managed fixture. `mvn -f backend/pom.xml clean install -DskipTests` was needed
+once after a stray concurrent build left `target/classes` with a truncated class file
+(`LessonApiMapper.class`); a clean rebuild cleared it, matching the environment note about a
+stale build biting after an odd boot/interrupt.
+
+### Preparation, not remediation — confirmed against the working tree before writing anything
+
+One node runs today; nothing is currently duplicated. Verified before any edit: `grep -rn
+"FOR UPDATE SKIP LOCKED\|pg_advisory" backend` — zero matches anywhere in the repository.
+`MaterialYoutubeBackfillJob` was `@Scheduled(fixedDelay = 300_000)` **and carried `@Transactional`
+at the job level**, wrapping the whole batch — including every YouTube call — in one database
+transaction. That is the exact violation `.claude/rules/14-performance.md` forbids, and it
+predates this phase; it is fixed here as part of the same change, not filed separately, because
+fixing the concurrency shape and fixing the transaction-boundary violation are the same edit.
+`AbandonedUploadCleanupJob` (`fixedDelay = 900_000`) already had no `@Transactional` at the job
+level and its S3 delete already ran after commit via `TransactionSynchronizationManager` — that
+shape was already correct and needed no transaction-boundary fix, only the claim.
+
+### What changed, and exactly where each transaction begins and ends
+
+**1. `MaterialYoutubeBackfillJob` / `MaterialYoutubeServiceImpl.backfillMissingYoutubeMetadata()`.**
+`@Transactional` removed from the job method entirely — the job now carries no transaction
+annotation at all. The three-phase shape lives in the service, split across two beans so
+Spring's `@Transactional` proxy actually applies (a method calling a sibling method on `this`
+is not intercepted; the claim and the save had to move to a different bean, not just a
+different method, to get real transaction boundaries):
+- **Phase 1 (short transaction, opens and commits inside
+  `MaterialYoutubeUrlEntityService.claimMissingMetadataBatch`):** a new repository method,
+  `MaterialYoutubeUrlRepository.claimMissingMetadataBatch(int limit)`, native SQL,
+  `SELECT ... WHERE title = '' AND thumbnail_url = '' AND metadata_error = '' ORDER BY id ASC
+  LIMIT :limit FOR UPDATE SKIP LOCKED`. Transaction opens when the entity-service method is
+  entered and commits when it returns — before any external call.
+- **Phase 2 (no transaction):** `MaterialYoutubeServiceImpl.backfillMissingYoutubeMetadata()`
+  loops over the claimed (now detached) rows and calls `youtubeClient.fetchOembed(row.getUrl())`
+  for each — no transaction is open anywhere in this loop.
+- **Phase 3 (one short transaction per row):** each fetched result is written back via
+  `MaterialYoutubeUrlEntityService.save(row)` — a new transaction per row, so a fetch failure on
+  row *N* does not roll back rows already saved for rows 1..N-1 in the same tick (a real,
+  incidental improvement over the previous all-or-nothing behaviour, not a stated goal).
+- **New collaborator required and not named in Scope's literal file list:**
+  `backend/service/.../material/services/entity/MaterialYoutubeUrlEntityService.java`.
+  `MaterialYoutubeServiceImpl` was the sole injector of `MaterialYoutubeUrlRepository` before
+  this phase — a pre-existing, narrow divergence from "1 entity = 1 repository = 1 service"
+  (every other entity in this codebase already has a dedicated `.../services/entity/` class).
+  Splitting the claim from the orchestrator required a second bean regardless of that rule, and
+  the natural, rule-compliant place for it is exactly that missing entity service — so this
+  phase adds it and moves every repository call in `MaterialYoutubeServiceImpl` through it,
+  closing the divergence as a side effect. Documented here rather than silently absorbed, the
+  same posture P1/P2/P6 took for their own "necessary beyond the literal file list" additions.
+- **Residual gap, disclosed rather than hidden:** the claim commits without writing a persisted
+  "in progress" marker (no schema column exists for one, and this phase's Scope does not include
+  `backend/migrations`; repurposing a user-visible column such as `metadataError` as a sentinel
+  was considered and rejected — it would leak a placeholder into a field the UI can read, and a
+  crash between claim and save would leave it stuck marked forever with no recovery path). This
+  means the window this phase closes is the *concurrent-invocation* one — two nodes' ticks
+  overlapping in real time claim disjoint rows, proven below — not a *sequential-reclaim* window
+  a few milliseconds to a couple of seconds wide between one node's claim-commit and its
+  save-commit, during which a second node's *later, non-overlapping* claim could still reclaim
+  and re-fetch the same rows. Given `fixedDelay = 300_000` per node and YouTube oEmbed latency
+  in the sub-second-to-low-single-digit-second range, that window is roughly three orders of
+  magnitude smaller than the tick interval. A duplicate fetch in that narrow window wastes one
+  extra YouTube call per affected row, never corrupts data (the second save simply overwrites
+  with equivalent freshly-fetched content) — the same "wasteful, never incorrect" character the
+  plan itself accepts for the abandoned-upload sweep's duplicate S3 deletes.
+
+**2. `AbandonedUploadCleanupJob` / `StorageService.cleanupAbandonedUploads()`.**
+Simpler: the claim and the delete now happen in the **same** transaction (matching the shape
+already there before this phase — `cleanupAbandonedUploads()` keeps its class-level
+`@Transactional`, and the S3 delete was already deferred to `afterCommit()`, outside that
+transaction). `PendingUploadRepository.findByConfirmedFalseAndExpiresAtBefore` (a plain,
+unlocked `SELECT`) is replaced by `claimExpiredUnconfirmed(LocalDateTime cutoff, int limit)` —
+native SQL, `SELECT ... WHERE confirmed = false AND expires_at < :cutoff ORDER BY expires_at ASC
+LIMIT :limit FOR UPDATE SKIP LOCKED`. Because the claimed rows are deleted before this
+transaction commits, there is no reclaim window at all here, unlike case 1 above — once claimed,
+a row is gone before any other transaction could see it again.
+
+**3. `TeacherVideoRefreshServiceImpl.refreshTeacherVideoIfNeeded`.** Different shape, as the plan
+predicted: read-triggered, not scheduled. **The no-transaction-across-HeyGen invariant already
+existed before this phase** — `LessonServiceImpl.getLesson()` carries no `@Transactional`
+specifically so the HeyGen call inside the refresh chain never runs inside a transaction (see
+that method's own JavaDoc, unchanged by this phase); `LessonEntityService.getReference` /
+`findByIdWithFetches` / `save` each open and close their own short transaction. This phase adds
+a **claim gate in front of the HeyGen call**, reusing the lesson's existing `@Version` column
+instead of a new "refresh timestamp" column (Scope does not include `backend/migrations`, and no
+dedicated timestamp field exists on `Lesson` outside the JSON-nested, non-atomically-addressable
+`generationMetadata.teacherVideo.checkedAt`):
+- New repository method `LessonRepository.claimForTeacherVideoRefresh(Long id, Long
+  expectedVersion)` — JPQL bulk update, `UPDATE Lesson l SET l.version = l.version + 1 WHERE
+  l.id = :id AND l.version = :expectedVersion`, returning the row count. Bulk updates are exempt
+  from JPA's automatic optimistic-lock enforcement, so the version predicate and increment are
+  written out explicitly rather than relying on Hibernate's usual versioned-`UPDATE` machinery —
+  this does not weaken `@Version`'s normal protection for content edits: any concurrent `save()`
+  that read the pre-claim version still fails its own version check once this claim commits,
+  exactly as it would against any other concurrent writer.
+- New pass-through `LessonEntityService.claimForTeacherVideoRefresh(Long, Long)` — a short
+  transaction of its own, called from `TeacherVideoRefreshServiceImpl` (a different bean, so
+  the call is genuinely proxied and transactional; `TeacherVideoRefreshServiceImpl` already
+  injects `LessonEntityService` rather than `LessonRepository` directly, per
+  `.claude/rules/10-architecture.md`, so no new architecture exception was needed here, unlike
+  case 1).
+- **Transaction boundary:** the claim opens and commits **before** `heyGenClient.getVideoStatus`
+  is called. On a lost claim, the method returns `new RefreshResult(lesson, teacherVideo)`
+  unchanged immediately — no HeyGen call, no `save()`, no exception. On a won claim, the
+  in-memory `lesson.setVersion(lesson.getVersion() + 1)` mirrors the already-committed DB state
+  before the HeyGen call and the later `lessonEntityService.save(lesson)` (its own short
+  transaction, after the HeyGen call returns), so the winner's own save targets the version it
+  actually holds rather than the stale pre-claim value.
+- **Accepted cost:** a claim that wins but then hits `HeyGenExternalException` leaves the
+  lesson's version incremented with no corresponding content change (the version bump already
+  committed before the HeyGen call could fail). This is a normal, bounded cost of "claim before
+  external call" — the alternative (claiming and saving atomically) is exactly the shape that
+  would hold a transaction across the HeyGen call, which is forbidden.
+- **Existing `@Version` behaviour, unbroken:** `LessonServiceImplTest`,
+  `LessonEntityServiceTest`'s existing (non-`ClaimForTeacherVideoRefresh`) tests, and every other
+  caller of `lessonEntityService.save(...)` continue to exercise Hibernate's normal versioned
+  update path untouched — this phase adds one new bulk-update method beside it, and does not
+  modify `Lesson.java`, `save()`, or any existing optimistic-lock test.
+
+### What was tested, and against which database
+
+**Unit tests (Mockito, no database, run everywhere):**
+- `MaterialYoutubeServiceImplTest` — rewritten to mock `MaterialYoutubeUrlEntityService` instead
+  of the repository directly; asserts the claimed batch is fetched-and-saved per row, and that
+  zero claimed rows means zero YouTube calls and zero saves.
+- `MaterialYoutubeUrlEntityServiceTest` (new) — the new entity service's five methods delegate
+  correctly to the repository.
+- `PendingUploadEntityServiceTest` / `StorageServiceTest` — renamed
+  `findExpiredUnconfirmed`/`claimExpiredUnconfirmed` call sites; behaviour otherwise unchanged.
+- `TeacherVideoRefreshServiceImplTest` — the two existing tests now stub
+  `claimForTeacherVideoRefresh(...) → true`; a new test asserts that a **lost** claim
+  (`→ false`) returns the exact input `Lesson`/`TeacherVideoRecord` objects unchanged, never
+  calls `heyGenClient`, and never calls `save`.
+- `LessonEntityServiceTest` — new nested `ClaimForTeacherVideoRefresh` class, two tests (1 row
+  updated → `true`; 0 rows updated → `false`).
+
+**Real-database integration tests, `@SpringBootTest @ActiveProfiles("test")`, H2 in PostgreSQL
+compatibility mode (`application-test.yml`, `MODE=PostgreSQL`, `ddl-auto: create-drop`, no
+Testcontainers/Docker needed):**
+- `TeacherVideoRefreshClaimConcurrencyIntegrationTest` — **a genuine concurrency proof.** Two
+  real threads, each in its own Spring-managed transaction (`TransactionTemplate`), both call
+  `LessonRepository.claimForTeacherVideoRefresh` for the same lesson id/version, started together
+  via a `CountDownLatch`. Asserts exactly one of the two returns `1` and the other `0`, and that
+  the lesson's version advanced by exactly `1`, not `2`. This claim is a plain `UPDATE ... WHERE
+  version = ?` — no PostgreSQL-specific syntax — so H2 is a full proof here, not a best-effort
+  one. **First version of this test deadlocked**: it held both transactions open across a
+  `CyclicBarrier` (mirroring the SKIP LOCKED tests' shape), but an `UPDATE` correctly *blocks* on
+  a locked row instead of skipping it, so the loser's `UPDATE` never returned to reach the
+  barrier the winner was waiting on. Rewritten to let the two `UPDATE`s serialize naturally
+  (no barrier across the call) — the blocking-then-correctly-failing behaviour *is* the
+  atomicity guarantee, not something to work around.
+- `MaterialYoutubeUrlClaimIntegrationTest`, `AbandonedUploadClaimIntegrationTest` — **correctness
+  proofs only, single-threaded, deliberately not concurrency tests.** Each proves its claim
+  query's `WHERE`/`ORDER BY`/`LIMIT` shape: only genuinely-missing/genuinely-expired rows are
+  returned, bounded to the requested limit, never an already-fetched or not-yet-expired row.
+
+**Real PostgreSQL, `docker compose` (Testcontainers cannot reach Docker in this sandbox — the
+documented npipe failure — but `docker compose` itself works here, as it did for P5/P6):** a
+genuinely concurrent, two-JDBC-connection proof, run directly against `docker-compose.yml`'s
+`postgres:16-alpine` service after booting the real application once (`mvn -f
+backend/application/pom.xml spring-boot:run`, same pattern as P6) to apply all 15 changesets and
+seed dictionary data, then seeding 6 rows each into `material_youtube_urls` and `pending_uploads`
+and 1 row into `lessons` by direct SQL. A small standalone Java program
+(`org.postgresql:postgresql:42.7.4` on the classpath, no Spring, no Hibernate — the literal SQL
+this phase's repository methods issue) ran two threads per claim, synchronized with a
+`CyclicBarrier`/`CountDownLatch` so both transactions were open together:
+- `material_youtube_urls` claim: node A claimed `{1,2,3}`, node B claimed `{4,5,6}` — disjoint,
+  both non-empty. Repeated after resetting the rows: node A `{4,5,6}`, node B `{1,2,3}` —
+  disjoint again, order not fixed, correctness is.
+- `pending_uploads` claim: same shape, same result — disjoint, both non-empty, both runs.
+- `lessons` version claim: exactly one of two concurrent `UPDATE`s matched a row both times run
+  (sum of rows-updated across both threads `= 1`), final version `= observed + 1`, never `+2`.
+
+This is the authoritative concurrency proof for the two `SKIP LOCKED` claims. It is not part of
+the automated Maven test suite — it is a manual, recorded proof in the same spirit as P5's
+`databasechangelog` read and P6's green-field Liquibase apply, both also run once, by hand,
+against a real `docker compose` Postgres and recorded here rather than left as an unrepeatable
+claim.
+
+**What could not be tested here, and why — read before trusting an H2-only run of the two
+`SKIP LOCKED` claims.** A genuinely concurrent version of `MaterialYoutubeUrlClaimIntegrationTest`
+and an equivalent for `AbandonedUploadClaimIntegrationTest` were written first, using the same
+two-threads-plus-barrier shape that works for the plain-`UPDATE` lesson claim. Run repeatedly
+against this project's H2 test datasource (`MODE=PostgreSQL`), they were **flaky**: on a fresh
+table with six unlocked, matching rows and no prior claim anywhere in the test JVM, one caller's
+`SELECT ... FOR UPDATE SKIP LOCKED` sometimes came back completely empty while the other claimed
+every row — not the disjoint-non-empty-both split the same query reliably produces on real
+PostgreSQL (confirmed above) and even on plain H2 outside PostgreSQL compatibility mode (checked
+separately with raw JDBC, no Spring, no Hibernate: two connections, one holds a row lock
+uncommitted, the other's `SKIP LOCKED` correctly excludes only that row). Inserting extra
+"warm-up" queries before the real claim sometimes made the flaky run pass, which is itself a
+sign of a first-execution-sensitive quirk rather than a fixable test bug. This matches the
+`docs/migration-guardrails.md` warning precisely: *"`SELECT … FOR UPDATE SKIP LOCKED` is
+Postgres-specific and H2 will not exercise it."* Measured here more precisely: H2 **parses and
+partially honours** the syntax (it is not a no-op), but its row-locking behaviour under genuine
+concurrent access, at least in `MODE=PostgreSQL` through this project's Hikari-pooled
+`@SpringBootTest` context, is not reliable enough to assert on — a flaky green is worse than an
+honest gap, so no concurrency claim is made from H2 for these two, and the two H2 tests that
+remain are deliberately scoped down to single-threaded correctness only, with the gap and the
+real-Postgres proof both documented in their own JavaDoc.
+
+A second, unrelated H2-only gap found and worked around, not fixed: loading a `Lesson` entity a
+**second** time in a fresh Hibernate session (e.g. `lessonRepository.findById` after an earlier
+`save()` in a different transaction) throws a Jackson deserialize error against this H2
+datasource's JSON column handling — reproduced even with an **empty** `generationMetadata` map,
+so it is not specific to this phase's content. `TeacherVideoRefreshClaimConcurrencyIntegrationTest`
+avoids it by reading the lesson's version from the `save()` return value and from a scalar JPQL
+`SELECT l.version FROM Lesson l WHERE l.id = :id` instead of a second full-entity load. Not
+reproduced against real PostgreSQL (the `docker compose` proof above reads `lessons.version`
+directly via SQL, and the existing, unrelated `MyLessonsSummaryRepositoryIntegrationTest` reloads
+`Lesson` rows with nested JSON metadata via Testcontainers-Postgres without issue — skipped here
+for the same Docker-npipe reason as always, but not the datasource this bug is specific to).
+Recorded here because the next person hitting a `MismatchedInputException` on a `Lesson` reload
+under this test profile should not spend an hour re-deriving that it is environment-specific.
+
+### Review — self-conducted `backend-rule-review`
+
+One real finding, fixed before this commit: the first `MaterialYoutubeUrlClaimIntegrationTest`
+and `AbandonedUploadClaimIntegrationTest` shared no test-to-test isolation and could see rows
+left behind by an earlier test method in the same `@SpringBootTest` context (this H2 database's
+`DB_CLOSE_DELAY=-1` keeps it alive across every test class in the same Surefire JVM). Fixed by
+adding class-level `@Transactional` to both (auto-rollback per test); confirmed
+`TeacherVideoRefreshClaimConcurrencyIntegrationTest` deliberately does **not** carry it, since
+wrapping the test method in one outer transaction would defeat the two independent
+`TransactionTemplate` transactions it depends on. No other findings: no `@Transactional` on any
+job class; every new/changed repository method used explicitly named parameters (`@Param`), not
+positional binding; `MaterialYoutubeUrlEntityService` is the sole injector of
+`MaterialYoutubeUrlRepository`, closing the pre-existing 1:1:1 divergence rather than adding a
+second one; no private methods introduced; every handwritten method carries JavaDoc; no magic
+values (the two `LIMIT`/batch-size constants — `YOUTUBE_METADATA_BACKFILL_LIMIT`,
+`CLEANUP_BATCH_LIMIT` — already existed as named constants before this phase and are unchanged).
+
+### Verification
+
+**`bash scripts/structure-lint.sh`: 14 → 14, byte-identical failure list.** P7's Scope files are
+not named by any structure-lint assertion; confirmed by diffing the full before/after failure
+lists — identical.
+
+**`bash scripts/verify-gates.sh`: 16 → 16, byte-identical failure list** (diffed line-for-line,
+not merely counted): `frontend/package.json` vitest pin, missing `lint` script, missing
+`eslint.config.js`, sidebar assertion, `check-openapi-documentation.sh`,
+`check-openapi-input-constraints.py`, `check-api-validation-tests.py`,
+`check-maven-dependency-analysis.py`, Logbook `DefaultSink`, Logbook `WithoutBodyStrategy`,
+service-source web/security/JWT import ban, `check-frontend-ui-rules.sh`,
+`check-production-static-methods.sh`, `check-production-current-time.sh`,
+`check-service-contract-quality.sh`, `check-coverage-integrity.sh`. The presigned-upload
+assertion (CR-1, must read exactly **1**) is not in the failure list — confirmed passing, count
+unchanged at 1 per exempted file. None of the 16 are new; none of the four carried assertions
+(presigned upload, `check-frontend-ui-rules.sh`, sidebar, `structure-lint`'s usage-events path)
+moved.
+
+**`bash scripts/lib/check-architecture-overview.sh`: passed (mvp) → passed (mvp).** The two
+scheduled-job paragraphs and the "single-node today" bullet were rewritten to describe the new
+claim shapes accurately (per this phase's own instruction: if the claim mechanism changes, the
+document describing it must stay true) — verified by re-reading the checker's `required_sections`
+list and confirming every section it requires is still present and none of the literal-substring
+assertions (cache-management row count, etc.) were touched.
+
+**Fixture manifest: 80/80**, validated before any change and immediately before this commit.
+
+**`mvn -f backend/pom.xml clean verify`: BUILD SUCCESS.** `application` module:
+**520 tests, 0 failures, 0 errors, 45 skipped** (was 515/0/0/45 — **+5 tests, same 45 skipped**,
+all five new tests are the three concurrency/correctness integration tests above, all passing,
+none skipped). Every module's `jacoco-check`: "All coverage checks have been met" —
+`domain`, `migrations`, `event-logging-to-db-feature`, `observability`, `external-services`,
+`cache-management`, `service`, `application`, all `SUCCESS`. **+14 new tests total**, all
+passing: `application` +5 (the three integration test classes); `service` +9
+(`MaterialYoutubeServiceImplTest` +1, `MaterialYoutubeUrlEntityServiceTest` +5 new,
+`TeacherVideoRefreshServiceImplTest` +1, `LessonEntityServiceTest` +2). Skipped count unchanged
+at 45 (this phase adds no test gated on Docker/Testcontainers — the two Docker-dependent gaps it
+touches, the SKIP LOCKED concurrency proofs, are covered by the manual `docker compose` proof
+instead of a skipped automated test).
+
+**Build** `mvn -f backend/pom.xml clean verify` → BUILD SUCCESS, `application` 520/0/0/45 (was
+515/0/0/45, +5, all passing). All modules' `jacoco-check`: coverage checks met.
+**Test** Unit tests above (Mockito, all modules); H2 `@SpringBootTest` integration tests above
+(claim correctness for the two `SKIP LOCKED` queries; a genuine two-thread concurrency proof for
+the plain-`UPDATE` lesson claim); a manual two-JDBC-connection concurrency proof against real
+PostgreSQL via `docker compose` for both `SKIP LOCKED` claims and the version claim (see above) —
+not part of the automated suite, recorded here as P5/P6 recorded their own manual DB proofs.
+**Review** Self-conducted `backend-rule-review` — one finding (test isolation), fixed in this
+commit; no other findings.
+**Verification** `structure-lint.sh`: **14 → 14**, byte-identical. `verify-gates.sh`: **16 → 16**,
+byte-identical. `check-architecture-overview.sh`: passed → passed. Fixture manifest: **80/80**,
+unchanged throughout. No transaction is held open across the HeyGen or YouTube call in any of
+the three components (see the transaction-boundary walkthrough above).
+**Rollback** `git revert` on this phase's commit. No out-of-repo action: the `docker compose`
+Postgres container used for the manual concurrency proof was removed (`docker compose down -v`)
+before this commit; `git status --porcelain` before and after that local run showed no residue
+outside this phase's intended file changes.
+
+### What was declined, and what is reported rather than fixed
+
+- **No persisted "claimed" marker for the two `SKIP LOCKED` batch jobs.** Explained above under
+  "residual gap" — would require either a new schema column (outside this phase's Scope, which
+  does not include `backend/migrations`) or repurposing a user-visible column as a sentinel
+  (rejected: it would leak placeholder content and has no clean recovery path on a crash between
+  claim and save). The window this leaves open is bounded to roughly the external-call duration
+  per row, not the five-or-fifteen-minute tick interval, and is wasteful, never incorrect.
+- **No automated H2 concurrency test for either `SKIP LOCKED` claim.** Written, found flaky
+  against this project's H2 datasource, and deliberately not kept — see "What could not be
+  tested here" above. The real proof is the manual `docker compose` run against PostgreSQL,
+  recorded above rather than automated, because Testcontainers cannot reach Docker in this
+  sandbox.
+- **`MaterialYoutubeUrlEntityService` was added beyond Scope's literal file list.** Necessary to
+  give the claim and the save their own transaction boundaries (Spring's `@Transactional` proxy
+  does not intercept same-class self-invocation), and it closes a pre-existing "1 entity = 1
+  repository = 1 service" divergence as a side effect. Documented rather than silently absorbed,
+  matching how P1/P2/P6 handled their own necessary-but-unlisted additions.
+- **Nothing in the plan's own P7 block was found wrong.** The plan's "preparation, not
+  remediation" framing, its call to prefer claiming over advisory locks, and its identification
+  of `TeacherVideoRefreshService` as a differently-shaped problem all held exactly as written.
+  One thing the plan did not mention and this phase found by reading the code first (per the
+  plan's own instruction): `MaterialYoutubeBackfillJob` already violated the
+  transaction-across-external-call rule before this phase, independent of any concurrency
+  concern — fixed in the same edit rather than filed separately, since the fix for one is the
+  fix for the other.
+
+---
+
 ## Carried red assertions
 
 Every phase's evidence must show these unchanged. A count that moves without a decision

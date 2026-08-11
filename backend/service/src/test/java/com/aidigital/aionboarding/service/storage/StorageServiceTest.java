@@ -36,6 +36,7 @@ import java.util.stream.IntStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
@@ -464,7 +465,7 @@ class StorageServiceTest {
 		@Test
 		void shouldReturnZeroAndSkipDeletesWhenNothingExpiredTest() {
 			// Given:
-			when(pendingUploadEntityService.findExpiredUnconfirmed(any(), any())).thenReturn(List.of());
+			when(pendingUploadEntityService.claimExpiredUnconfirmed(any(), anyInt())).thenReturn(List.of());
 
 			// When:
 			int result = service.cleanupAbandonedUploads();
@@ -479,7 +480,7 @@ class StorageServiceTest {
 			// Given:
 			PendingUpload expired = pendingUploadFor(12L, "key-7", 100L,
 					LocalDateTime.now(ZoneOffset.UTC).minusHours(1), false);
-			when(pendingUploadEntityService.findExpiredUnconfirmed(any(), any())).thenReturn(List.of(expired));
+			when(pendingUploadEntityService.claimExpiredUnconfirmed(any(), anyInt())).thenReturn(List.of(expired));
 
 			try (MockedStatic<TransactionSynchronizationManager> txMgr =
 						 mockStatic(TransactionSynchronizationManager.class)) {

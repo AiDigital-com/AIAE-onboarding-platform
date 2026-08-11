@@ -8,7 +8,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -43,16 +42,15 @@ class PendingUploadEntityServiceTest {
 	}
 
 	@Test
-	void findExpiredUnconfirmedShouldDelegateToRepositoryWithCutoffAndPageTest() {
+	void claimExpiredUnconfirmedShouldDelegateToRepositoryWithCutoffAndLimitTest() {
 		// Given:
 		LocalDateTime cutoff = LocalDateTime.of(2026, 1, 1, 0, 0);
 		PendingUpload pendingUpload = Instancio.of(PendingUpload.class).set(field(PendingUpload::getId), 2L).create();
-		PageRequest pageable = PageRequest.of(0, 100);
-		when(pendingUploadRepository.findByConfirmedFalseAndExpiresAtBefore(eq(cutoff), eq(pageable)))
+		when(pendingUploadRepository.claimExpiredUnconfirmed(eq(cutoff), eq(100)))
 				.thenReturn(List.of(pendingUpload));
 
 		// When:
-		List<PendingUpload> result = pendingUploadEntityService.findExpiredUnconfirmed(cutoff, pageable);
+		List<PendingUpload> result = pendingUploadEntityService.claimExpiredUnconfirmed(cutoff, 100);
 
 		// Then:
 		assertThat(result).containsExactly(pendingUpload);

@@ -17,7 +17,6 @@ import com.aidigital.aionboarding.service.user.services.entity.UserEntityService
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -177,14 +176,18 @@ public class StorageService {
 
 	/**
 	 * Deletes storage objects and tracking rows for pending uploads that expired without ever
-	 * being confirmed, bounded to {@link #CLEANUP_BATCH_LIMIT} per call.
+	 * being confirmed, bounded to {@link #CLEANUP_BATCH_LIMIT} per call. The claim and the row
+	 * deletes run in this one transaction — {@code FOR UPDATE SKIP LOCKED} at claim time keeps
+	 * two nodes from claiming the same rows, and deleting the rows before commit means there is
+	 * no window afterward in which a second node could reclaim them, unlike a scheme that saves
+	 * results back after external I/O.
 	 *
 	 * @return number of abandoned uploads cleaned up in this call
 	 */
 	@Transactional
 	public int cleanupAbandonedUploads() {
-		List<PendingUpload> expired = pendingUploadEntityService.findExpiredUnconfirmed(
-				currentTime.utcDateTime(), PageRequest.of(0, CLEANUP_BATCH_LIMIT));
+		List<PendingUpload> expired = pendingUploadEntityService.claimExpiredUnconfirmed(
+				currentTime.utcDateTime(), CLEANUP_BATCH_LIMIT);
 		if (expired.isEmpty()) {
 			return 0;
 		}

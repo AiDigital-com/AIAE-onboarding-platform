@@ -428,6 +428,22 @@ public class LessonEntityService {
 	}
 
 	/**
+	 * Atomically claims the right to refresh a lesson's teacher-video status. Runs in its own
+	 * short transaction, called from a different bean than the read-triggered orchestrator so
+	 * the external video-provider call it gates never runs with a transaction open. See
+	 * {@link LessonRepository#claimForTeacherVideoRefresh(Long, Long)} for the locking shape.
+	 *
+	 * @param lessonId        lesson primary key
+	 * @param expectedVersion version the caller last observed
+	 * @return {@code true} when this call won the claim and may proceed to call the video
+	 *         provider; {@code false} when another writer already changed the version first
+	 */
+	@Transactional
+	public boolean claimForTeacherVideoRefresh(Long lessonId, Long expectedVersion) {
+		return lessonRepository.claimForTeacherVideoRefresh(lessonId, expectedVersion) == 1;
+	}
+
+	/**
 	 * Removes the given lesson entity from the database.
 	 *
 	 * @param lesson the lesson entity to delete

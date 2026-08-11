@@ -413,6 +413,34 @@ class LessonEntityServiceTest {
 		}
 	}
 
+	@org.junit.jupiter.api.Nested
+	class ClaimForTeacherVideoRefresh {
+
+		@Test
+		void shouldReturnTrueWhenTheRepositoryUpdatedExactlyOneRowTest() {
+			// Given:
+			when(lessonRepository.claimForTeacherVideoRefresh(10L, 3L)).thenReturn(1);
+
+			// When:
+			boolean result = lessonEntityService.claimForTeacherVideoRefresh(10L, 3L);
+
+			// Then:
+			assertThat(result).isTrue();
+		}
+
+		@Test
+		void shouldReturnFalseWhenAnotherWriterAlreadyChangedTheVersionTest() {
+			// Given:
+			when(lessonRepository.claimForTeacherVideoRefresh(11L, 3L)).thenReturn(0);
+
+			// When:
+			boolean result = lessonEntityService.claimForTeacherVideoRefresh(11L, 3L);
+
+			// Then:
+			assertThat(result).isFalse();
+		}
+	}
+
 	private AppUser appUser(Long id) {
 		return new AppUser(id, "clerk-" + id, "user@example.com", "User " + id, "admin", "User", null, null, null);
 	}

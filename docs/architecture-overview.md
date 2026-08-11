@@ -196,7 +196,22 @@ sequenceDiagram
 Two scheduled jobs run outside any request: `MaterialYoutubeBackfillJob`
 (`fixedDelay = 300_000`) and `AbandonedUploadCleanupJob`
 (`fixedDelay = 900_000`), both in
-`backend/application/src/main/java/com/aidigital/aionboarding/jobs/`.
+`backend/application/src/main/java/com/aidigital/aionboarding/jobs/`. Neither
+job carries `@Transactional` at the job level: each claims a bounded batch
+with `SELECT ... FOR UPDATE SKIP LOCKED` in its own short transaction (so two
+nodes claim disjoint rows instead of the same batch), then does its external
+work (YouTube oEmbed calls, S3 object deletes) with no transaction open, then
+records results in a separate short transaction — see
+`MaterialYoutubeUrlRepository#claimMissingMetadataBatch` and
+`PendingUploadRepository#claimExpiredUnconfirmed`. Read-triggered teacher-video
+refresh (`TeacherVideoRefreshServiceImpl`, invoked from `LessonDetailEnricher`
+and `TeacherVideoServiceImpl`) uses a different mechanism for the same reason:
+`LessonRepository#claimForTeacherVideoRefresh` is a conditional
+`UPDATE ... WHERE version = ?` against the lesson's existing `@Version`
+column, so at most one of two nodes serving the same lesson calls HeyGen; the
+loser returns the lesson unchanged rather than risking a duplicate call and a
+spurious optimistic-lock conflict on what was, from its caller's side, only a
+read.
 
 ## API and security boundaries
 
@@ -309,8 +324,12 @@ round trip because those repository methods were already `@QueryHints
   interceptor and the Logbook client interceptor.
 - Two scheduled jobs (`MaterialYoutubeBackfillJob`,
   `AbandonedUploadCleanupJob`, see *Primary runtime flows*) run independently
-  of any request; both are single-node today (§6.1 D-E — multi-node is
-  planned, not live).
+  of any request; one node runs today (§6.1 D-E — multi-node is planned, not
+  live). Both jobs, plus the read-triggered teacher-video refresh, now claim
+  their work (`SELECT ... FOR UPDATE SKIP LOCKED` for the two batch jobs, a
+  conditional `@Version` update for the refresh) so adding a second node is a
+  deployment decision, not a correctness event (P7) — see *Primary runtime
+  flows* for the exact transaction shape.
 - MVP usage telemetry: `UsageLoggingAspect` (AOP, pointcut over
   `*..service..services.impl.*ServiceImpl.*`, no `@Transactional` on the
   aspect itself) hands events to `RoutingUsageEventSink`, which prefers an

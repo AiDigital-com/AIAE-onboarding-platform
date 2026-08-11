@@ -41,6 +41,18 @@ public class TeacherVideoRefreshServiceImpl implements TeacherVideoRefreshServic
 		if (!shouldRefreshTeacherVideoUrl(teacherVideo, force)) {
 			return new RefreshResult(lesson, teacherVideo);
 		}
+		if (!lessonEntityService.claimForTeacherVideoRefresh(lesson.getId(), lesson.getVersion())) {
+			// Another node (or another request on this node) already won the claim for this
+			// lesson's refresh. Returning unchanged here — rather than proceeding to call HeyGen
+			// and then save() with our now-stale version — is exactly what avoids the duplicate
+			// provider call and the spurious optimistic-lock 409 on what is, from this caller's
+			// side, only a read.
+			return new RefreshResult(lesson, teacherVideo);
+		}
+		// The claim above already advanced the row's version in the database; mirror that on
+		// this in-memory entity so the save() below targets the version we actually hold, not
+		// the one we read before claiming.
+		lesson.setVersion(lesson.getVersion() + 1);
 		try {
 			HeyGenVideoStatus video = heyGenClient.getVideoStatus(textValueNormalizer.raw(teacherVideo.videoId()));
 			String checkedAt = currentTime.instantString();

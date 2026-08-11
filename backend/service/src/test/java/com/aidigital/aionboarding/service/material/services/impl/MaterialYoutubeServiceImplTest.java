@@ -2,13 +2,13 @@ package com.aidigital.aionboarding.service.material.services.impl;
 
 import com.aidigital.aionboarding.domain.material.entities.Material;
 import com.aidigital.aionboarding.domain.material.entities.MaterialYoutubeUrl;
-import com.aidigital.aionboarding.domain.material.repositories.MaterialYoutubeUrlRepository;
 import com.aidigital.aionboarding.external.youtube.YoutubeClient;
 import com.aidigital.aionboarding.external.youtube.model.YoutubeOEmbedMetadata;
 import com.aidigital.aionboarding.service.common.mapping.TextValueNormalizer;
 import com.aidigital.aionboarding.service.mappers.material.MaterialMapper;
 import com.aidigital.aionboarding.service.mappers.material.MaterialMapperImpl;
 import com.aidigital.aionboarding.service.material.services.MaterialYoutubeService.PreparedYoutubeRecord;
+import com.aidigital.aionboarding.service.material.services.entity.MaterialYoutubeUrlEntityService;
 import org.instancio.Instancio;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,12 +17,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageRequest;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.instancio.Select.field;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,7 +32,7 @@ import static org.mockito.Mockito.when;
 class MaterialYoutubeServiceImplTest {
 
 	@Mock
-	private MaterialYoutubeUrlRepository materialYoutubeUrlRepository;
+	private MaterialYoutubeUrlEntityService materialYoutubeUrlEntityService;
 	@Mock
 	private YoutubeClient youtubeClient;
 	@Spy
@@ -43,14 +44,14 @@ class MaterialYoutubeServiceImplTest {
 	private MaterialYoutubeServiceImpl service;
 
 	@Test
-	void backfillMissingYoutubeMetadataShouldFetchAndSaveEachMissingRowTest() {
+	void backfillMissingYoutubeMetadataShouldFetchAndSaveEachClaimedRowTest() {
 		// Given:
-		MaterialYoutubeUrl missingRow = Instancio.of(MaterialYoutubeUrl.class)
+		MaterialYoutubeUrl claimedRow = Instancio.of(MaterialYoutubeUrl.class)
 				.set(field(MaterialYoutubeUrl::getId), 40L)
 				.set(field(MaterialYoutubeUrl::getUrl), "https://youtu.be/abc123")
 				.create();
-		when(materialYoutubeUrlRepository.findWithMissingMetadata(PageRequest.of(0, 12)))
-				.thenReturn(List.of(missingRow));
+		when(materialYoutubeUrlEntityService.claimMissingMetadataBatch(12))
+				.thenReturn(List.of(claimedRow));
 		YoutubeOEmbedMetadata metadata = new YoutubeOEmbedMetadata(
 				"Video title", "Author", "https://youtube.com/author", "https://img", 120, 90, "YouTube", ""
 		);
@@ -61,11 +62,24 @@ class MaterialYoutubeServiceImplTest {
 
 		// Then:
 		ArgumentCaptor<MaterialYoutubeUrl> captor = ArgumentCaptor.forClass(MaterialYoutubeUrl.class);
-		verify(materialYoutubeUrlRepository).save(captor.capture());
-		assertThat(captor.getValue()).isSameAs(missingRow);
+		verify(materialYoutubeUrlEntityService).save(captor.capture());
+		assertThat(captor.getValue()).isSameAs(claimedRow);
 		assertThat(captor.getValue().getTitle()).isEqualTo("Video title");
 		assertThat(captor.getValue().getAuthorName()).isEqualTo("Author");
 		assertThat(captor.getValue().getThumbnailWidth()).isEqualTo(120);
+	}
+
+	@Test
+	void backfillMissingYoutubeMetadataShouldDoNothingWhenNoRowsAreClaimedTest() {
+		// Given:
+		when(materialYoutubeUrlEntityService.claimMissingMetadataBatch(12)).thenReturn(List.of());
+
+		// When:
+		service.backfillMissingYoutubeMetadata();
+
+		// Then:
+		verify(youtubeClient, never()).fetchOembed(any());
+		verify(materialYoutubeUrlEntityService, never()).save(any());
 	}
 
 	@Test
@@ -84,7 +98,7 @@ class MaterialYoutubeServiceImplTest {
 
 		// Then:
 		ArgumentCaptor<MaterialYoutubeUrl> captor = ArgumentCaptor.forClass(MaterialYoutubeUrl.class);
-		verify(materialYoutubeUrlRepository, times(2)).save(captor.capture());
+		verify(materialYoutubeUrlEntityService, times(2)).save(captor.capture());
 		List<MaterialYoutubeUrl> saved = captor.getAllValues();
 		assertThat(saved.get(0).getMaterial()).isSameAs(material);
 		assertThat(saved.get(0).getUrl()).isEqualTo(first.url());
@@ -98,13 +112,13 @@ class MaterialYoutubeServiceImplTest {
 		// Given:
 		Long materialId = 65L;
 		List<MaterialYoutubeUrl> expected = List.of(Instancio.create(MaterialYoutubeUrl.class));
-		when(materialYoutubeUrlRepository.findByMaterialIdOrderBySortOrderAsc(materialId)).thenReturn(expected);
+		when(materialYoutubeUrlEntityService.findByMaterialIdOrderBySortOrderAsc(materialId)).thenReturn(expected);
 
 		// When:
 		List<MaterialYoutubeUrl> result = service.findByMaterialIdOrderBySortOrderAsc(materialId);
 
 		// Then:
 		assertThat(result).isSameAs(expected);
-		verify(materialYoutubeUrlRepository).findByMaterialIdOrderBySortOrderAsc(materialId);
+		verify(materialYoutubeUrlEntityService).findByMaterialIdOrderBySortOrderAsc(materialId);
 	}
 }
