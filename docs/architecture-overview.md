@@ -385,6 +385,41 @@ the gap is visible rather than mistaken for compliance.
   the generic token/unit gate. This entry will not close inside this
   migration; it is a recorded, permanent divergence, not debt.
 
+## Accepted risk: SVG uploads execute script when opened directly
+
+**Decided 2026-08-11. No code change.**
+
+`UploadPurpose.MATERIAL_UPLOAD` and `LESSON_ASSET` allow any `image/` content type, so
+`image/svg+xml` is permitted by design. SVG is an XML document, not a bitmap: it may contain
+`<script>`, and a browser that *navigates* to it — as `openStorageFile` does, setting
+`window.location.href` on a freshly opened tab — renders it as a document and runs that
+script. The same file loaded through `<img src>`, which is how the attachment grid draws
+previews, never executes anything.
+
+**Why it is accepted rather than fixed.**
+
+- Upload requires an authenticated account inside `AUTH_ALLOWED_EMAIL_DOMAIN`. This is an
+  insider or compromised-account vector, not a public one.
+- The script runs on the storage origin, not the application origin, so Clerk tokens and app
+  session state are out of reach. The realistic damage is a convincing page on a
+  corporate-looking URL.
+- Every fix costs something the product is keeping: banning SVG removes a supported
+  attachment type; serving it as `Content-Disposition: attachment` removes full-size viewing
+  and leaves only the thumbnail; sanitising on upload preserves everything but must cover
+  both the presigned and the streaming path, and SVG sanitisation is an arms race rather
+  than a fix.
+- P8 already narrowed it. The extension-spoofing route — naming a file `.svg` while
+  declaring another type — is closed: `presignGet` no longer derives the served content type
+  from the storage key, and the key's extension is now derived from the validated content
+  type. What remains is only the honest route: declare `image/svg+xml`, upload an SVG.
+
+This follows the precedent set for the unbounded presigned `PUT` size in the audit's §7.1.3:
+a real defect with bounded exposure, recorded rather than silently carried.
+
+**Revisit if** users outside the company domain can upload; SVG starts arriving from an
+untrusted source; object storage moves to a subdomain of the application; or the attachment
+UI begins rendering stored files inside the application origin.
+
 ## Known upstream defect
 
 `.claude/tasks/README.md` documents the task artifacts as `review-report.md`

@@ -51,14 +51,26 @@ That `PUT` targets a third-party storage host, not our API. It cannot go through
 endpoints, and routing an external host through it would attach our Bearer token to a
 third party. So the request must use the platform `fetch`.
 
-The only alternative implementation is to proxy uploads through the backend — which
-`14-performance.md` explicitly forbids:
+The only alternative implementation is to proxy uploads through the backend. That is a real
+cost — `LESSON_ASSET` allows 300 MB, and routing it through the application spends a request
+thread and the bandwidth twice — but it is the *cost* that makes it wrong here, not a rule.
+
+*Corrected 2026-08-11.* An earlier revision of this request said `14-performance.md`
+"explicitly forbids" proxying, and quoted the rule immediately below the claim:
 
 > Stream or presign file transfers; do not heap-buffer complete files without a small
 > enforced limit.
 
-**So the gate forbids the only implementation the standard's own performance rules
-allow.** A project that follows `14-performance.md` cannot pass `verify-gates.sh`.
+The quote disproves the claim. **Stream *or* presign** — streaming through the backend is
+permitted, and this project already ships a streaming upload path that predates the
+migration. We withdraw that argument rather than send you a request whose own citation
+contradicts it.
+
+**What remains, and it is enough.** There is no OpenAPI operation for a PUT to an S3-hosted
+URL, so the presigned upload cannot go through the generated client, and
+`verify-gates.sh` fails any `fetch(` under `frontend/src` regardless of where it points. The
+gate has no way to express "this call deliberately leaves our API surface", so a correct
+implementation cannot pass it.
 
 ### Why we did not work around it
 
@@ -511,7 +523,7 @@ generated project copies.
 
 | ID | Gate | Severity | Blocking us? | We need |
 |---|---|---|---|---|
-| CR-1 | `verify-gates.sh` — raw `fetch` | Blocking | **Yes** | An exemption path; the rule as written is unsatisfiable alongside `14-performance.md` |
+| CR-1 | `verify-gates.sh` — raw `fetch` | Blocking | **Yes** | A way to mark a call as deliberately outside the API surface |
 | CR-2 | `verify-gates.sh` — sidebar tokens | **Blocking** | **Yes** | A declared navigation model instead of token matching |
 | CR-3 | `check-frontend-ui-rules.sh` — scan path | Medium | No | Confirmation that relocating vendored code is the intended pattern |
 | CR-4 | Cross-cutting | **Blocking** | **Yes** | An exemption mechanism — without it one accepted exception hides 21 further assertions |
