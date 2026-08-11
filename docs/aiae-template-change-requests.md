@@ -443,6 +443,70 @@ Either makes the pair self-consistent.
 
 ---
 
+## CR-11 — the scaffold's own services violate the entity-service rule, and ship no example of it
+
+**Severity: medium. Every generated project starts from a sample that breaks a hard rule.**
+
+### The conflict
+
+`.claude/rules/10-architecture.md` says, in the copy that ships from this template:
+
+```
+11: - Follow the rule `1 entity = 1 repository = 1 service to work with that entity`.
+12: - Only the paired entity service implementation may inject that entity's repository.
+```
+
+`.claude/rules/00-backend-hard-rules.md:13` repeats it: *"Every backend JPA entity has one
+repository in `domain` and one paired entity service in `service/entity`."*
+
+Both scaffold service classes inject a repository directly:
+
+```
+scaffold/backend/service/.../service/cache/JpaCacheInvalidationEventService.java:34
+    private final CacheInvalidationEventRepository repository;
+
+scaffold/backend/service/.../service/sample/services/impl/SampleServiceImpl.java:37
+    private final SampleRepository repo;
+```
+
+Neither is a paired entity service. `JpaCacheInvalidationEventService` is the cache
+invalidation protocol adapter; `SampleServiceImpl` is the worked example a generated project
+is meant to imitate.
+
+**And `scaffold/backend/service/src/main/java/*/service/entity/` does not exist.** The
+scaffold ships no paired entity service at all, so there is no reference implementation of
+the shape the rule mandates — only two counter-examples, one of them the sample.
+
+### Why it costs something
+
+An agent generating a new feature reads the rule, looks at the sample for the house style,
+and finds the sample contradicting the rule. Whichever it follows, a reviewer using
+`backend-rule-review` will object.
+
+For us it surfaced while installing `cache-management`. Taking your reference implementation
+verbatim would have put a second class into our repository injecting a repository directly,
+which our installed rules forbid. We added a paired
+`CacheInvalidationEventEntityService` between the adapter and the repository instead — a
+deliberate divergence from your reference, which we now have to remember at every template
+sync.
+
+### Proposed change
+
+Pick one and make the scaffold agree with itself:
+
+1. **Add the missing layer** — ship `service/entity/` with a paired entity service per
+   scaffold entity, and route `SampleServiceImpl` and `JpaCacheInvalidationEventService`
+   through it. This also gives generated projects the reference implementation the rule
+   currently describes but never demonstrates.
+2. **Or scope the rule** — state explicitly that protocol adapters under `service/cache/`
+   and the sample feature are exempt, so a project can follow the scaffold without a
+   documented divergence.
+
+We would prefer (1): the rule is a good one, and the sample is the first thing every
+generated project copies.
+
+---
+
 ## Summary
 
 | ID | Gate | Severity | Blocking us? | We need |
@@ -457,6 +521,7 @@ Either makes the pair self-consistent.
 | CR-8 | `structure-lint.sh` — changelog paths | Medium | **Yes** | A property check instead of hardcoded paths |
 | CR-9 | `CLAUDE.md` managed *and* meant to be adapted | **High** | **Yes** | Seed-once, or a sanctioned unhashed region |
 | CR-10 | link checker vs path rewriter file sets | Low | No | The two to cover the same files |
+| CR-11 | scaffold services break the entity-service rule | Medium | No — diverged | A paired entity service in the scaffold, or an explicit exemption |
 
 Everything else in our audit is our own work and is in progress. We are happy to supply the
 full audit, reproduction commands, or a patch for any of the above.
