@@ -1,5 +1,6 @@
 package com.aidigital.aionboarding.external.storage.impl;
 
+import com.aidigital.aionboarding.external.common.time.CurrentTime;
 import com.aidigital.aionboarding.external.storage.StorageExternalException;
 import com.aidigital.aionboarding.external.storage.config.StorageProperties;
 import org.junit.jupiter.api.Test;
@@ -8,9 +9,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.security.PrivateKey;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -54,6 +57,8 @@ class CloudFrontUrlSignerTest {
 
 	@Mock
 	private StorageProperties properties;
+	@Mock
+	private CurrentTime currentTime;
 
 	@Test
 	void shouldParsePkcs1PrivateKeyTest() {
@@ -61,7 +66,7 @@ class CloudFrontUrlSignerTest {
 		when(properties.getCloudFrontPrivateKey()).thenReturn(PKCS1_PRIVATE_KEY);
 
 		// When:
-		PrivateKey result = new CloudFrontUrlSigner(properties).parsePrivateKey(PKCS1_PRIVATE_KEY);
+		PrivateKey result = new CloudFrontUrlSigner(properties, currentTime).parsePrivateKey(PKCS1_PRIVATE_KEY);
 
 		// Then:
 		assertThat(result).isNotNull();
@@ -74,8 +79,29 @@ class CloudFrontUrlSignerTest {
 		when(properties.getCloudFrontPrivateKey()).thenReturn(INVALID_KEY);
 
 		// When / Then:
-		assertThatThrownBy(() -> new CloudFrontUrlSigner(properties))
+		assertThatThrownBy(() -> new CloudFrontUrlSigner(properties, currentTime))
 				.isInstanceOf(StorageExternalException.class)
 				.hasMessageContaining("Failed to parse CloudFront private key");
+	}
+
+	@Test
+	void shouldUseInjectedCurrentTimeRatherThanTheSystemClockWhenSigningTest() {
+		// Given: this is the negative case for the split — before it, sign() called
+		// Instant.now() directly and check-production-current-time.sh flagged this file as one
+		// of the 3 violations; now the expiration is derived from the injected boundary.
+		when(properties.getCloudFrontPrivateKey()).thenReturn(PKCS1_PRIVATE_KEY);
+		when(properties.getCloudFrontDomain()).thenReturn("cdn.example.com");
+		when(properties.getCloudFrontKeyPairId()).thenReturn("KEYPAIRID");
+		Instant fixedNow = Instant.parse("2026-08-11T00:00:00Z");
+		when(currentTime.instant()).thenReturn(fixedNow);
+		CloudFrontUrlSigner signer = new CloudFrontUrlSigner(properties, currentTime);
+
+		// When:
+		String url = signer.sign("uploads/key.mp4", java.time.Duration.ofMinutes(10));
+
+		// Then: a signed URL was produced and the injected clock — not the system clock — was
+		// consulted to compute its expiration.
+		assertThat(url).isNotNull();
+		verify(currentTime).instant();
 	}
 }

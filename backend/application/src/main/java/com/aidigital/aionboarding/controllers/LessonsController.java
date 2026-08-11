@@ -172,7 +172,8 @@ public class LessonsController implements LessonsApi {
     @PreAuthorize("@perm.has('" + PermissionKeys.LESSONS_MANAGE_ASSETS + "')")
     public ResponseEntity<UploadedFileResponseV1> uploadLessonFile(MultipartFile file) {
         AppUser viewer = currentUser.requireUser();
-        UploadValidator.UploadValidationRecord uploadMeta = uploadValidator.validate(file);
+        UploadValidator.UploadValidationRecord uploadMeta =
+            uploadValidator.validate(file.getOriginalFilename(), file.getContentType(), file.getSize());
         try (java.io.InputStream content = file.getInputStream()) {
             String storageKey = storageService.putObjectStreaming(
                 viewer, UploadPurpose.LESSON_ASSET, content, uploadMeta.sizeBytes(), uploadMeta.originalName(), uploadMeta.mimeType());

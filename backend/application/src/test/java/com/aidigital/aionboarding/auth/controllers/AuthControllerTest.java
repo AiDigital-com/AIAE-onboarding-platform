@@ -1,6 +1,7 @@
 package com.aidigital.aionboarding.auth.controllers;
 
 import com.aidigital.aionboarding.controllers.AuthController;
+import com.aidigital.aionboarding.error.mapper.GlobalExceptionResponseHelperImpl;
 import com.aidigital.aionboarding.mappers.auth.UserMapperImpl;
 import com.aidigital.aionboarding.security.AppUserFactory;
 import com.aidigital.aionboarding.security.AuthProperties;
@@ -11,7 +12,7 @@ import com.aidigital.aionboarding.security.SecurityConfig;
 import com.aidigital.aionboarding.security.SecurityProperties;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.security.RequestAuthenticationCache;
-import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.user.services.UserService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -46,7 +47,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 		ClerkJwtClaimsValidator.class,
 		ClerkPublishableKeyDecoder.class,
 		CompanyEmailDomainAuthorizationManager.class,
-		CurrentTime.class,
+		CurrentTimeImpl.class,
+		GlobalExceptionResponseHelperImpl.class,
 		RequestAuthenticationCache.class,
 		AuthControllerTest.MeterRegistryTestConfig.class
 })

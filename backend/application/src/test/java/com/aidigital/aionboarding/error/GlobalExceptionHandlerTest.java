@@ -1,9 +1,10 @@
 package com.aidigital.aionboarding.error;
 
 import com.aidigital.aionboarding.api.v1.model.ApiErrorV1;
+import com.aidigital.aionboarding.error.mapper.GlobalExceptionResponseHelperImpl;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
-import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.validation.ConstraintViolationException;
 import org.hibernate.LazyInitializationException;
@@ -20,8 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class GlobalExceptionHandlerTest {
 
-	private final GlobalExceptionHandler handler = new GlobalExceptionHandler(new CurrentTime(),
-			new SimpleMeterRegistry());
+	private final GlobalExceptionHandler handler = new GlobalExceptionHandler(
+			new GlobalExceptionResponseHelperImpl(new CurrentTimeImpl()), new SimpleMeterRegistry());
 
 	@Test
 	void shouldMapAppExceptionCodesToHttpStatusesTest() {
@@ -115,7 +116,8 @@ class GlobalExceptionHandlerTest {
 	void shouldMapLazyInitializationToInternalServerErrorAndIncrementRouteTaggedCounterTest() {
 		// Given:
 		SimpleMeterRegistry registry = new SimpleMeterRegistry();
-		GlobalExceptionHandler handlerWithOwnRegistry = new GlobalExceptionHandler(new CurrentTime(), registry);
+		GlobalExceptionHandler handlerWithOwnRegistry = new GlobalExceptionHandler(
+				new GlobalExceptionResponseHelperImpl(new CurrentTimeImpl()), registry);
 		MockHttpServletRequest request = new MockHttpServletRequest();
 		request.setAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE, "/api/v1/lessons/{id}/ask");
 
@@ -136,7 +138,8 @@ class GlobalExceptionHandlerTest {
 	void shouldTagLazyInitializationCounterAsUnmatchedWhenNoRouteResolvedTest() {
 		// Given:
 		SimpleMeterRegistry registry = new SimpleMeterRegistry();
-		GlobalExceptionHandler handlerWithOwnRegistry = new GlobalExceptionHandler(new CurrentTime(), registry);
+		GlobalExceptionHandler handlerWithOwnRegistry = new GlobalExceptionHandler(
+				new GlobalExceptionResponseHelperImpl(new CurrentTimeImpl()), registry);
 		MockHttpServletRequest request = new MockHttpServletRequest();
 
 		// When:

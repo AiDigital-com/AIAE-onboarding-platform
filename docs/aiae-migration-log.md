@@ -2204,6 +2204,261 @@ outside this phase's intended file changes.
 
 ---
 
+## P8 — Boundary splits and the upload content check · **COMPLETE**
+
+Completed 2026-08-11 on branch `mig/p08-boundaries` (from `migration` @ `7b3b83d`).
+
+### Environment
+
+Same shims as P0–P7: `python3` resolved to a real 3.14.5 via a copy on `PATH` ahead of the
+Windows Store stub; `JAVA_HOME=/c/Users/Admin/.jdks/corretto-21.0.12` and
+`/c/Users/Admin/tools/apache-maven-3.9.16/bin` prepended for Maven. `mvn -f backend/pom.xml
+clean install -DskipTests` was run once at the start, per the environment note about a stale
+`~/.m2` jar. Fixture manifest re-validated **80/80** before any change and again immediately
+before this commit — P8's Scope never touches a managed fixture.
+
+### 1 — `GlobalExceptionHandler` split
+
+Added `error/mapper/GlobalExceptionResponseHelper` (interface, one method:
+`buildApiError(ValidationMessage, HttpStatus)`) and `GlobalExceptionResponseHelperImpl`
+(`@Component`), which now owns everything the handler does not need to decide a status:
+`CurrentTime`, the MDC correlation-id lookup, and the internal-to-`ApiErrorV1` DTO mapping
+(`toDto`, moved verbatim). `GlobalExceptionHandler` now injects `GlobalExceptionResponseHelper`
+instead of `CurrentTime` directly, and every handler method calls
+`responseHelper.buildApiError(message, status)` instead of building `ResponseEntity`/`ApiErrorV1`
+itself.
+
+**Checked before copying, per the brief's own warning about CR-11:** the scaffold's reference
+`GlobalExceptionHandler`/`GlobalExceptionResponseHelper`/`Impl` (read from the standard checkout,
+`cc64e49`) contain zero `private` methods — every response-building method is `public` or
+package-private, and the only `private` members are `private static final` constants and
+`private final` injected fields, both explicitly exempted by `00-backend-hard-rules.md`. The
+scaffold's own shape is compliant here (unlike the entity-service rule CR-11 already filed
+against it), so nothing needed correcting before adapting it to this project's actual
+`ApiErrorV1`/`ValidationMessage`/`ErrorReason` types.
+
+**Not gate-tracked, by measurement, not by assumption:** grepped `scripts/lib/*.py` and
+`scripts/verify-gates.sh` for `GlobalException` and for a private-method-count assertion outside
+`*ServiceImpl.java` files — no checker asserts on this class's shape. The split satisfies
+`.claude/rules/30-web-openapi.md`'s "centralize error mapping in `GlobalExceptionHandler` and
+its response helper" wording (which named a helper that did not yet exist) and is verified by
+`backend-rule-review`, not a gate count.
+
+**Negative test for the split:** `GlobalExceptionResponseHelperImplTest` (new, 4 tests) —
+status/timestamp/body mapping, per-parameter DTO mapping, and both MDC correlation-id branches
+(present/absent), all independently testable now without going through a full exception
+handler. `GlobalExceptionHandlerTest` (existing, unchanged test count) now constructs
+`GlobalExceptionHandler` with a real `GlobalExceptionResponseHelperImpl(new CurrentTimeImpl())`.
+
+### 2 — `CurrentTime` split (service module)
+
+`backend/service/.../common/time/CurrentTime.java` is now an interface (`utcDateTime()`,
+`instant()`, plus a default `instantString()`); `CurrentTimeImpl` (new, `@Component`) owns both
+`now()` calls. This clears 2 of the 3 `check-production-current-time.sh` violations —
+confirmed by filename, not just by inspection: `scan-production-java.py`'s `scan_time` function
+explicitly whitelists `path.name == "CurrentTimeImpl.java"`, so the interface carries zero
+`now()` calls and the one file that does is name-exempted.
+
+**Mechanical, necessary-beyond-Scope's-literal-file-list fixup, documented per the P1/P2/P6/P7
+precedent:** 12 test files under `backend/service/src/test/**` and one under
+`backend/application/src/test/**` (`AuthControllerTest`, a `@WebMvcTest` that `@Import`s
+`CurrentTime.class` to satisfy `SecurityConfig`'s dependency chain) called `new CurrentTime()`
+or referenced `CurrentTime.class` in a Spring `@Import`/mock-registration context; all 13 were
+mechanically updated to `CurrentTimeImpl`, with no behavior change — `CurrentTime` is now an
+interface and cannot be instantiated directly.
+
+**Negative test for the split:** `CurrentTimeImplTest` (new, in `service`, 3 tests) — asserts
+`utcDateTime()`/`instant()` bracket the system clock and `instantString()` round-trips through
+`instant()` rather than a second `now()` call.
+
+### 2a — the third violation: `CloudFrontUrlSigner`
+
+`external/storage/impl/CloudFrontUrlSigner.java:56` called `Instant.now().plus(expiresIn)`
+directly — the violation neither source document named, measured at P0 and P2 as the reason
+`check-production-current-time.sh` reports 3, not 2.
+
+**Plan contradiction found and resolved, reported per this phase's own instruction.** The plan's
+step 2a says "inject `CurrentTime` and use it," naming the service module's type. That is not
+possible without a module cycle: `backend/service/pom.xml` already depends on
+`backend/external-services` (confirmed: `service` injects `StorageClient`, defined in
+`external-services`), so `external-services` cannot depend back on `service`'s `CurrentTime`
+— and the standard's own scaffold has no `external-services` module at all (`grep -n "<module>"
+templates/generated-project/scaffold/backend/pom.xml` lists 7 modules, none named
+`external-services`), so this boundary was never designed for and neither source document could
+have caught it. **Resolved by duplicating the narrow contract**, not by adding a dependency
+edge: a second, distinct `com.aidigital.aionboarding.external.common.time.CurrentTime`
+interface + `CurrentTimeImpl` (new, `@Component`, one method: `instant()`) now live in
+`external-services`, injected into `CloudFrontUrlSigner`'s constructor (now
+`CloudFrontUrlSigner(StorageProperties, CurrentTime)`) and `StorageConfig`'s
+`cloudFrontUrlSigner` `@Bean` method updated to match. The Impl file is named
+`CurrentTimeImpl.java` deliberately, for the same filename-based scanner exemption — confirmed
+it works regardless of package.
+
+**A second, self-inflicted bug found and fixed before this commit, not shipped:** giving both
+`CurrentTimeImpl` classes (service's and external-services') the same simple class name in the
+same Spring context — both modules are on `application`'s classpath, and both get
+component-scanned — produced `ConflictingBeanDefinitionException: Annotation-specified bean
+name 'currentTimeImpl' ... conflicts with existing, non-compatible bean definition`, discovered
+by running the full test suite (see Build below) before assuming green. Fixed by giving the
+external-services one an explicit `@Component("externalServicesCurrentTimeImpl")` name; type-based
+injection is unaffected since the two `CurrentTime` interfaces are unrelated types in different
+packages. `AuthControllerTest`'s `@WebMvcTest` slice separately needed
+`GlobalExceptionResponseHelperImpl.class` added to its `@Import` list, because `@WebMvcTest`
+auto-includes `@RestControllerAdvice` beans (`GlobalExceptionHandler`) and this slice previously
+satisfied that bean's only dependency (`CurrentTime`) via an explicit import that no longer
+applies after step 1's split.
+
+**Negative test for the split:** `CloudFrontUrlSignerTest` (existing, +1 test) — a fixed
+`Instant` is stubbed on the injected `CurrentTime` mock and `verify(currentTime).instant()`
+confirms `sign()` consults it rather than the system clock. `CurrentTimeImplTest` (new, in
+`external-services`, 1 test) for the duplicated Impl itself.
+
+### 3 — `UploadValidator`'s `MultipartFile` import
+
+`UploadValidator.validate` took a `MultipartFile` — the only service-layer import of
+`org.springframework.web.multipart`, and the entire reason
+`verify-gates.sh`'s `grep -RInE '...|org\.springframework\.web|...'` over
+`backend/service/src/main/java` failed. Changed the signature to
+`validate(String originalName, String mimeType, long sizeBytes)`; the one caller
+(`LessonsController.uploadLessonFile`, in `application`, which is allowed to depend on
+`MultipartFile`) now extracts the three fields itself:
+`uploadValidator.validate(file.getOriginalFilename(), file.getContentType(), file.getSize())` —
+a single expression, not a branch, so `check-thin-controllers.py`'s count is unaffected (verified
+by measurement, see Verification). The `file == null || file.isEmpty()` check that used to guard
+against a missing file was dropped rather than moved into the controller: the generated
+`LessonsApi.uploadLessonFile` declares
+`@RequestPart(value = "file", required = true)` (confirmed by reading the generated source), so
+Spring itself never lets a null `MultipartFile` reach this method, and `file.isEmpty()`
+(`getSize() == 0`) was already fully covered by the existing `sizeBytes <= 0` check.
+
+**Negative test for the split:** `UploadValidatorTest` rewritten for the new signature (6 tests,
++1 over the original 5 — `validate_negativeSize`, since a raw `long` parameter, unlike
+`MultipartFile.getSize()`, can be constructed negative directly).
+
+### 4 — upload content verification (audit §2.4)
+
+Read §2.4 first, as instructed; the "read leading bytes" idea was not implemented, for exactly
+the reason given there (SVG is text, no magic bytes). Fixed at the two places that decide, plus
+wired the previously-dead field:
+
+- **`StorageClientImpl.presignGet`**: removed the `inferContentType(storageKey)` call and the
+  conditional `responseContentType(...)` override entirely (the method is now dead code and was
+  deleted, not left orphaned). Not setting an override means S3 serves the object's own stored
+  `Content-Type` header — the value `presignPut`/`putObject`/`putObjectStreaming` already write
+  explicitly — so the storage key's extension can no longer influence what the browser is told
+  to render.
+- **`StorageService.sanitize`**: **chose "normalise it away" over "validate consistency," and
+  recorded the reason** — the plan's two options are equivalent in effect, but validating
+  consistency needs an exhaustive extension↔content-type map to avoid rejecting legitimate
+  uploads of an allowed-but-unlisted subtype (both `MATERIAL_UPLOAD` and `LESSON_ASSET` allow
+  *any* `image/`/`video/`-prefixed content type, not a fixed list), while deriving the extension
+  from the already-validated `contentType` has no such gap: `sanitize(fileName, contentType)`
+  now keeps only the file name's base (pre-extension) stem, sanitized as before, and appends an
+  extension derived from `contentType` — a small explicit map for 3 types where the MIME subtype
+  disagrees with convention (`image/jpeg`→`jpg`, `video/quicktime`→`mov`, `text/plain`→`txt`),
+  falling back to the subtype itself (stripped of `+suffix`/`;parameter`) for everything else.
+  The client-supplied file name's own extension is never consulted. Verified this reproduces the
+  exact previous output for every content type already covered by a test
+  (`video/mp4`→`.mp4`, `image/png`→`.png`, etc.) — no existing test's expected storage-key suffix
+  changed.
+- **`PendingUpload.expectedContentType`**: wired into `confirmUpload` — right after the existing
+  size check, using the `headObject` metadata already fetched at that point, a mismatch between
+  the stored content type and the type recorded at presign time now throws (new
+  `UploadRejectionReason.CONTENT_TYPE_MISMATCH`, following the existing enum's exact pattern).
+
+**Not urgent, and said so in code and here, per the brief:** production runs
+`CLOUDFRONT_ENABLED=true`; `presignGet` returns on the CloudFront branch before either the old
+override or its removal would ever run, so production was never exposed. The code default is
+`false`, so this closes the vector for any environment that boots without CloudFront — local, a
+new staging box, a misconfigured redeploy.
+
+**The SVG test, confirmed red-then-green in both directions, not assumed:**
+`StorageServiceTest.shouldNormalizeAnSvgNamedUploadDeclaredAsPngToAPngStorageKeyTest`
+(`presignPut(..., "payload.svg", "image/png", ...)` must produce a storage key ending
+`.png`, never containing `.svg`) and
+`StorageClientImplTest.shouldNotOverrideResponseContentTypeFromTheStorageKeysExtensionTest`
+(`presignGet` on a `.svg`-suffixed key must leave `responseContentType()` `null`). Verified by
+temporarily copying `git show migration:...StorageService.java` and
+`...StorageClientImpl.java` (the pre-P8 originals) back over the working files, re-running just
+these two tests, and observing both fail — `"uploads/.../payload.svg"` does not end with
+`/payload.png`, and the captured `GetObjectPresignRequest`'s `responseContentType()` came back
+`"image/svg+xml"`, not `null` — then restoring the P8 versions and re-running to confirm both
+pass, plus a full `mvn -f backend/pom.xml clean verify` afterward to confirm nothing else
+regressed from the round-trip. Both directions checked; not asserted from reasoning alone.
+A third test (`shouldThrowAndRecordAMetricWhenStoredContentTypeDoesNotMatchTheExpectedOneTest`,
+for the `expectedContentType` wiring) failed the same way against the pre-P8 code, as a bonus
+confirmation, though the brief only required the SVG test to be checked both ways.
+
+**`docs/architecture-overview.md` updated in the same commit**, per this project's own
+practice of keeping the document synchronized with the implemented repository (not part of
+P8's literal Scope list, but necessary for the same reason P7 rewrote its own scheduled-job
+paragraphs): the presigned-upload sequence diagram and the "Decisions, constraints, and known
+risks" table row both described the `.svg` override as a live, config-dependent, `later-phase`
+risk; both are rewritten to state it is closed in P8 and how.
+
+### Build, test, review
+
+**Build** `mvn -f backend/pom.xml clean verify` → **BUILD SUCCESS**. `application` module:
+**524 tests, 0 failures, 0 errors, 45 skipped** (was 520/0/0/45 at P7's end) — **+4**, all in the
+new `GlobalExceptionResponseHelperImplTest`; no other application-module test file's method
+count changed (`GlobalExceptionHandlerTest`, `LessonsControllerTest`, `AuthControllerTest` were
+edited for the new constructor/mock/import shapes, not for new test methods). `service` and
+`external-services` modules each gained tests too (`CurrentTimeImplTest` ×2 modules,
+`StorageServiceTest` +2, `UploadValidatorTest` +1, `CloudFrontUrlSignerTest` +1,
+`StorageClientImplTest` +1), not reflected in the 520→524 application-module figure because they
+land in different modules. Every module's `jacoco-check`: "All coverage checks have been met."
+**Test** All of the above, plus the red/green verification described under step 4.
+**Review** Self-conducted `backend-rule-review` against
+`.claude/rules/00-backend-hard-rules.md` and `10-architecture.md`: no private methods introduced
+anywhere (`GlobalExceptionResponseHelperImpl`'s `toDto`/`toParameterDto`,
+`StorageService`'s `sanitize`/`deriveExtension`, all package-private); every new/changed
+production method carries JavaDoc; no magic strings/numbers introduced without a named constant;
+no new repository injection; the two `CurrentTimeImpl` classes are each `@Component`-annotated
+with Lombok-free, hand-written constructors (none needed — no injected fields on either); the
+module-boundary duplication decision (§2a above) was checked against `10-architecture.md`'s
+"outbound HTTP/SDK integrations live in `backend/external-services` only" and found consistent
+— nothing here adds a `service`→`external-services` reverse dependency or an `external-services`
+call into `service`.
+
+### Verification
+
+| Gate | Before | After |
+|---|---|---|
+| `bash scripts/verify-gates.sh` | **16** | **14** — exactly the two predicted: `#11` (service source web/security/JWT/servlet import) and `#14` (`check-production-current-time.sh`) are gone; the other 14 are byte-identical to P7's list, diffed line-for-line |
+| `bash scripts/lib/check-production-current-time.sh <4 module roots>` | 3 | **0** — `check-production-current-time: OK (4 source tree(s) scanned)` |
+| `grep -RInE '...\|org\.springframework\.web\|...' backend/service/src/main/java` | 1 match (`UploadValidator.java`) | **0 matches** |
+| `bash scripts/structure-lint.sh` | 14 | **14** — unchanged, confirmed by diffing the full 14-item list; none of P8's files appear in it |
+| `bash scripts/lib/check-architecture-overview.sh` | passed (mvp) | **passed (mvp)** — the presigned-upload paragraphs were rewritten, not added/removed, so the checker's required-sections list is untouched |
+| Fixture manifest | 80/80 | **80/80**, unchanged throughout |
+| `verify-gates.sh` presigned-upload assertion (CR-1, carried) | exactly 1 per exempted file | **unchanged** — 1 per file, confirmed by direct `grep -c` |
+
+**Movement beyond the predicted two: none.** The only two gates that moved are the two the plan
+named; every other count (`structure-lint`'s 14, `check-frontend-ui-rules.sh`'s 2222 — untouched,
+no frontend file in this phase's diff — and the sidebar/telemetry carried failures) is identical
+to P7's.
+
+**Rollback** `git revert` on this phase's commit. No out-of-repo action.
+
+### What the plan got wrong, and what was declined
+
+- **Step 2a's literal instruction ("inject `CurrentTime` and use it") does not work as written**
+  — see §2a above. Resolved by duplicating the narrow interface into `external-services` rather
+  than adding a dependency edge back to `service`, since the latter would create a module cycle
+  `service → external-services → service` (`service` already depends on `external-services` for
+  `StorageClient`). Neither source document could have caught this: the standard's own scaffold
+  has no `external-services` module at all, so the module-boundary question this phase's own fix
+  ran into was never designed for upstream, either.
+- **The plan's Scope block for P8 omits `CloudFrontUrlSigner.java`, `StorageConfig.java`, and
+  the two new `CurrentTime`/`CurrentTimeImpl` file pairs** from its literal file list, even
+  though step 2a's own text requires editing `CloudFrontUrlSigner.java` by name. Treated the same
+  way P1/P2/P6/P7 treated their own gaps: done, documented here, not silently absorbed.
+- **Nothing was declined.** All four pieces in the brief were implemented in full, including the
+  `expectedContentType` wiring the brief offered as one of two options ("wire it in, or remove
+  it") — wiring it in was chosen because it is strictly additive defense-in-depth and the field
+  already exists on every row.
+
+---
+
 ## Carried red assertions
 
 Every phase's evidence must show these unchanged. A count that moves without a decision

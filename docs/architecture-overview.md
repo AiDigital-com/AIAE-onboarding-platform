@@ -186,11 +186,11 @@ sequenceDiagram
     participant A as Spring API
     participant S3 as AWS S3
     B->>A: presignPut(fileName, contentType, size)
-    A->>A: StorageService validates purpose/size/content-type; sanitizes fileName
-    A-->>B: presigned PUT URL (storageKey carries attacker-influenced extension)
+    A->>A: StorageService validates purpose/size/content-type; derives<br/>the storage-key extension from contentType, never from fileName
+    A-->>B: presigned PUT URL (storageKey extension always matches contentType)
     B->>S3: PUT file bytes directly (bypasses the backend; no heap-buffering)
-    B->>A: confirmUpload(storageKey)
-    Note over A,S3: presignGet: CloudFront branch returns before content-type<br/>override when CLOUDFRONT_ENABLED=true (default false)
+    B->>A: confirmUpload(storageKey)<br/>compares headObject's contentType to expectedContentType
+    Note over A,S3: presignGet serves the object's stored Content-Type;<br/>no override derived from the storage key's extension (P8)
 ```
 
 Two scheduled jobs run outside any request: `MaterialYoutubeBackfillJob`
@@ -347,7 +347,7 @@ round trip because those repository methods were already `@QueryHints
 | Contract-first OpenAPI | One backend/frontend API contract | Generated sources must not be edited |
 | BrowserRouter | Real client-side routes with direct-link support | Deployment must preserve the SPA-fallback behavior |
 | MVP usage telemetry kept (D-D) | Feedback signal during the MVP phase | `backend/event-logging-to-db-feature` stays; `prepare-engineering-handoff.sh` is never run against this project |
-| `.svg` content-type override in `presignGet` (audit §2.4) | `sanitize()` lets dots/extensions survive into the storage key; `inferContentType` + `responseContentDisposition("inline")` beat the stored type | Config-dependent: inert once `CLOUDFRONT_ENABLED=true`, but that flag defaults `false`; fix belongs in `presignGet`/`presignPut`, tracked for a later phase |
+| `.svg` content-type override in `presignGet` — **closed in P8** (audit §2.4) | Was config-dependent: inert once `CLOUDFRONT_ENABLED=true`, but that flag defaults `false`, so any environment without CloudFront activated it | `presignGet` no longer derives a response content-type override from the storage key's extension (it lets S3 serve the stored type); `StorageService.sanitize` derives the key's extension from the validated `contentType`, never from the client-supplied file name; `confirmUpload` now also rejects a stored content type that disagrees with `PendingUpload.expectedContentType` |
 | UI/navigation carried over unchanged (D-A) | MUI/Emotion, the CSS, and the left sidebar are this product's established visual system and navigation model; the rule against replacing them without an explicit request outranks the generic gate default | `check-frontend-ui-rules.sh` and the sidebar assertion in `verify-gates.sh` stay red permanently, carried and annotated (not gate-gamed) |
 | Presigned direct-to-S3 upload bypasses `shared/api/client.ts` (CR-1) | No OpenAPI operation models an S3-hosted PUT; routing it through the backend would heap-buffer large files | `verify-gates.sh` carries exactly one exemption per file, mechanically asserted at count `== 1` |
 

@@ -7,6 +7,7 @@ import com.aidigital.aionboarding.external.heygen.model.HeyGenVideoStatus;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.mapping.TextValueNormalizer;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.lesson.models.TeacherVideoRecord;
 import com.aidigital.aionboarding.service.lesson.services.entity.LessonEntityService;
 import com.aidigital.aionboarding.service.lesson.support.LessonRecordAssembler;
@@ -42,7 +43,7 @@ class TeacherVideoRefreshServiceImplTest {
 	@Spy
 	private TextValueNormalizer textValueNormalizer = new TextValueNormalizer();
 	@Spy
-	private CurrentTime currentTime = new CurrentTime();
+	private CurrentTime currentTime = new CurrentTimeImpl();
 	@Spy
 	private TeacherVideoMetadataSupport teacherVideoMetadataSupport =
 			new TeacherVideoMetadataSupport(new TextValueNormalizer());

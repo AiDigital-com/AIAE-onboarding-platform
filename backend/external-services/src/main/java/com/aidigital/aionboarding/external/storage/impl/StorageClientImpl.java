@@ -86,15 +86,18 @@ public class StorageClientImpl implements StorageClient {
         }
 
         try {
-            GetObjectRequest.Builder objectRequestBuilder = GetObjectRequest.builder()
+            // Deliberately does not override the response content type from the storage key's
+            // extension (audit §2.4, P8): the key's extension is attacker-influenced input (it is
+            // derived from the client-supplied file name), and overriding here let a `.svg`-named
+            // upload be served as `image/svg+xml` regardless of its declared or actual content.
+            // Omitting the override means S3 serves the object's own stored Content-Type header —
+            // the value validated and set at PUT time — which is what should decide how the
+            // browser renders the response.
+            GetObjectRequest objectRequest = GetObjectRequest.builder()
                 .bucket(properties.getBucket())
                 .key(storageKey)
-                .responseContentDisposition("inline");
-            String responseContentType = inferContentType(storageKey);
-            if (responseContentType != null) {
-                objectRequestBuilder.responseContentType(responseContentType);
-            }
-            GetObjectRequest objectRequest = objectRequestBuilder.build();
+                .responseContentDisposition("inline")
+                .build();
 
             GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
                 .signatureDuration(lifetime)
@@ -263,35 +266,4 @@ public class StorageClientImpl implements StorageClient {
         return contentType;
     }
 
-    private String inferContentType(String storageKey) {
-        String lowerKey = storageKey.toLowerCase();
-        if (lowerKey.endsWith(".mp4") || lowerKey.endsWith(".m4v")) {
-            return "video/mp4";
-        }
-        if (lowerKey.endsWith(".webm")) {
-            return "video/webm";
-        }
-        if (lowerKey.endsWith(".mov")) {
-            return "video/quicktime";
-        }
-        if (lowerKey.endsWith(".jpg") || lowerKey.endsWith(".jpeg")) {
-            return "image/jpeg";
-        }
-        if (lowerKey.endsWith(".png")) {
-            return "image/png";
-        }
-        if (lowerKey.endsWith(".gif")) {
-            return "image/gif";
-        }
-        if (lowerKey.endsWith(".webp")) {
-            return "image/webp";
-        }
-        if (lowerKey.endsWith(".svg")) {
-            return "image/svg+xml";
-        }
-        if (lowerKey.endsWith(".pdf")) {
-            return "application/pdf";
-        }
-        return null;
-    }
 }

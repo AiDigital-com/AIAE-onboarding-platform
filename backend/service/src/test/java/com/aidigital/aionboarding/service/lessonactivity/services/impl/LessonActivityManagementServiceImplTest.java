@@ -6,6 +6,7 @@ import com.aidigital.aionboarding.domain.common.dictionary.entities.LessonStatus
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityPromptRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.GenerateActivityResultRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
@@ -54,7 +55,7 @@ class LessonActivityManagementServiceImplTest {
 	private LessonActivityPersistenceHelper persistenceHelper;
 
 	@Spy
-	private CurrentTime currentTime = new CurrentTime();
+	private CurrentTime currentTime = new CurrentTimeImpl();
 
 	@InjectMocks
 	private LessonActivityManagementServiceImpl service;

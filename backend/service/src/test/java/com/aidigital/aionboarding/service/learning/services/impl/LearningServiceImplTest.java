@@ -12,6 +12,7 @@ import com.aidigital.aionboarding.domain.user.entities.User;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.learning.models.LearningAssigneeRecord;
 import com.aidigital.aionboarding.service.learning.models.RoadmapAssignmentEnrollmentRecord;
 import com.aidigital.aionboarding.service.learning.models.RoadmapTeamAssignmentRecord;
@@ -81,7 +82,7 @@ class LearningServiceImplTest {
 	private LearningActivityCompletionPolicy learningActivityCompletionPolicy;
 
 	@Spy
-	private CurrentTime currentTime = new CurrentTime();
+	private CurrentTime currentTime = new CurrentTimeImpl();
 
 	@InjectMocks
 	private LearningServiceImpl service;

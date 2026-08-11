@@ -3,6 +3,7 @@ package com.aidigital.aionboarding.service.teamdashboard.services.impl;
 import com.aidigital.aionboarding.domain.common.dictionary.UserRoleCode;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.teamdashboard.models.TeamDashboardIndividualRoadmapRecord;
 import com.aidigital.aionboarding.service.teamdashboard.models.TeamDashboardKpisRecord;
 import com.aidigital.aionboarding.service.teamdashboard.models.TeamDashboardPeriod;
@@ -41,7 +42,7 @@ class TeamDashboardServiceImplTest {
 	private TeamDashboardRecordAssembler teamDashboardMapper;
 
 	@Spy
-	private CurrentTime currentTime = new CurrentTime();
+	private CurrentTime currentTime = new CurrentTimeImpl();
 
 	@InjectMocks
 	private TeamDashboardServiceImpl service;

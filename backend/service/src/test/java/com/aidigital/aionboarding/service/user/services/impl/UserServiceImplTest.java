@@ -8,6 +8,7 @@ import com.aidigital.aionboarding.service.common.dictionary.DictionaryLookupServ
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.grade.services.entity.GradeEntityService;
 import com.aidigital.aionboarding.service.group.support.GroupAccessPolicy;
 import com.aidigital.aionboarding.service.mappers.user.UserRecordMapper;
@@ -65,7 +66,7 @@ class UserServiceImplTest {
 	private StorageService storageService;
 
 	@Spy
-	private CurrentTime currentTime = new CurrentTime();
+	private CurrentTime currentTime = new CurrentTimeImpl();
 
 	@InjectMocks
 	private UserServiceImpl service;

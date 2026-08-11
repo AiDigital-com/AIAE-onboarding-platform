@@ -8,6 +8,7 @@ import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.mapping.TextValueNormalizer;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.mappers.material.MaterialMapper;
 import com.aidigital.aionboarding.service.mappers.material.MaterialMapperImpl;
 import com.aidigital.aionboarding.service.material.models.MaterialAttachmentInput;
@@ -50,7 +51,7 @@ class MaterialFileServiceImplTest {
 	@Spy
 	private TextValueNormalizer textValueNormalizer = new TextValueNormalizer();
 	@Spy
-	private CurrentTime currentTime = new CurrentTime();
+	private CurrentTime currentTime = new CurrentTimeImpl();
 
 	@InjectMocks
 	private MaterialFileServiceImpl service;

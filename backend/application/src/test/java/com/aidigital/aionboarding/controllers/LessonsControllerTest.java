@@ -208,7 +208,7 @@ class LessonsControllerTest {
 				.create();
 		UploadedFileResponseV1 expectedBody = Instancio.create(UploadedFileResponseV1.class);
 		when(currentUser.requireUser()).thenReturn(viewer);
-		when(uploadValidator.validate(file)).thenReturn(uploadMeta);
+		when(uploadValidator.validate("diagram.png", "image/png", 7L)).thenReturn(uploadMeta);
 		when(storageService.putObjectStreaming(
 				eq(viewer), eq(UploadPurpose.LESSON_ASSET), any(InputStream.class), eq(7L), eq("diagram.png"), eq(
 						"image/png")))

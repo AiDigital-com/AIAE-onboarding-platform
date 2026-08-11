@@ -11,6 +11,7 @@ public enum UploadRejectionReason {
 	ALREADY_CONFIRMED("already_confirmed"),
 	EXPIRED("expired"),
 	SIZE_MISMATCH("size_mismatch"),
+	CONTENT_TYPE_MISMATCH("content_type_mismatch"),
 	NOT_FOUND("not_found");
 
 	private final String value;

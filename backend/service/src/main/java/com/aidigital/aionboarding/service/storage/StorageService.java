@@ -26,6 +26,7 @@ import java.io.InputStream;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -36,6 +37,21 @@ public class StorageService {
 	private static final Logger LOG = LoggerFactory.getLogger(StorageService.class);
 	private static final String DEFAULT_CONTENT_TYPE = "application/octet-stream";
 	private static final String INVALID_UPLOAD_REFERENCE = "Invalid or expired upload reference.";
+
+	/**
+	 * Canonical file extension for a handful of common declared content types, so the storage
+	 * key's extension can be derived from the (already validated) content type instead of from
+	 * the client-supplied file name. Not exhaustive by design — an unmapped content type falls
+	 * back to {@link #deriveExtension} below rather than to a hardcoded default, so a legitimate
+	 * upload of an allowed-but-unlisted subtype (e.g. an {@code image/} MIME type not in this
+	 * map) still gets a sensible extension.
+	 */
+	private static final Map<String, String> KNOWN_EXTENSIONS_BY_CONTENT_TYPE = Map.of(
+			"video/quicktime", "mov",
+			"image/jpeg", "jpg",
+			"text/plain", "txt");
+
+	private static final String FALLBACK_EXTENSION = "bin";
 
 	/**
 	 * Bounds each abandoned-upload sweep so a large backlog cannot turn one job run into an
@@ -80,7 +96,7 @@ public class StorageService {
 		String resolvedContentType = resolveContentType(contentType);
 		validateUploadPolicy(purpose, resolvedContentType, sizeBytes);
 
-		String storageKey = "uploads/" + UUID.randomUUID() + "/" + sanitize(fileName);
+		String storageKey = "uploads/" + UUID.randomUUID() + "/" + sanitize(fileName, resolvedContentType);
 		Duration expiry = Duration.ofSeconds(properties.getPresignPutExpiresSeconds());
 		String url = storageClient.presignPut(storageKey, resolvedContentType, expiry);
 
@@ -139,6 +155,13 @@ public class StorageService {
 			// Left unconfirmed rather than deleted here: deleting now would mean an S3 network
 			// call inside this transaction. The abandoned-upload sweep reclaims it once expired.
 			throw rejectUpload(UploadRejectionReason.SIZE_MISMATCH);
+		}
+		if (!Objects.equals(metadata.contentType(), pendingUpload.getExpectedContentType())) {
+			// expectedContentType was recorded at presign time (see #presignPut) but never read
+			// until this check (P8, audit §2.4): the presigned PUT's signature binds the client to the
+			// declared content type, so a stored type that differs from what was declared means
+			// the object was not written the way this reference authorized.
+			throw rejectUpload(UploadRejectionReason.CONTENT_TYPE_MISMATCH);
 		}
 
 		// Atomic conditional update rather than read-then-save: two requests racing to confirm
@@ -261,7 +284,7 @@ public class StorageService {
 	public String putObject(AppUser owner, UploadPurpose purpose, byte[] bytes, String fileName, String contentType) {
 		String resolvedContentType = resolveContentType(contentType);
 		validateUploadPolicy(purpose, resolvedContentType, bytes.length);
-		String storageKey = "uploads/" + UUID.randomUUID() + "/" + sanitize(fileName);
+		String storageKey = "uploads/" + UUID.randomUUID() + "/" + sanitize(fileName, resolvedContentType);
 		storageClient.putObject(storageKey, bytes, resolvedContentType);
 		registerConfirmedUpload(owner, storageKey, resolvedContentType, bytes.length);
 		return storageKey;
@@ -288,7 +311,7 @@ public class StorageService {
 	) {
 		String resolvedContentType = resolveContentType(contentType);
 		validateUploadPolicy(purpose, resolvedContentType, contentLength);
-		String storageKey = "uploads/" + UUID.randomUUID() + "/" + sanitize(fileName);
+		String storageKey = "uploads/" + UUID.randomUUID() + "/" + sanitize(fileName, resolvedContentType);
 		storageClient.putObjectStreaming(storageKey, content, contentLength, resolvedContentType);
 		registerConfirmedUpload(owner, storageKey, resolvedContentType, contentLength);
 		return storageKey;
@@ -390,12 +413,59 @@ public class StorageService {
 	}
 
 	/**
-	 * Strips characters unsafe for a storage key from a file name.
+	 * Builds a safe storage-key suffix from a file name and a resolved content type. The
+	 * extension is always derived from {@code contentType} — never from the client-supplied
+	 * {@code fileName} — so an attacker cannot make the storage key carry an extension that
+	 * disagrees with the declared, already-validated content type (audit §2.4, P8): before this
+	 * change, the file name's own extension survived into the key verbatim, which is what let a
+	 * file declared {@code image/png} but named {@code payload.svg} be stored under a
+	 * {@code .svg} key and later served as {@code image/svg+xml} (see
+	 * {@code StorageClientImpl.presignGet}, fixed separately in this same phase).
 	 *
-	 * @param fileName original file name, possibly null
-	 * @return sanitized file name suffix
+	 * @param fileName    original file name, possibly null; only its base name (without
+	 *                    extension) is kept
+	 * @param contentType resolved (non-blank) content type the extension is derived from
+	 * @return sanitized file name suffix, with an extension consistent with {@code contentType}
 	 */
-	String sanitize(String fileName) {
-		return fileName == null ? "file" : fileName.replaceAll("[^a-zA-Z0-9._-]", "_");
+	String sanitize(String fileName, String contentType) {
+		String base = fileName == null ? "file" : fileName;
+		int lastDot = base.lastIndexOf('.');
+		String stem = lastDot > 0 ? base.substring(0, lastDot) : base;
+		String safeStem = stem.replaceAll("[^a-zA-Z0-9_-]", "_");
+		if (safeStem.isBlank()) {
+			safeStem = "file";
+		}
+		return safeStem + "." + deriveExtension(contentType);
+	}
+
+	/**
+	 * Derives a file extension from a content type: a small set of common types are mapped
+	 * explicitly (see {@link #KNOWN_EXTENSIONS_BY_CONTENT_TYPE}); anything else falls back to
+	 * the MIME subtype itself (e.g. {@code image/webp} → {@code webp}), stripped of any
+	 * {@code +suffix} or {@code ;parameter} and any character that is not a plain letter or
+	 * digit, so an unlisted but otherwise legitimate content type still gets a sensible
+	 * extension instead of a generic one.
+	 *
+	 * @param contentType resolved (non-blank) content type
+	 * @return a lowercase, filesystem-safe extension with no leading dot
+	 */
+	String deriveExtension(String contentType) {
+		String known = KNOWN_EXTENSIONS_BY_CONTENT_TYPE.get(contentType);
+		if (known != null) {
+			return known;
+		}
+		int slash = contentType.indexOf('/');
+		String subtype = slash >= 0 ? contentType.substring(slash + 1) : contentType;
+		subtype = subtype.toLowerCase();
+		int semicolon = subtype.indexOf(';');
+		if (semicolon >= 0) {
+			subtype = subtype.substring(0, semicolon);
+		}
+		int plus = subtype.indexOf('+');
+		if (plus >= 0) {
+			subtype = subtype.substring(0, plus);
+		}
+		subtype = subtype.replaceAll("[^a-z0-9]", "");
+		return subtype.isBlank() ? FALLBACK_EXTENSION : subtype;
 	}
 }

@@ -7,6 +7,7 @@ import com.aidigital.aionboarding.domain.teamdashboard.repositories.RoadmapStats
 import com.aidigital.aionboarding.domain.teamdashboard.repositories.WeeklyActivityProjection;
 import com.aidigital.aionboarding.service.common.mapping.ScalarValueReader;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.teamdashboard.models.TeamDashboardIndividualLessonRecord;
 import com.aidigital.aionboarding.service.teamdashboard.models.TeamDashboardIndividualRoadmapRecord;
 import com.aidigital.aionboarding.service.teamdashboard.models.TeamDashboardKpisRecord;
@@ -41,7 +42,7 @@ import static org.mockito.Mockito.when;
 class TeamDashboardRecordAssemblerTest {
 
 	private final TeamDashboardRecordAssembler assembler = new TeamDashboardRecordAssembler(
-			new TeamDashboardSupport(new CurrentTime()), new ObjectMapper(), new ScalarValueReader());
+			new TeamDashboardSupport(new CurrentTimeImpl()), new ObjectMapper(), new ScalarValueReader());
 
 	@Nested
 	class ToMemberRecord {

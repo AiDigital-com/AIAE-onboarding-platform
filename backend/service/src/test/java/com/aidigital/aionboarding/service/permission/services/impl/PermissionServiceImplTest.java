@@ -8,6 +8,7 @@ import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.security.RequestAuthenticationCache;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.group.services.entity.GroupLeadEntityService;
 import com.aidigital.aionboarding.service.group.services.entity.GroupMemberEntityService;
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
@@ -61,7 +62,7 @@ class PermissionServiceImplTest {
 	private RequestAuthenticationCache requestAuthenticationCache;
 
 	@Spy
-	private CurrentTime currentTime = new CurrentTime();
+	private CurrentTime currentTime = new CurrentTimeImpl();
 
 	@InjectMocks
 	private PermissionServiceImpl service;
