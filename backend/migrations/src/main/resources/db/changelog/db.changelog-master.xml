@@ -21,4 +21,8 @@
 
 	<include file="1.0.0/db.version-master.xml" relativeToChangelogFile="true"/>
 
+	<!-- New (P6), not versioned history — cache-invalidation outbox table backing
+	     backend/cache-management. See docs/aiae-migration-plan.md §2.7. -->
+	<include file="changes/0003-cache-invalidation.xml" relativeToChangelogFile="true"/>
+
 </databaseChangeLog>

@@ -8,9 +8,9 @@ Platform** and must not be copied into the rule tree.
 
 - Owner: engineering (AIAE convergence migration)
 - Lifecycle phase: MVP
-- Last verified against: `migration` @ P3 (2026-08-10)
+- Last verified against: `migration` @ P6 (2026-08-11)
 - Verification evidence: `bash scripts/local-verify.sh`
-- Cache status: disabled
+- Cache status: enabled
 - MVP usage telemetry: enabled during MVP
 
 ## Identity
@@ -29,13 +29,17 @@ Platform** and must not be copied into the rule tree.
 | `backend/application` | Spring Boot runtime, security, controllers, OpenAPI implementations |
 | `backend/external-services` | outbound integrations |
 | `backend/event-logging-to-db-feature` | MVP usage-event logging to PostgreSQL |
+| `backend/observability` | reusable outbound-call metrics (`ExternalClientMetricsInterceptor`, `ExternalCallTimer`) |
+| `backend/cache-management` | distributed cache-invalidation outbox, registry, and scheduled poller (P6) |
 | `backend/config` | shared configuration module |
 
 Liquibase changelogs live at
 `backend/migrations/src/main/resources/db/changelog/`. The Spring property is
 `classpath:db/changelog/db.changelog-master.xml` — a classpath resource, so it is
 unaffected by the module directory name. All 14 changeSets in
-`1.0.0/db.version-master.xml` declare `preConditions` with `onFail="MARK_RAN"`.
+`1.0.0/db.version-master.xml` declare `preConditions` with `onFail="MARK_RAN"`,
+plus one further changeSet (P6) in `changes/0003-cache-invalidation.xml`,
+included from `db.changelog-master.xml` alongside `1.0.0/db.version-master.xml`.
 
 ## Product and system context
 
@@ -103,22 +107,32 @@ which is why this has bitten before.
 
 ## Repository and module boundaries
 
-`backend/pom.xml` declares exactly six top-level Maven modules, in this order:
+`backend/pom.xml` declares eight top-level Maven modules, in this order:
 `domain`, `migrations`, `event-logging-to-db-feature`, `service`,
-`application`, `external-services`. `backend/config` (Checkstyle rule files)
-is a plain directory referenced by path from the Checkstyle plugin
-configuration — it is **not** a Maven module and has no `pom.xml`; the
-*Backend modules* table above lists it for completeness but it does not appear
-in `<modules>`.
+`application`, `external-services`, `observability`, `cache-management`.
+(Corrected in P6: this sentence had drifted to "exactly six" and omitted
+`observability` after P4 added it — a documentation gap, not a code defect,
+fixed here because P6 touches the same paragraph for `cache-management`.)
+`backend/config` (Checkstyle rule files) is a plain directory referenced by
+path from the Checkstyle plugin configuration — it is **not** a Maven module
+and has no `pom.xml`; the *Backend modules* table above lists it for
+completeness but it does not appear in `<modules>`.
 
 | Area | Responsibility | May depend on |
 |---|---|---|
 | `frontend/` | React UI, routing, Clerk auth integration, typed API consumption | Generated OpenAPI types and `shared/api/client.ts` |
-| `backend/application` | Runtime composition, security, OpenAPI controllers, exception translation, SPA hosting, scheduled jobs | `service`, `external-services`, runtime infrastructure |
-| `backend/service` | Business use cases, validation, authorization, orchestration, mapping | `domain` entity services, `external-services` contracts, `event-logging-to-db-feature` (for `@LogUsage`, currently unreferenced by any real `*ServiceImpl` — see `backend/DEPENDENCY-ANALYSIS.md`) |
+| `backend/application` | Runtime composition, security, OpenAPI controllers, exception translation, SPA hosting, scheduled jobs, the shared Spring/JCache manager bridge (`CacheManagerConfig`, no `@EnableCaching`) | `service`, `external-services`, `observability`, runtime infrastructure |
+| `backend/service` | Business use cases, validation, authorization, orchestration, mapping, the cache-invalidation outbox adapter and application registry (P6) | `domain` entity services, `external-services` contracts, `cache-management` (JPA outbox + registry interfaces), `event-logging-to-db-feature` (for `@LogUsage`, currently unreferenced by any real `*ServiceImpl` — see `backend/DEPENDENCY-ANALYSIS.md`) |
 | `backend/domain` | JPA entities and Spring Data repositories | Persistence APIs only |
 | `backend/migrations` | Liquibase changelogs | No production Java modules |
 | `backend/external-services` | Outbound integrations: OpenAI, S3/CloudFront, YouTube, SSRF-resistant link fetch | Third-party SDKs/HTTP only |
+
+`backend/observability` (see *Backend modules* above) is a reusable metrics leaf with no
+internal-module dependencies. `backend/cache-management` (see *Backend modules* above) is the
+generic, app-agnostic cache-invalidation mechanism — outbox event/service contracts, registry
+contracts, and the scheduled poller — and is self-contained by design (its `pom.xml` forbids
+depending on `domain`/`service`/`application`); `backend/service` depends on it for the JPA
+outbox adapter and application registry (P6).
 
 The MVP usage-telemetry module is documented once, in the *Backend modules*
 table above, kept by decision D-D and never removed by
@@ -216,16 +230,17 @@ Two scheduled jobs run outside any request: `MaterialYoutubeBackfillJob`
   2026-08-10).
 - All 14 changeSets in `1.0.0/db.version-master.xml` declare `preConditions`
   with `onFail="MARK_RAN"`.
+- `db/changelog/changes/0003-cache-invalidation.xml` (P6, new — no recorded
+  history at risk) adds one further changeSet creating
+  `cache_invalidation_event`, the cross-node cache-invalidation outbox; 15
+  changeSets are declared in total once this file's `<include>` in
+  `db.changelog-master.xml` is counted alongside `1.0.0/db.version-master.xml`.
 - JPA identifiers use `Long`; schema identifiers use `BIGINT`.
 
 ## Caching and consistency
 
-Hibernate L2 caching is enabled and is the **only** cache manager in the
-context: `hibernate.javax.cache.uri: ehcache.xml`, `spring.cache.type: jcache`
-is declared but `@EnableCaching` is intentionally **not** present anywhere in
-the codebase (adding it without also setting `spring.cache.jcache.config:
-ehcache.xml` would create a second, empty `javax.cache.CacheManager` beside
-Hibernate's — see `docs/migration-guardrails.md`). `ehcache.xml`
+Hibernate L2/query caching is enabled through JCache/Ehcache
+(`hibernate.javax.cache.uri: ehcache.xml`). `ehcache.xml`
 (`backend/application/src/main/resources/ehcache.xml`) declares 18 regions:
 8 entity regions and 8 matching `findXByCode` query regions over the
 project's lookup/dictionary entities (`UserRole`, `LessonStatus`,
@@ -234,11 +249,40 @@ project's lookup/dictionary entities (`UserRole`, `LessonStatus`,
 Hibernate infrastructure regions
 (`hibernate-cache.default-query-results-region`,
 `hibernate-cache.default-update-timestamps-region` — required because
-`missing_cache_strategy: fail`). All cached sources are `READ_ONLY`
-`@Immutable` dictionary entities changed only by Liquibase; there is no
-multi-node cache-invalidation protocol yet because no distributed cache
-mutation exists to invalidate. `backend/cache-management` does not exist in
-this repository.
+`missing_cache_strategy: fail`). All 8 cached sources are `READ_ONLY`
+`@Immutable` dictionary entities changed only by Liquibase.
+
+**There is still exactly one `javax.cache.CacheManager` in the context** —
+`@EnableCaching` is intentionally **not** present anywhere in the codebase
+(it would activate Spring Boot's `JCacheCacheConfiguration`, which resolves
+the provider's *default* URI, not `ehcache.xml`, creating a second, empty
+manager beside Hibernate's — see `docs/migration-guardrails.md`).
+`com.aidigital.aionboarding.config.CacheManagerConfig` (`backend/application`)
+instead builds the `javax.cache.CacheManager` from the same `ehcache.xml`
+classpath resource, wraps it in Spring's `JCacheCacheManager` for the
+`cache-management` module's `CacheService`/`CacheUpdaterService`, and forces
+Hibernate to reuse that exact instance via a `HibernatePropertiesCustomizer`
+setting `hibernate.javax.cache.cache_manager` — verified by object-identity
+assertion in `CacheInvalidationOutboxIntegrationTest`.
+
+**Cross-node invalidation (P6, `backend/cache-management`).** A shared
+PostgreSQL `cache_invalidation_event` outbox
+(`db/changelog/changes/0003-cache-invalidation.xml`) is polled by every node
+on a fixed delay (`ScheduledCacheUpdater`), ordered by monotonic event ID —
+never by timestamp. `JpaCacheInvalidationEventService`
+(`backend/service/.../common/cache/`) publishes inside the mutating
+transaction (`Propagation.MANDATORY`: publishing outside one fails).
+`ApplicationCacheNamesByClassRegistry` — which maps a mutated class to the
+region names to clear — starts **empty by design**: all 8 cached sources
+above are immutable/Liquibase-only, so no transaction ever mutates them and
+no publish call is ever made today. This is preparation for a planned,
+not-yet-live, multi-node deployment (§6.1 D-E of the migration plan); the
+registry becomes load-bearing the moment a mutable source is cached. `M3`:
+`DictionaryLookupService`'s former bean-level `ConcurrentHashMap` was folded
+into this same managed cache — it duplicated the `findXByCode` query regions
+above and sat outside this protocol; removing it does not add a database
+round trip because those repository methods were already `@QueryHints
+(HINT_CACHEABLE)`.
 
 ## External integrations
 
@@ -259,11 +303,10 @@ this repository.
   with configured percentiles).
 - Logbook provides structured HTTP logging; production/Replit logging is
   metadata-only (`WithoutBodyStrategy`) — see `LogbookConfig`.
-- `ExternalClientMetricsInterceptor` / `ExternalCallTimer` currently live in
-  `backend/external-services` (not yet the standard's `backend/observability`
-  leaf module — see *Adopted standards* below); every third-party
-  `PooledRestClientFactory` client registers both this interceptor and the
-  Logbook client interceptor.
+- `ExternalClientMetricsInterceptor` / `ExternalCallTimer` live in the
+  standard's leaf `backend/observability` module (moved there by P4); every
+  third-party `PooledRestClientFactory` client registers both this
+  interceptor and the Logbook client interceptor.
 - Two scheduled jobs (`MaterialYoutubeBackfillJob`,
   `AbandonedUploadCleanupJob`, see *Primary runtime flows*) run independently
   of any request; both are single-node today (§6.1 D-E — multi-node is
@@ -295,18 +338,6 @@ These are **not** exceptions to the rules. The AIAE contract in `.claude/` is
 authoritative; the items below record where the implementation still lags, so
 the gap is visible rather than mistaken for compliance.
 
-- **Observability module.** `ExternalClientMetricsInterceptor` and
-  `ExternalCallTimer` currently live in
-  `backend/external-services/.../external/common/http/` alongside
-  `PooledRestClientFactory`. The standard places them in a leaf
-  `backend/observability` module that `application` can attach without
-  depending on `external-services`. Nothing outside `external-services`
-  consumes them today, so the extraction is low-risk.
-- **Distributed cache.** No `ApplicationCacheNamesByClassRegistry` and no
-  `CacheInvalidationEventService` exist. The rules in `12-database.md`,
-  `14-performance.md`, and `agent_docs/distributed_cache.md` describe the
-  target design; the AIAE template provides a `backend/cache-management`
-  module for it.
 - **Coverage phase tooling — partially closed by P2, `-Pmvp` still pending
   P9.** `scripts/lib/` and `.template-phase` (`mvp`) now exist, and
   `scripts/lib/check-coverage-integrity.sh` runs and reports 14 findings

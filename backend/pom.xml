@@ -27,6 +27,7 @@
 		<module>application</module>
 		<module>external-services</module>
 		<module>observability</module>
+		<module>cache-management</module>
 	</modules>
 
 	<properties>
@@ -157,6 +158,11 @@
 			<dependency>
 				<groupId>${project.groupId}</groupId>
 				<artifactId>observability</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>${project.groupId}</groupId>
+				<artifactId>cache-management</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 		</dependencies>

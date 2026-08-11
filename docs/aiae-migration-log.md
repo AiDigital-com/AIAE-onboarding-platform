@@ -1547,6 +1547,333 @@ first, per the plan's own Rollback note — recorded here so it survives to rele
 
 ---
 
+## P6 — `cache-management` and the second cache · **COMPLETE**
+
+Completed 2026-08-11 on branch `mig/p06-cache-management` (from `migration` @ `e178678`).
+
+### Environment
+
+Same shims as P0–P5: `python3` resolved to a real 3.14.5 via a copy on `PATH` ahead of the
+Windows Store stub; `JAVA_HOME=/c/Users/Admin/.jdks/corretto-21.0.12` and
+`/c/Users/Admin/tools/apache-maven-3.9.16/bin` prepended for Maven (`mvn -v` → Java `21.0.12`).
+Fixture manifest re-validated **80/80** before any change and again immediately before this
+commit — P6's Scope never touches a managed fixture, so this was a formality, not a finding.
+
+### Preconditions re-confirmed
+
+`.claude/agent_docs/distributed_cache.md` was installed in P1 and is unchanged since. Read in
+full before writing any code, together with `docs/migration-guardrails.md` §2.2's trap and the
+plan's P6 block, §2.5's "18 regions" correction, and §6.1 D-E.
+
+### What was built
+
+**`backend/cache-management` (new Maven module).** Ported verbatim from the standard checkout
+(`cc64e49`, `templates/generated-project/scaffold/backend/cache-management`), package
+`com.aidigital.aionboarding.cachemanagement`, self-contained by its own `pom.xml` comment
+(no dependency on `domain`/`service`/`application`): `cache/CacheService(+Impl)`,
+`config/CacheManagementProperties`, `event/CacheInvalidationEvent` (record) +
+`CacheInvalidationEventService` (interface, `updatesAfter(long, int)` — never `LocalDateTime`),
+`registry/CacheNamesByClassRegistry` (interface) + `CacheNamesByClassService(+Impl)`,
+`updater/CacheRegistryVerifier`, `CacheUpdaterService(+Impl)`, `ScheduledCacheUpdater`
+(`@Scheduled(fixedDelayString/initialDelayString)`, bounded batches, no `parallelStream()`
+anywhere). Added `<module>cache-management</module>` and a `dependencyManagement` entry to
+`backend/pom.xml`.
+
+**Outbox entity + repository (`backend/domain`).** `domain.cache.entities.CacheInvalidationEventEntity`
+(extends `IdAwareEntity`; `trackedClass` TEXT, `createdAt` `Instant`) and
+`domain.cache.repositories.CacheInvalidationEventRepository`
+(`findByIdGreaterThanOrderByIdAsc(long, Pageable)`; `@Modifying @Query` `deleteCreatedBefore`).
+
+**Application wiring (`backend/service`), one deliberate deviation from the scaffold reference.**
+`service.common.cache.JpaCacheInvalidationEventService implements CacheInvalidationEventService`
+and `service.common.cache.ApplicationCacheNamesByClassRegistry implements
+CacheNamesByClassRegistry` — the two class names `structure-lint` requires by name, both found
+under `backend/service`. The scaffold's own reference `JpaCacheInvalidationEventService` injects
+`CacheInvalidationEventRepository` directly; this project's `.claude/rules/10-architecture.md`
+("Only the paired entity service implementation may inject that entity's repository") and
+`00-backend-hard-rules.md` are stricter, so a paired entity service —
+`service.common.cache.services.entity.CacheInvalidationEventEntityService`, mirroring
+`UserEntityService`'s existing pattern exactly — was inserted between them. `publishUpdateEvent`
+is `@Transactional(propagation = MANDATORY)` on **both** `JpaCacheInvalidationEventService` and
+the entity service's `save(...)` (defense in depth — found during self-review, see *Review*
+below — so a future direct caller of the entity service cannot silently open its own transaction
+and defeat the atomicity guarantee the outer method alone would otherwise be the only thing
+enforcing).
+
+**Liquibase (`backend/migrations`).** New file
+`db/changelog/changes/0003-cache-invalidation.xml` — one changeSet,
+`id="0003-create-cache-invalidation-event"`, direct `<preConditions onFail="MARK_RAN">` per
+`.claude/rules/12-database.md`, creating `cache_invalidation_event` (`id BIGINT` autoincrement,
+`tracked_class TEXT NOT NULL`, `created_at TIMESTAMP WITH TIME ZONE NOT NULL`) plus an index on
+`created_at`. Included from `db.changelog-master.xml` (the file P5 renamed for exactly this) via
+`<include file="changes/0003-cache-invalidation.xml" relativeToChangelogFile="true"/>`, alongside
+the existing `1.0.0/db.version-master.xml` include. New file, no recorded history at risk —
+matches §2.7 exactly as the plan predicted.
+
+**M2 — the registry stays empty, and there is a dedicated test proving it.**
+`ApplicationCacheNamesByClassRegistry.cacheNamesByClassMap()` returns `Map.of()`. Its own JavaDoc
+and `ApplicationCacheNamesByClassRegistryTest` (unit) plus
+`CacheInvalidationOutboxIntegrationTest.shouldStartWithAnEmptyApplicationRegistryTest`
+(integration, real bean) both pin this. No warm-up code was added (none exists today; none was
+needed).
+
+**M3 — `DictionaryLookupService`'s `ConcurrentHashMap` folded into the managed cache.** Removed
+the bean-level `Map<String, Long> cache` (was line 38) and the `cacheKey` parameter/prefixes
+(`"user_role:" + code`, etc.) from all 8 lookup methods and the shared `lookup(...)` helper.
+Every finder passed to `lookup(...)` (`userRoleRepository::findByCode`, etc.) is already
+`@QueryHints(HINT_CACHEABLE)`-annotated with a matching `ehcache.xml` `findXByCode` region
+(verified region-by-region against `ehcache.xml` before removing the map, not assumed), so this
+does not add a database round trip on repeated lookups — it removes the second, unmanaged cache
+`distributed_cache.md` calls out by name. `DictionaryLookupServiceTest`'s
+`shouldCacheRepeatedLookupsTest` — which asserted `verify(userRoleRepository,
+times(1)).findByCode(...)`, i.e. asserted the presence of the map being removed — was replaced
+with `shouldDelegateEveryLookupToTheRepositoryWithoutASecondBeanLevelCacheTest`, asserting
+`times(2)`: the repository mock is now hit on every call, proving no bean-level memoization
+remains reachable from this class. This **is** the "M3 test asserting no second cache instance is
+reachable from `DictionaryLookupService`" the plan's Test block asks for.
+
+**The cache-manager situation, and how the second manager was avoided.** Before this phase there
+was exactly one `javax.cache.CacheManager` (Hibernate's, from `hibernate.javax.cache.uri:
+ehcache.xml`) and zero Spring `CacheManager` beans. The `cache-management` module's
+`CacheServiceImpl`/`CacheUpdaterServiceImpl` need Spring `CacheManager` beans (they resolve
+regions via `org.springframework.cache.CacheManager`, not `javax.cache` directly) to reach the
+Hibernate L2/query regions by name — required application wiring per the scaffold's own
+`cache-management/pom.xml` comment ("a bridge CacheManager that exposes the Hibernate
+second-level (L2) cache"). **`@EnableCaching` was never added.** Verified by decompiling the
+installed `spring-boot-autoconfigure-3.4.0.jar`: `CacheAutoConfiguration` is
+class-level-gated `@ConditionalOnBean(CacheAspectSupport.class)`, and that bean is registered
+only by `@EnableCaching`'s imported configuration — so without the annotation, Spring Boot's
+`JCacheCacheConfiguration` (and its would-be no-URI `getCacheManager()` call) never activates,
+full stop, regardless of `spring.cache.type: jcache` already being declared. Instead,
+`com.aidigital.aionboarding.config.CacheManagerConfig` (new, `backend/application`) manually
+declares three `@Bean`s: the `javax.cache.CacheManager` resolved from the same `ehcache.xml`
+classpath resource; a Spring `CacheManager` (`JCacheCacheManager`) wrapping it, for
+`cache-management`'s beans to use; and a `HibernatePropertiesCustomizer` that sets
+`hibernate.javax.cache.cache_manager` to that exact instance. Decompiled
+`hibernate-jcache-6.6.2.Final.jar` (`JCacheRegionFactory.resolveCacheManager`) to confirm
+Hibernate checks that property **first** and, when it is already a `javax.cache.CacheManager`
+instance, returns it verbatim (`useExplicitCacheManager`) instead of resolving one itself via
+`CachingProvider`/URI — so this is not "two managers that happen to share a URI and get
+deduplicated by the JSR-107 provider," it is Hibernate reusing the literal object Spring created.
+Added the one new dependency this requires, `org.springframework:spring-context-support`
+(version-managed by the already-imported `spring-framework-bom`, unversioned in
+`backend/application/pom.xml`) — the module that carries `JCacheCacheManager`; verified it is not
+already on the classpath under any other artifact before adding it.
+`CacheInvalidationOutboxIntegrationTest.shouldShareTheExactJCacheManagerWithSpringAndHibernateTest`
+asserts object identity (`isSameAs`) across all three: the `javax.cache.CacheManager` bean, what
+`JCacheCacheManager.getCacheManager()` returns, and what the `HibernatePropertiesCustomizer`
+places in the properties map — and passed for real (H2, not mocked) in this phase's build.
+
+### Review — self-conducted `backend-rule-review`
+
+Ran the review sequence from `.claude/skills/backend-rule-review` against this diff before
+closing the phase. One real finding, fixed in this same commit (see *entity service's `save`*
+above): `CacheInvalidationEventEntityService.save(...)` was originally plain `@Transactional`
+(REQUIRED) rather than `MANDATORY`, meaning a future caller that bypassed
+`JpaCacheInvalidationEventService` and called the entity service directly would silently open
+its own transaction instead of failing — undermining the "publication outside a transaction
+fails" contract for that one bypass path. Changed to `MANDATORY` on both layers; re-ran
+`mvn -f backend/pom.xml -pl cache-management,service -am test` after the fix — green, no
+regressions, no test needed updating (all existing tests already call through the outer
+service). No other findings: 1 entity = 1 repository = 1 service holds
+(`CacheInvalidationEventEntityService` is the only class injecting
+`CacheInvalidationEventRepository`, confirmed by `grep`); no controller/orchestrator injects a
+repository; no outbound integration was added; `@ConfigurationProperties` used throughout
+(`CacheManagementProperties`), no `@Value`; zero `private` methods introduced in any production
+class (checked every new/edited file); `CacheInvalidationEvent` is a top-level record; every
+handwritten method carries JavaDoc except `@Override`s that inherit their contract; every new
+Maven submodule (`cache-management`) declares Lombok; polling batches are explicitly bounded
+(`CacheManagementProperties.batchSize`/`maxBatchesPerPoll`, defaults 500/20); no transaction
+spans external I/O (none was added); generated OpenAPI sources untouched (no controller changes).
+
+**A lifecycle detail considered and accepted, not a finding.** `CacheManagerConfig.jCacheManager()`
+is `@Bean(destroyMethod = "close")`, matching the scaffold's own reference exactly, with no
+explicit `@DependsOn` forcing destruction order against the `EntityManagerFactory` bean (the
+`CacheAutoConfiguration$CacheManagerEntityManagerFactoryDependsOnPostProcessor` that would add
+this automatically is itself gated behind `@EnableCaching`, which this phase does not add).
+Considered and accepted rather than fixed: Spring's default reverse-creation-order destruction
+already destroys the EMF (created after the customizer that depends on `jCacheManager`) before
+`jCacheManager` itself; `javax.cache.CacheManager.close()` is specified idempotent regardless.
+515 application tests across this run's many repeated Spring context creations/destructions,
+including this bean every time, produced zero shutdown-related failures.
+
+### Verification
+
+**`bash scripts/structure-lint.sh`: 15 → 14.** Exactly the one predicted assertion cleared —
+`ehcache.xml remains without cache-management` — confirmed by diffing the full before/after
+failure lists line-for-line: identical except that one line. None of the module's own six new
+assertions (module `pom.xml`; `<module>cache-management</module>`; `<artifactId>cache-management
+</artifactId>` in `service/pom.xml`; `@EnableScheduling`; `JpaCacheInvalidationEventService.java`
++ `ApplicationCacheNamesByClassRegistry.java` under `backend/service`; the changelog + its
+include) newly failed, and neither did the `updatesAfter(LocalDateTime` or
+`parallelStream()`-under-`*/cache` bans. **Observation, not a defect fixed here:** that
+`parallelStream()` ban's glob (`backend/application/src/main/java/*/cache`) is a single-level
+wildcard that cannot match this project's multi-segment package path
+(`com/aidigital/aionboarding/cache`) — it would not fire even if a violation existed. Out of
+Scope (`scripts/lib/**` is P2's), and moot regardless since no `parallelStream()` was added
+anywhere; reported so the next person does not mistake silence there for coverage.
+
+**`bash scripts/verify-gates.sh`: 16 → 16, byte-identical failure list**, diffed line-for-line
+(not merely counted) — confirmed no unrelated movement in either direction, including the four
+carried red assertions (presigned-upload count exactly 1; sidebar assertion; `check-frontend-ui-
+rules.sh`; usage-events changelog path) and `check-maven-dependency-analysis.py` (still fails —
+`maven-dependency-plugin` is not yet activated in `backend/pom.xml`'s `build/plugins`, a
+pre-existing gap this phase's Scope does not touch).
+
+**`bash scripts/lib/check-architecture-overview.sh`: passed (mvp) → passed (mvp).** The
+cache-management-specific assertions this gate gained the moment the module directory exists —
+exactly one `- Cache status: enabled` line, exactly one `` | `backend/cache-management` | ``
+module-table row — both satisfied; verified the exact literal-substring count is **1** for both
+before treating the doc as done, not merely that the script exited 0.
+
+**`bash scripts/lib/check-liquibase-preconditions.sh`: 0 → 0, unchanged.** The new changeSet
+declares direct `<preConditions>`; all 15 changesets (14 existing + 1 new) still comply.
+
+**`mvn -f backend/pom.xml clean verify`: BUILD SUCCESS.** `application` module:
+**515 tests, 0 failures, 0 errors, 45 skipped** (was 507/0/0/44 — **+8 tests, +1 skip**, all in
+the new `backend/application/.../cache/` integration tests, explained below). Every module's
+`jacoco-check` reports "All coverage checks have been met," including the brand-new
+`cache-management` bundle (7 of its 12 classes are graded — `CacheManagementProperties` is
+excluded by the existing `**/config/**` rule — at effectively full coverage from the ported
+scaffold test suite) and `service` (169 classes, was 166 — the three new classes are covered by
+dedicated unit tests). Per-module reactor results, all `SUCCESS`: `domain`, `migrations`,
+`event-logging-to-db-feature`, `observability`, `external-services`, **`cache-management`
+(new)**, `service`, `application`.
+
+**New tests, by module** (36 total, 35 run + 1 skipped, 0 failures):
+- `cache-management` (19, all new, all pass): `CacheServiceImplTest` (1),
+  `CacheManagementPropertiesTest` (5), `CacheInvalidationEventServiceTest` (1),
+  `CacheInvalidationEventTest` (1), `CacheNamesByClassServiceImplTest` (1),
+  `CacheRegistryVerifierTest` (3), `CacheUpdaterServiceImplTest` (3),
+  `ScheduledCacheUpdaterTest` (4) — ported from the standard checkout, package-adjusted only,
+  covering: registry verification (disabled/missing-region/present-region), a mutation-source
+  with no registered regions failing loudly, monotonic-sequence rejection, cursor-hold-on-failure
+  retry, and bounded-batch backlog behavior.
+- `service` (9, all new, all pass): `CacheInvalidationEventEntityServiceTest` (3),
+  `JpaCacheInvalidationEventServiceTest` (5), `ApplicationCacheNamesByClassRegistryTest` (1) —
+  plus `DictionaryLookupServiceTest`'s one replaced test (M3, above; count unchanged at 12).
+- `application` (8: 7 pass, 1 skipped): `CacheInvalidationOutboxIntegrationTest` (7, `@SpringBootTest`
+  + H2, all pass for real) — commit publishes exactly one event; rollback publishes none;
+  publication outside a transaction throws `IllegalTransactionStateException`; Spring/Hibernate
+  share the exact `javax.cache.CacheManager` instance (object identity, not type-only); the
+  `hibernate-cache.*.UserRole` region is reachable through Spring's `CacheManager` abstraction;
+  the real registry starts empty; registry verification against the real empty registry with
+  `verify-registry=true` does not throw. `CacheInvalidationRemoteEvictionIntegrationTest` (1,
+  **skipped** — `@Testcontainers(disabledWithoutDocker = true)`, the same Docker-npipe gap
+  `DictionaryCacheIntegrationTest`/`LiquibaseChangelogSmokeTest` already carry in this sandbox,
+  not a new gap and not counted as a pass) asserts `CacheUpdaterService.clearCache(...)` —
+  `ScheduledCacheUpdater`'s exact call for a remote invalidation event — causes the next
+  `findByCode` to miss the Hibernate query cache and repopulate from the database. This is the
+  "real L2 integration test proves remote invalidation causes the next read to hit the database"
+  item `distributed_cache.md`'s Required Verification list asks for; it is written and correct,
+  and simply cannot execute in this sandbox for the same reason two pre-existing tests can't.
+
+**Independent proof gathered the way P5 did, because the integration test above cannot run
+here.** `docker compose -f docker-compose.yml up -d postgres` against an empty database
+(confirmed via `psql \dt` → no relations), then `mvn -f backend/application/pom.xml
+spring-boot:run -Dskip.frontend=true` (after `mvn clean install -DskipTests` to refresh
+`~/.m2`, same trap P5 documented). Liquibase applied **15** changesets green-field (`Run: 15,
+Previously run: 0`, `Table cache_invalidation_event created`, `Index
+idx_cache_invalidation_event_created_at created`), then **0** on a second boot against the
+now-migrated schema (`Run: 0, Previously run: 15`). Read `databasechangelog` directly:
+14 rows carry `filename = db/changelog/1.0.0/db.version-master.xml` (byte-identical to every
+prior phase's proof) and the 15th carries `filename =
+db/changelog/changes/0003-cache-invalidation.xml`, `id = 0003-create-cache-invalidation-event`.
+`\d cache_invalidation_event` confirmed the exact column set (`id BIGINT` identity,
+`tracked_class TEXT NOT NULL`, `created_at TIMESTAMP WITH TIME ZONE NOT NULL`) and both indexes.
+Both boots reached the Clerk-configuration validation step and stopped there (`CLERK_PUBLISHABLE_KEY`
+was intentionally not supplied) — an environment-config requirement unrelated to this phase, not
+a defect; the schema/migration proof above does not depend on the app reaching a listening port.
+`docker compose down -v` removed the container/network/volume afterward;
+`git status --porcelain` before and after this local run is identical except this phase's
+intended file changes.
+
+**Ehcache region count: 18 before, 18 after — unchanged, as required.** `ehcache.xml` was not
+edited in this phase (confirmed by empty `git diff` on that file). 8 entity regions + 8
+`findXByCode` query regions + 2 infrastructure regions
+(`hibernate-cache.default-query-results-region`, `hibernate-cache.default-update-timestamps-region`,
+required by `missing_cache_strategy: fail`) — counted directly against the file, not assumed from
+either source document (both of which say "16," corrected already in the plan's own §2.5).
+
+**`docs/architecture-overview.md` updated per trap 5, and two adjacent pre-existing staleness
+items fixed while in the same paragraphs.** `- Cache status: enabled` (was `disabled`) and one
+`` | `backend/cache-management` | `` *Backend modules* row now satisfy
+`check-architecture-overview.sh`'s unconditional cache-management block; a matching
+`` | `backend/observability` | `` row was added at the same time (see below). Rewrote *Caching
+and consistency* to describe the outbox/registry/poller mechanism, the shared-manager identity
+proof, and M3; struck the "Distributed cache" entry from *Adopted standards the code has not
+caught up to yet* (closed by this phase, per the plan's own §3 step 1a table). **Found and fixed
+as a byproduct, not part of this phase's mandate:** the *Repository and module boundaries*
+section still said "`backend/pom.xml` declares exactly six top-level Maven modules" and omitted
+`backend/observability` from both that sentence and the *Backend modules* table — stale since P4
+landed (confirmed: `ExternalClientMetricsInterceptor`/`ExternalCallTimer` are already at
+`backend/observability/.../external/`, not `backend/external-services` as the doc still claimed
+in two places, including its own "Adopted standards" bullet for the same thing). Both fixed here
+because this phase's edit sits in the exact same paragraphs and leaving them wrong beside a
+correct edit would misinform the next reader — the same posture P5 took for the stale
+`db.root-master` references. Verified the two module-table rows this phase added are each the
+**exactly-one** literal-substring match `check-architecture-overview.sh` requires (`grep -Fc`),
+not merely "present somewhere" — an early draft accidentally added a second matching row in a
+different table and was caught and fixed before this commit.
+
+**Build** `mvn -f backend/pom.xml clean verify` → BUILD SUCCESS, `application` module
+515/0/0/45 (was 507/0/0/44). All modules' `jacoco-check`: "All coverage checks have been met,"
+including the new `cache-management` bundle.
+**Test** Full backend suite via `clean verify` (above) plus the independent Liquibase green-field
+(15/0/15) and idempotent re-apply (0/15/15) proof against a real local Postgres via `docker
+compose` + `spring-boot:run`, `databasechangelog` read directly, table/index structure confirmed
+by `\d`. `CacheInvalidationRemoteEvictionIntegrationTest` **skipped** (Testcontainers/Docker-npipe
+gap in this sandbox, same as two pre-existing tests; reported honestly, not counted as a pass).
+**Review** Self-conducted `backend-rule-review` per `.claude/skills/backend-rule-review` — one
+real finding (entity-service `save(...)` propagation), fixed in this commit; no other findings.
+**Verification** `structure-lint.sh`: **15 → 14** (exactly the one predicted assertion, diffed
+line-for-line). `verify-gates.sh`: **16 → 16**, byte-identical failure list. `check-architecture-
+overview.sh`: passed (mvp) → passed (mvp), with the cache-management-specific assertions now
+satisfied at exactly one occurrence each. `check-liquibase-preconditions.sh`: **0 → 0**,
+unchanged. Ehcache regions: **18 → 18**, unchanged (file not edited). Fixture manifest: **80/80**,
+unchanged throughout.
+**Rollback** `git revert` on this phase's commit. The `0003-create-cache-invalidation-event`
+changeSet was exercised in rehearsal (green-field apply, confirmed above) but never against a
+populated schema with real invalidation traffic — if this phase is reverted after having reached
+a real deployment, the table drop belongs in a follow-up changeSet, not a schema edit, per
+`.claude/rules/12-database.md`'s "do not rewrite existing applied changelogs." No out-of-repo
+action: nothing was deployed; the local Postgres container/network/volume were removed
+(`docker compose down -v`) before this commit, confirmed by `git status --porcelain` showing no
+residue.
+
+### What was declined, and what is reported rather than fixed
+
+- **No domain-level `@DataJpaTest` was added for `CacheInvalidationEventRepository`.** Its two
+  custom methods are exercised indirectly — `findByIdGreaterThanOrderByIdAsc`-adjacent behavior
+  through `CacheInvalidationOutboxIntegrationTest`'s real H2-backed `count()`/`deleteAll()`
+  calls, `deleteCreatedBefore`'s JPQL syntax validated at every `@SpringBootTest` context boot
+  that registers the repository (515 of them in this run) — and at the unit level in
+  `CacheInvalidationEventEntityServiceTest`. Adding a dedicated repository-level test would have
+  required adding H2 as a new test dependency to `backend/domain`, which has none today and no
+  existing precedent for one; judged not worth the new dependency for a two-method repository
+  already covered three other ways.
+- **The JSR-107 "same URI, same manager" provider-dedup path was considered and not used.**
+  Relying on `CachingProvider.getCacheManager(uri, classLoader)` returning an identical instance
+  for equal arguments would have worked but depends on exact URI/classloader equality between two
+  independently-written call sites (Hibernate's internal resolution and a hypothetical Spring-side
+  duplicate). Reusing Hibernate's own `hibernate.javax.cache.cache_manager` override property
+  instead — verified by decompiling `hibernate-jcache-6.6.2.Final.jar` — removes that dependency
+  entirely: there is structurally one call that creates the manager and one property that hands
+  Hibernate the exact same object, not two independent resolutions expected to agree.
+- **Nothing in the plan's own P6 block was found wrong.** Unlike P4/P5, this phase's own written
+  block (`docs/aiae-migration-plan.md`, "P6 — `cache-management` and the second cache") already
+  carries the corrected 18-region count and the correct changelog path from §2.7 — the "16
+  regions" and "move `CacheConfig`" defects both source *documents* describe were already fixed
+  in the plan text itself before this phase started; there was nothing left to disprove here.
+  This phase's own brief's two adjacent documentation defects (the "six modules"/`observability`
+  location staleness in `docs/architecture-overview.md`) are reported above as found-and-fixed,
+  not as plan defects.
+- **Movement was exactly the predicted one in `structure-lint.sh`, and exactly zero (byte-
+  identical) in `verify-gates.sh` and `check-architecture-overview.sh`.** No unexplained over- or
+  under-shoot in any of the three gates this phase's Verification block names.
+
+---
+
 ## Carried red assertions
 
 Every phase's evidence must show these unchanged. A count that moves without a decision

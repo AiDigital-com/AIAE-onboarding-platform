@@ -18,10 +18,19 @@ import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
+/**
+ * Resolves dictionary codes (e.g. {@code "admin"}) to their primary keys/entities.
+ *
+ * <p>M3 (see {@code .claude/agent_docs/distributed_cache.md}): this class used to keep its own
+ * bean-level {@code ConcurrentHashMap<String, Long>}, duplicating what the 8 dictionary entities'
+ * Hibernate L2 regions and their {@code findByCode} query-cache regions already cache — and doing
+ * so outside the {@code cache-management} invalidation protocol. Every {@code findByCode} call
+ * below is already {@code @QueryHints(HINT_CACHEABLE)}-annotated on its repository (see
+ * {@code ehcache.xml}'s {@code findXByCode} regions), so removing the extra map does not add a
+ * database round trip on repeated lookups — it removes a second, unmanaged cache instance.
+ */
 @Service
 @RequiredArgsConstructor
 public class DictionaryLookupService {
@@ -35,38 +44,84 @@ public class DictionaryLookupService {
 	private final LessonAssetKindRepository lessonAssetKindRepository;
 	private final MaterialFileKindRepository materialFileKindRepository;
 
-	private final Map<String, Long> cache = new ConcurrentHashMap<>();
-
+	/**
+	 * Resolves a user role code to its primary key.
+	 *
+	 * @param code the {@code user_role.code} value to resolve
+	 * @return the matching primary key
+	 */
 	public Long userRoleId(String code) {
-		return lookup("user_role:" + code, userRoleRepository::findByCode, code);
+		return lookup(userRoleRepository::findByCode, code);
 	}
 
+	/**
+	 * Resolves a lesson status code to its primary key.
+	 *
+	 * @param code the {@code lesson_status.code} value to resolve
+	 * @return the matching primary key
+	 */
 	public Long lessonStatusId(String code) {
-		return lookup("lesson_status:" + code, lessonStatusRepository::findByCode, code);
+		return lookup(lessonStatusRepository::findByCode, code);
 	}
 
+	/**
+	 * Resolves a lesson publication status code to its primary key.
+	 *
+	 * @param code the {@code lesson_publication_status.code} value to resolve
+	 * @return the matching primary key
+	 */
 	public Long lessonPublicationStatusId(String code) {
-		return lookup("lesson_publication_status:" + code, lessonPublicationStatusRepository::findByCode, code);
+		return lookup(lessonPublicationStatusRepository::findByCode, code);
 	}
 
+	/**
+	 * Resolves a lesson content format code to its primary key.
+	 *
+	 * @param code the {@code lesson_content_format.code} value to resolve
+	 * @return the matching primary key
+	 */
 	public Long lessonContentFormatId(String code) {
-		return lookup("lesson_content_format:" + code, lessonContentFormatRepository::findByCode, code);
+		return lookup(lessonContentFormatRepository::findByCode, code);
 	}
 
+	/**
+	 * Resolves an activity type code to its primary key.
+	 *
+	 * @param code the {@code activity_type.code} value to resolve
+	 * @return the matching primary key
+	 */
 	public Long activityTypeId(String code) {
-		return lookup("activity_type:" + code, activityTypeRepository::findByCode, code);
+		return lookup(activityTypeRepository::findByCode, code);
 	}
 
+	/**
+	 * Resolves an activity progress status code to its primary key.
+	 *
+	 * @param code the {@code activity_progress_status.code} value to resolve
+	 * @return the matching primary key
+	 */
 	public Long activityProgressStatusId(String code) {
-		return lookup("activity_progress_status:" + code, activityProgressStatusRepository::findByCode, code);
+		return lookup(activityProgressStatusRepository::findByCode, code);
 	}
 
+	/**
+	 * Resolves a lesson asset kind code to its primary key.
+	 *
+	 * @param code the {@code lesson_asset_kind.code} value to resolve
+	 * @return the matching primary key
+	 */
 	public Long lessonAssetKindId(String code) {
-		return lookup("lesson_asset_kind:" + code, lessonAssetKindRepository::findByCode, code);
+		return lookup(lessonAssetKindRepository::findByCode, code);
 	}
 
+	/**
+	 * Resolves a material file kind code to its primary key.
+	 *
+	 * @param code the {@code material_file_kind.code} value to resolve
+	 * @return the matching primary key
+	 */
 	public Long materialFileKindId(String code) {
-		return lookup("material_file_kind:" + code, materialFileKindRepository::findByCode, code);
+		return lookup(materialFileKindRepository::findByCode, code);
 	}
 
 	/**
@@ -135,13 +190,23 @@ public class DictionaryLookupService {
 				.orElseThrow(() -> new AppException(ErrorReason.C001, "lesson_asset_kind:" + code));
 	}
 
-	<T extends DictionaryEntity> Long lookup(
-			String cacheKey,
-			Function<String, java.util.Optional<T>> finder,
-			String code
-	) {
-		return cache.computeIfAbsent(cacheKey, k -> finder.apply(code)
+	/**
+	 * Resolves a dictionary code to its primary key through the given repository finder.
+	 *
+	 * <p>Package-private (not private) so it stays spyable per {@code .claude/rules/20-tests.md}.
+	 * Deliberately uncached at this level: {@code finder} is always a {@code @QueryHints
+	 * (HINT_CACHEABLE)} repository method, so Hibernate's own L2/query cache already serves
+	 * repeated lookups without a bean-level map duplicating it.
+	 *
+	 * @param finder the repository's cacheable {@code findByCode} method reference
+	 * @param code the dictionary code to resolve
+	 * @param <T> the dictionary entity type
+	 * @return the matching primary key
+	 * @throws AppException C001 if no dictionary row with the given code exists
+	 */
+	<T extends DictionaryEntity> Long lookup(Function<String, java.util.Optional<T>> finder, String code) {
+		return finder.apply(code)
 				.map(DictionaryEntity::getId)
-				.orElseThrow(() -> new AppException(ErrorReason.C001, "dictionary:" + code)));
+				.orElseThrow(() -> new AppException(ErrorReason.C001, "dictionary:" + code));
 	}
 }

@@ -71,5 +71,13 @@
             <groupId>${project.groupId}</groupId>
             <artifactId>external-services</artifactId>
         </dependency>
+        <!-- Distributed cache invalidation mechanism (see
+             .claude/agent_docs/distributed_cache.md). This module owns the JPA outbox
+             implementation (JpaCacheInvalidationEventService) and the application-owned
+             registry (ApplicationCacheNamesByClassRegistry). -->
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>cache-management</artifactId>
+        </dependency>
 </dependencies>
 </project>

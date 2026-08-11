@@ -136,6 +136,15 @@
 			<artifactId>cache-api</artifactId>
 		</dependency>
 
+		<!-- Bridges the shared javax.cache manager into Spring's cache abstraction
+			 (org.springframework.cache.jcache.JCacheCacheManager) for the cache-management
+			 module's CacheService/CacheUpdaterService. No @EnableCaching — see
+			 com.aidigital.aionboarding.config.CacheManagerConfig. -->
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-context-support</artifactId>
+		</dependency>
+
 		<!-- Test scope -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
