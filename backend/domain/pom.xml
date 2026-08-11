@@ -13,6 +13,21 @@
 	<artifactId>domain</artifactId>
 	<name>AIAE Onboarding Platform — domain</name>
 
+	<!-- Coverage floor override — P9, 2026-08-11, docs/aiae-migration-plan.md §6.1 D-C.
+		 The strict 0.80 LINE / 0.70 BRANCH default (backend/pom.xml properties) is
+		 held everywhere it already passes. This module is the one exception,
+		 measured 2026-08-11 with the seven hand-written jacoco excludes gone: 0.0232
+		 LINE / 0.0714 BRANCH (entities and repositories, effectively untested).
+		 Pinned just under that measured value so the module cannot regress further
+		 while its tests are written — see docs/aiae-migration-plan.md §6.1 D-C
+		 "Still open" and the P9 log row for the sizing. Remove this override only
+		 once real tests (entity equals/hashCode contracts, Testcontainers
+		 repository tests) close the gap to 0.80/0.70. -->
+	<properties>
+		<jacoco.line.coverage>0.0231</jacoco.line.coverage>
+		<jacoco.branch.coverage>0.0714</jacoco.branch.coverage>
+	</properties>
+
 	<!-- Leaf module. Depends on JPA + validation only. NO other internal modules. -->
 	<dependencies>
 		<dependency>

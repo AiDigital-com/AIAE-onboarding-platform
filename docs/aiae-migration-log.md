@@ -2459,6 +2459,298 @@ to P7's.
 
 ---
 
+## P9 — Coverage gate · **COMPLETE**
+
+Completed 2026-08-11 on branch `mig/p09-coverage` (from `migration` @ `5fa0cf8`).
+
+### Environment
+
+Same shims as P0–P8: `python3` resolved to a real 3.14.5 via a copy on `PATH` ahead of the
+Windows Store stub; `JAVA_HOME=/c/Users/Admin/.jdks/corretto-21.0.12` and
+`/c/Users/Admin/tools/apache-maven-3.9.16/bin` prepended for Maven. `rsync` not needed. One
+addition: `mvn` was run to completion in the foreground for every measurement in this phase,
+never backgrounded — a background `mvn clean test` run earlier in this phase completed
+correctly (BUILD SUCCESS, confirmed from its captured output) but the mechanism used to wait
+on it (a `Monitor` task) notifies the orchestrator, not this agent, so the result was
+re-produced from scratch in the foreground before being trusted. Recording this as an
+environment trap for the next phase that is tempted to background a multi-minute `mvn` run.
+
+### Step 0a — every module that passes by not being measured
+
+Checked all eight reactor modules by counting `src/main/java` / `src/test/java` files
+directly, not by trusting the plan's five-module list (which predates P4–P8):
+
+| Module | Main `.java` | Test `.java` | Status |
+|---|---|---|---|
+| `domain` | 106 | 1 | measured (barely) |
+| `migrations` | 0 | 0 | **no Java — legitimately exempt** |
+| `event-logging-to-db-feature` | 24 | 9 | measured |
+| `service` | 419 | 100 | measured |
+| `application` | 180 | 92 | measured |
+| `external-services` | 78 | 19 | measured |
+| `observability` | 2 | **0** | **unmeasured — the plan's known case** |
+| `cache-management` | 20 | 8 | measured |
+
+`observability` was the only module passing `jacoco:check` for free by having zero
+execution data, exactly as the plan predicted (it was created with no tests in P4).
+
+**A second, undocumented instance of the same hazard was found while measuring, not by this
+count.** With the seven hand-written excludes still in the pom (the pre-P9 state), `domain`'s
+jacoco report analyzed **0 classes** — confirmed directly:
+
+```
+[INFO] --- jacoco:0.8.12:check (jacoco-check) @ domain ---
+[INFO] Analyzed bundle 'domain' with 0 classes
+[INFO] All coverage checks have been met.
+```
+
+`domain`'s package tree is almost entirely `entities/`, `repositories/`, and one `models/`
+package (confirmed by listing every directory under `backend/domain/src/main/java`) —
+precisely three of the seven hand-written excludes the old jacoco config carried, plus one
+file elsewhere named `DictionaryEntity.java` caught by the fourth (`**/*Entity.class`). The
+remaining handful of pure-constant holder classes outside those directories
+(`common/dictionary/*Code.java` — `static final String` fields and a private constructor,
+no other code) turn out not to produce a jacoco report row **either way**, confirmed by
+checking the "after" 61-class report directly: they are absent from it too, for a reason
+unrelated to any exclude (most likely nothing in them survives javac's constant-folding into
+anything JaCoCo instruments). So the 0-classes result is not purely an artifact of the seven
+excludes matching everything — it is that plus a smaller, separate, non-exclude-related gap
+— but the seven excludes are still what took every entity, repository, and JPA-mapped
+constant class out of the report, which is the part this phase's own step 4 fixes. So the
+hardcoded `<minimum>0.8</minimum>` LINE gate that §2.3 and P0 recorded as "live and met" was,
+for this module specifically, never evaluating its real production code: it passed the same
+way a module with zero tests passes, just by exclusion instead of by absence of tests. Step
+0a's literal text only names the zero-tests variant (`observability`); this is the same
+failure mode reached by a different door, and it is exactly what removing the seven
+excludes (step 4) was going to expose regardless — recorded here so the mechanism is
+understood, not just the number.
+
+### Step 0b — `observability` tests, written before the floor was set
+
+Two new files, `backend/observability/src/test/java/.../external/ExternalCallTimerTest.java`
+and `.../ExternalClientMetricsInterceptorTest.java`, both on `SimpleMeterRegistry` per the
+brief, following the existing project convention
+(`service/.../observability/SecurityMetricsTest.java`,
+`external-services/.../http/PooledRestClientFactoryTest.java`): package-private class,
+private fields, `Given/When/Then`, no shared fixtures.
+
+- **`ExternalCallTimerTest`** — 4 tests. Asserts the `external.client.requests` timer carries
+  `client`/`operation`/`outcome` for both the `Supplier` and `Runnable` overloads, that the
+  return value/side effect passes through, and that a thrown exception is rethrown while
+  still being timed and tagged. **Correction to the brief's wording:** the brief says a thrown
+  exception "still records `outcome=failure`"; the actual tag value the class writes is
+  `"error"`, not `"failure"` (`ExternalCallTimer.java:39`). Tests assert the real value,
+  `error` — the contract is preserved, only the brief's paraphrase was off.
+- **Overload-resolution pitfall found and fixed before it could hide a method from
+  coverage.** An untyped lambda passed to the two `record(...)` overloads
+  (`Supplier<T>` vs `Runnable`) that is compatible with both — an assignment expression or a
+  throw-only block — is resolved by `javac` to the `Supplier` overload every time, silently.
+  A first draft of the `Runnable`-overload tests therefore exercised the `Supplier` overload
+  a second time and left `record(String, String, Runnable)` at 0% (confirmed via
+  `target/site/jacoco/jacoco.csv` before the fix: `ExternalCallTimer` LINE_MISSED=4 against
+  lines 58–62, the void method body). Fixed by declaring the lambda in an explicitly typed
+  `Runnable` local variable before the call, which forces the correct overload; the comment
+  explaining why is left in the test.
+- **`ExternalClientMetricsInterceptorTest`** — 7 tests. Asserts `external.client.requests`
+  with `client`/`outcome` for 2xx/4xx/5xx responses and for a thrown `IOException` (tagged
+  `io_error`, per the class's own JavaDoc), plus 3 direct tests of the package-private
+  `classifyOutcome` helper.
+
+Result: `mvn -f backend/pom.xml -pl observability -am test` → **11 tests, 0 failures**;
+`observability` moved from 0 classes analyzed to 2, at **1.0000 LINE / 1.0000 BRANCH** — see
+the per-module table below. This is the commit that switches the module from unmeasured to
+measured, landing before step 3 below per the brief's explicit ordering requirement.
+
+### Step 1 — measured, excludes removed, check skipped
+
+Removed the seven hand-written excludes (`**/entities/**`, `**/*Entity.class`, `**/models/**`,
+`**/*Exception.class`, `**/repositories/**`, `**/config/**`, `**/*_.class`) from both the
+`report` and `check` blocks, keeping only the three generated `**/api/v1/**` ones (step 4,
+done here because it is the only way to measure honestly). Ran
+`mvn -f backend/pom.xml clean test -B` to the `test` phase only — `checkstyle-check` and
+`jacoco-check` are both bound to `verify`, so this measures every module without any gate
+blocking the reactor — in the **foreground**, to completion, twice: once against this
+phase's changes (the "after" row below) and once more with the pom changes and the new
+observability tests `git stash`-ed away (the "before" row, reproducing the pre-P9 tree
+exactly). Both runs: **BUILD SUCCESS**, `application` module 524 tests / 0 failures / 45
+skipped, matching P8's baseline.
+
+Per-module LINE/BRANCH, computed from each module's `target/site/jacoco/jacoco.csv`
+(`LINE_COVERED/(LINE_MISSED+LINE_COVERED)`, same for BRANCH — the exact ratio
+`jacoco:check`'s `COVEREDRATIO` computes):
+
+| Module | Before (7 excludes, pre-P9) | | After (3 generated excludes only) | | Gap to 0.80/0.70 |
+|---|---|---|---|---|---|
+| | LINE | BRANCH | LINE | BRANCH | |
+| `domain` | n/a — **0 classes analyzed** | n/a | **0.0232** | **0.0714** | 0.777 LINE / 0.629 BRANCH |
+| `migrations` | no Java — exempt | | no Java — exempt | | — |
+| `event-logging-to-db-feature` | 0.9551 | 0.7685 | 0.9526 | 0.7778 | none — already passes |
+| `service` | 0.8417 | 0.7112 | 0.8428 | 0.7084 | none — already passes |
+| `application` | 0.8669 | 0.7156 | 0.8666 | 0.7116 | none — already passes |
+| `external-services` | 0.9079 | 0.8105 | 0.8415 | 0.7300 | none — already passes |
+| `observability` | no execution data — **0 classes analyzed** | | **1.0000** | **1.0000** | none — new tests close it fully |
+| `cache-management` | 0.9298 | 0.9091 | 0.9452 | 0.9375 | none — already passes |
+
+The "before" LINE/BRANCH ratios for the five already-measured modules move by a few tenths
+of a point in either direction — expected, since the excludes were removing a small,
+non-uniform slice of each module's code (mostly `**/config/**` and the odd `*Exception.class`
+outside `domain`), not a proportional one. `external-services`' before/after gap is the
+largest of the five (LINE **−0.0664**, BRANCH **−0.0805**) because `**/config/**` alone
+excluded a disproportionate share of that module relative to `domain`'s effectively-total
+exclusion.
+
+**The domain finding matters more than a number.** `domain`'s "before" coverage is not
+"0.0236/0.0714, close to zero" — with the old excludes in place there is **no coverage
+figure for domain at all**, because there was nothing left to measure. The 0.0232/0.0714 in
+the "after" column is the first real coverage number this module has ever had.
+
+### Step 2 — the note the plan required, and where it changed under measurement
+
+The plan's own D-C table (§6.1, from the original 5-module reactor, pre-P4) predicted two
+overrides: `domain` (both LINE and BRANCH) and `external-services` (BRANCH only, "short by
+0.0022"). **Re-measurement after P4–P8 shows only one override is still needed.**
+`external-services` gained tests in P8 (`CurrentTimeImplTest`, `CloudFrontUrlSignerTest`,
+`StorageClientImplTest`, for the `CurrentTimeImpl` split, the `CloudFrontUrlSigner` fix, and
+the SVG-content-type fix) that raised its BRANCH coverage from the plan's 0.6978 to a
+measured **0.7300** — comfortably above 0.70, with LINE at 0.8415. (P7's own new tests landed
+in `service`, not `external-services` — checked against P7's log row before writing this.)
+**No override is added for `external-services`.** This is the literal purpose of D-C's
+re-measurement requirement, not a deviation from it: "hold 0.80/0.70 everywhere it already
+holds; relax only where it does not," and it now holds one more place than the plan expected.
+
+`domain` remains the sole exception, and remains far short — 0.0232 LINE / 0.0714 BRANCH
+against 0.80/0.70, a gap of **0.777 LINE-points and 0.629 BRANCH-points**. That gap, on 61
+classes of entities/repositories with essentially one test file today, is the size of the
+P15 job for this module, unchanged in substance from what P0's log already flagged ("write
+real tests … or give `domain` a permanent lower floor" — §6.1 D-C "Still open").
+
+`cache-management` and `observability` did not exist when D-C's table was written; both
+measure comfortably above 0.80/0.70 (0.9452/0.9375 and 1.0000/1.0000) and need no override.
+
+### Step 3 — strict defaults moved into the parent `<properties>`
+
+`backend/pom.xml`: added `jacoco.line.coverage=0.80` and `jacoco.branch.coverage=0.70` to the
+top-level `<properties>` (above `<profiles>`, so `check-coverage-integrity.sh`'s
+"first-occurrence-is-default" read picks these up, not a profile's). Wired **both** the
+existing LINE limit and a **new BRANCH limit** (previously nonexistent, per §2.3) in the
+`jacoco-check` execution's `<rule>` to `${jacoco.line.coverage}` / `${jacoco.branch.coverage}`
+instead of the hardcoded `0.8`/nothing.
+
+### Step 4 — the seven hand-written excludes deleted from both blocks
+
+Done as part of step 1 above (measuring honestly required it). Confirmed only the three
+generated `**/api/v1/**` excludes remain, in both the `report` and `jacoco-check` blocks —
+`check-coverage-integrity.sh`'s check #6 ("excludes limited to generated code") now finds
+nothing to flag; see Verification below.
+
+### Step 5 — one override, not two, in the module's own pom
+
+`backend/domain/pom.xml` — added a `<properties>` block overriding both
+`jacoco.line.coverage` (`0.0231`) and `jacoco.branch.coverage` (`0.0714`), each pinned just
+under the 2026-08-11 measured value (0.0232 / 0.0714 — the branch floor lands on the same
+rounding as the measured value since 8/112 truncates to 0.0714 at four decimals) so the
+module cannot regress further. The comment names D-C and the date and states the removal
+condition (real tests closing the gap). **No other module's pom was touched** —
+`external-services` needs no override per step 2's finding above, and `cache-management` /
+`observability` never needed one.
+
+### Step 6 — the `handoff` profile and `-Phandoff` in CI
+
+**The plan's literal instruction here does not match the current file, and the mismatch was
+checked rather than guessed at.** `grep -n "Phandoff" .github/workflows/ci.yml` returns
+**nothing** — P2 (completed 2026-08-10, per its own row above) already replaced the project's
+original CI file (the one §2.3 quotes: `mvn ... -Phandoff -B`) with the standard's 5-job,
+`coverage-phase.sh`-driven workflow, which reads `.template-phase` and passes `-Pmvp` or
+nothing — never `-Phandoff`. **There was nothing to drop.** This is a plan passage that
+predates P2's own convergence of `ci.yml`, not a contradiction requiring a stop: the correct
+action is the one P2 already took, and this phase changes nothing in `.github/workflows/ci.yml`.
+
+What *was* still live in `backend/pom.xml` was the `handoff` **Maven profile** (distinct from
+the CI flag) — a leftover that, after step 3 moved the same two values into `<properties>`,
+became a byte-for-byte duplicate that nothing activates (`coverage-phase.sh`'s
+`coverage_phase_maven_args` only ever emits `-Pmvp` or an empty string). Removed it and left
+a comment explaining why, naming D-C and the date, and stating explicitly that **no `-Pmvp`
+profile is added** — D-C's revision relaxes per-module via pinned pom properties, not via a
+global profile, so there is nothing for `-Pmvp` to do and adding an unused one would just
+recreate the same "dead configuration" problem §2.3 already found once.
+
+`.template-phase` already exists holding `mvp` (created in P1); nothing about its content
+needed to change for this phase — flipping it to `engineering` is P15's job (§6.1 D-C, P15
+step 3), not P9's, and doing it here would trip
+`check-coverage-integrity.sh` check #2's regression detector for no reason.
+
+### Build, test, review
+
+**Build** `mvn -f backend/pom.xml clean verify` — **no profile flag** — → **BUILD SUCCESS**,
+reproduced twice in the foreground after the `git stash`/`pop` round-trip used for the
+before/after measurement, confirming the result was not disturbed by that detour.
+**Test** **1,936 tests across the reactor, 0 failures, 0 errors, 45 skipped** (summed from
+every module's `target/surefire-reports/*.txt`): `domain` 2, `event-logging-to-db-feature`
+48, `service` 1,155, `application` 524 (45 skipped), `external-services` 177,
+`observability` **11 (new)**, `cache-management` 19. `migrations` has no test-bearing source.
+Every module's `jacoco-check` printed "All coverage checks have been met." — confirmed
+individually for `domain` (61 classes, was 0), `observability` (2 classes), `external-services`
+(55 classes) and `cache-management` (8 classes) by re-running
+`mvn -f backend/pom.xml -pl domain,cache-management,observability,external-services -am verify`
+and grepping the "Analyzed bundle" / "coverage checks" lines directly.
+**Review** Self-conducted `production-code-review` against the POM diff (the plan's named
+review for this phase): both `<properties>` additions are minimal and commented; the removed
+excludes and profile are diffed to confirm no unrelated line moved; the one new override
+lands in the module it targets, not in the parent; no `-D jacoco.*` or `-Dmaven.test.skip`
+flag was introduced anywhere; `check-coverage-integrity.sh`'s own five other checks (phase
+marker present, no phase regression, mvp-floor-if-present, no skip flags, excludes
+generated-only) were read against the diff and confirmed to have nothing to flag beyond the
+one assertion this phase exists to clear.
+
+### Verification
+
+| Gate | Before | After |
+|---|---|---|
+| `bash scripts/verify-gates.sh` | **14** | **13** — exactly the predicted assertion (`check-coverage-integrity.sh reported violations`) is gone; the other 13 are byte-identical to the pre-P9 list, diffed line-for-line |
+| `bash scripts/lib/check-coverage-integrity.sh` (standalone) | **14 problem(s)** (7 excludes × 2 blocks) | **`OK (phase=mvp, strict 0.80/0.70, mvp n/a/n/a)`** — 0 problems |
+| `bash scripts/structure-lint.sh` | 14 | **14** — unchanged, diffed line-for-line; none of P9's files (all under `backend/pom.xml`, `backend/domain/pom.xml`, `backend/observability/src/test/**`) appear in structure-lint's list |
+| `bash scripts/lib/check-architecture-overview.sh .` | passed (mvp) | **passed (mvp)** — unchanged, no doc file touched this phase |
+| Fixture manifest (`.claude/.aiae-fixtures-manifest`) | 80/80 | **80/80** — re-hashed every entry after the commit-eligible diff; nothing under `.claude/**` or the four managed root files touched |
+| `mvn -f backend/pom.xml clean verify` (no flags) | N/A — pre-P9 defaults were 0.8 LINE only, no BRANCH limit | **BUILD SUCCESS** under strict 0.80 LINE / 0.70 BRANCH defaults, reproduced twice |
+
+**Movement beyond the predicted one assertion: none.** `verify-gates.sh` moved by exactly the
+one assertion the brief predicted (14 → 13); every other gate is unchanged; `structure-lint`
+stayed at 14 with an identical violation list; `check-architecture-overview.sh` kept passing
+without being touched.
+
+**Rollback** `git revert` on this phase's commit restores the seven excludes, the hardcoded
+`0.8`-only LINE limit, and the `handoff` profile; `backend/domain/pom.xml`'s override and the
+two new observability test files revert with it. No out-of-repo action.
+
+### What the plan got wrong, what changed under measurement, and what was declined
+
+- **Every number in the plan's D-C table (§6.1) predates P4–P8 and two of the eight modules
+  it should describe did not exist when it was written.** Re-measured all eight; only
+  `domain` still needs an override — `external-services` closed its own gap between P0 and
+  P8 through ordinary test-writing in P7/P8, not through this phase. Recorded above, not
+  carried forward as fact.
+- **The plan's P9 step 6 instruction to "drop `-Phandoff` from the CI invocation" describes a
+  file that no longer exists in that form** — P2 replaced it. Checked directly
+  (`grep -n Phandoff .github/workflows/ci.yml` → no matches) rather than assumed; nothing was
+  changed in `.github/workflows/ci.yml` this phase because there was nothing left to drop.
+- **A second "passes by not being measured" module was found that step 0a's literal text did
+  not anticipate**: `domain` under the old excludes analyzed 0 classes, the same free pass as
+  a zero-test module, reached through total exclusion rather than absent tests. This is not a
+  new decision — it does not change what step 5 does (`domain` still gets the one override) —
+  but it changes *why* the pre-P9 "0.80 LINE, live and met" claim in §2.3 was true for a
+  module that, it turns out, was never actually being checked.
+- **The `handoff` Maven profile was removed**, beyond the plan's literal "override the floor
+  in exactly two places" instruction (superseded by D-C's revision to "only where needed",
+  itself superseding the original two-place instruction to one place here) — it duplicated
+  the new default properties exactly and was activated by nothing, so keeping it would have
+  reintroduced the same "dead configuration" finding §2.3 already made once about `-Phandoff`.
+  Documented rather than silently dropped, per the pattern every prior phase in this log used
+  for its own scope extensions.
+- **Nothing else was declined.** Steps 0a, 0b, 1–6 were all executed in full, in the order
+  the brief requires (0b's tests before step 3's strict defaults).
+
+---
+
 ## Carried red assertions
 
 Every phase's evidence must show these unchanged. A count that moves without a decision

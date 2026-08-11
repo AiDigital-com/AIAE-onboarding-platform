@@ -54,6 +54,13 @@
 		<checkstyle.version>10.21.0</checkstyle.version>
 
 		<git-commit-id.skip>false</git-commit-id.skip>
+
+		<!-- Strict coverage floor, D-C (docs/aiae-migration-plan.md §6.1). This is the
+			 pom default, so a bare `mvn verify` is always strict — modules that cannot
+			 meet it yet override one or both properties in their own pom, pinned at
+			 their measured value with a dated comment (P9, 2026-08-11). -->
+		<jacoco.line.coverage>0.80</jacoco.line.coverage>
+		<jacoco.branch.coverage>0.70</jacoco.branch.coverage>
 	</properties>
 
 	<dependencyManagement>
@@ -276,18 +283,16 @@
 							</goals>
 							<configuration>
 								<excludes>
-									<!-- Kept in sync with the jacoco-check rule's excludes below,
+									<!-- Only generated OpenAPI server code. Every hand-written exclude
+										 (entities/, *Entity.class, models/, *Exception.class,
+										 repositories/, config/, *_.class) was removed by P9 — see
+										 docs/aiae-migration-plan.md §6.1 D-C — because it hid
+										 hand-written code from both this report and the check
+										 below. Kept in sync with the jacoco-check rule's excludes,
 										 so the report humans read matches what the gate enforces. -->
 									<exclude>**/api/v1/model/**</exclude>
 									<exclude>**/api/v1/invoker/**</exclude>
 									<exclude>**/api/v1/*Api.class</exclude>
-									<exclude>**/entities/**</exclude>
-									<exclude>**/*Entity.class</exclude>
-									<exclude>**/models/**</exclude>
-									<exclude>**/*Exception.class</exclude>
-									<exclude>**/repositories/**</exclude>
-									<exclude>**/config/**</exclude>
-									<exclude>**/*_.class</exclude>
 								</excludes>
 							</configuration>
 						</execution>
@@ -302,13 +307,6 @@
 									<exclude>**/api/v1/model/**</exclude>
 									<exclude>**/api/v1/invoker/**</exclude>
 									<exclude>**/api/v1/*Api.class</exclude>
-									<exclude>**/entities/**</exclude>
-									<exclude>**/*Entity.class</exclude>
-									<exclude>**/models/**</exclude>
-									<exclude>**/*Exception.class</exclude>
-									<exclude>**/repositories/**</exclude>
-									<exclude>**/config/**</exclude>
-									<exclude>**/*_.class</exclude>
 								</excludes>
 								<rules>
 									<rule>
@@ -317,7 +315,12 @@
 											<limit>
 												<counter>LINE</counter>
 												<value>COVEREDRATIO</value>
-												<minimum>0.8</minimum>
+												<minimum>${jacoco.line.coverage}</minimum>
+											</limit>
+											<limit>
+												<counter>BRANCH</counter>
+												<value>COVEREDRATIO</value>
+												<minimum>${jacoco.branch.coverage}</minimum>
 											</limit>
 										</limits>
 									</rule>
@@ -442,17 +445,15 @@
 		</plugins>
 	</build>
 
-	<!-- Phased testing — see testing-policy.md.
-		 Default = Phase 1/2 gate (0.00 -> ratcheted up over sprints).
-		 -Phandoff = Phase 3 strict gates: >=0.80 line, >=0.70 branch. -->
-	<profiles>
-		<profile>
-			<id>handoff</id>
-			<properties>
-				<jacoco.line.coverage>0.80</jacoco.line.coverage>
-				<jacoco.branch.coverage>0.70</jacoco.branch.coverage>
-			</properties>
-		</profile>
-	</profiles>
+	<!-- P9, 2026-08-11 (docs/aiae-migration-plan.md §6.1 D-C): the `handoff` profile
+		 that used to live here duplicated exactly these two values and, per §2.3, was
+		 already read by nothing — `.github/workflows/ci.yml` never passed -Phandoff
+		 even before this phase (verified: P2 already replaced ci.yml with the
+		 standard's coverage-phase.sh-driven workflow, which only ever passes -Pmvp or
+		 nothing). The strict 0.80/0.70 default now lives once, in <properties>
+		 above, and applies to every module unless that module's own pom overrides
+		 it (see backend/domain/pom.xml). No -Pmvp profile is added here: D-C
+		 deliberately relaxes per-module, pinned at measured values, not with a
+		 global profile flip. -->
 
 </project>
