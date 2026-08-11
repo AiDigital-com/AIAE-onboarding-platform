@@ -83,7 +83,7 @@ paths:
       operationId: updateUserGrade
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the updateUserGrade.
         required: true
@@ -185,7 +185,7 @@ paths:
       operationId: assignUserRole
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the assignUserRole.
         required: true
@@ -291,7 +291,7 @@ paths:
       operationId: addTeamMember
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: leadId, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: leadId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the addTeamMember.
         required: true
@@ -310,7 +310,7 @@ paths:
       operationId: removeTeamMember
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: leadId, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: leadId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the removeTeamMember.
         required: true
@@ -330,8 +330,8 @@ paths:
       operationId: removeTeamMemberById
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: leadId, in: path, required: true, schema: { type: integer, format: int64 } }
-        - { name: memberId, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: leadId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: memberId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OkResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -397,7 +397,7 @@ paths:
       operationId: getGroup
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/GroupResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -410,7 +410,7 @@ paths:
       operationId: updateGroup
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the updateGroup.
         required: true
@@ -429,7 +429,7 @@ paths:
       operationId: deleteGroup
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OkResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -443,7 +443,7 @@ paths:
       operationId: listGroupMembers
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
         - name: search
           in: query
           required: false
@@ -471,7 +471,7 @@ paths:
       operationId: addGroupMember
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the addGroupMember.
         required: true
@@ -491,8 +491,8 @@ paths:
       operationId: removeGroupMember
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
-        - { name: userId, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: userId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OkResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -506,7 +506,7 @@ paths:
       operationId: listGroupRoadmapAssignments
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/RoadmapGroupAssignmentsListResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -520,12 +520,13 @@ paths:
       operationId: listGroupCandidateUsers
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
         - name: forLeads
           in: query
           required: false
           description: When true, searches lead candidates (admin/team lead role, excluding current leads) instead of member candidates.
           schema: { type: boolean, default: false }
+          x-unconstrained-reason: Boolean type already constrains the value domain to true/false; no additional bound applies.
         - name: search
           in: query
           required: false
@@ -554,7 +555,7 @@ paths:
       operationId: addGroupLead
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the addGroupLead.
         required: true
@@ -574,8 +575,8 @@ paths:
       operationId: removeGroupLead
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
-        - { name: userId, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: userId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OkResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -594,6 +595,7 @@ paths:
           required: false
           description: When true, includes deactivated grades. Requires grades.manage.
           schema: { type: boolean, default: false }
+          x-unconstrained-reason: Boolean type already constrains the value domain to true/false; no additional bound applies.
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/GradesListResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -622,7 +624,7 @@ paths:
       operationId: updateGrade
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the updateGrade.
         required: true
@@ -641,7 +643,7 @@ paths:
       operationId: deactivateGrade
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OkResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -654,7 +656,7 @@ paths:
       operationId: activateGrade
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OkResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -805,7 +807,7 @@ paths:
       operationId: getMaterial
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/MaterialResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -817,7 +819,7 @@ paths:
       operationId: updateMaterial
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the updateMaterial.
         required: true
@@ -836,7 +838,7 @@ paths:
       operationId: deleteMaterial
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OkIdResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -936,7 +938,7 @@ paths:
       operationId: getLesson
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LessonDetailResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -949,7 +951,7 @@ paths:
       operationId: updateLessonContent
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the updateLessonContent.
         required: true
@@ -968,7 +970,7 @@ paths:
       operationId: deleteLesson
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OkIdResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -982,7 +984,7 @@ paths:
       operationId: changeLessonStatus
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the changeLessonStatus.
         required: true
@@ -1002,7 +1004,7 @@ paths:
       operationId: getLessonGenerationStatus
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LessonGenerationStatusResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1015,7 +1017,7 @@ paths:
       operationId: reviseLesson
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the reviseLesson.
         required: true
@@ -1035,7 +1037,7 @@ paths:
       operationId: getLessonActivities
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LessonActivitiesResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1048,7 +1050,7 @@ paths:
       operationId: generateActivity
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the generateActivity.
         required: true
@@ -1068,8 +1070,8 @@ paths:
       operationId: getLessonActivity
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
-        - { name: activityId, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: activityId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LessonActivityDetailResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1082,8 +1084,8 @@ paths:
       operationId: updateActivity
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
-        - { name: activityId, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: activityId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the updateActivity.
         required: true
@@ -1102,8 +1104,8 @@ paths:
       operationId: deleteLessonActivity
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
-        - { name: activityId, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: activityId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LessonActivitiesResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1117,8 +1119,8 @@ paths:
       operationId: submitActivityProgress
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
-        - { name: activityId, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: activityId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the submitActivityProgress.
         required: true
@@ -1137,8 +1139,8 @@ paths:
       operationId: resetActivityProgress
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
-        - { name: activityId, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: activityId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OkResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1152,7 +1154,7 @@ paths:
       operationId: askLessonAssistant
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the askLessonAssistant.
         required: true
@@ -1172,7 +1174,7 @@ paths:
       operationId: getLessonAssistantConversation
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LessonAssistantConversationResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1185,7 +1187,7 @@ paths:
       operationId: clearLessonAssistantConversation
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OkResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1199,7 +1201,7 @@ paths:
       operationId: addLessonAsset
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the addLessonAsset.
         required: true
@@ -1219,8 +1221,8 @@ paths:
       operationId: deleteLessonAsset
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
-        - { name: assetId, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: assetId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LessonResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1234,7 +1236,7 @@ paths:
       operationId: assignLesson
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the assignLesson.
         required: true
@@ -1254,7 +1256,7 @@ paths:
       operationId: listLessonAssignees
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LearningAssigneesResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1268,7 +1270,7 @@ paths:
       operationId: revokeLessonAssignments
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the revokeLessonAssignments.
         required: true
@@ -1288,7 +1290,7 @@ paths:
       operationId: getLessonEnrollment
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/EnrollmentResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1301,7 +1303,7 @@ paths:
       operationId: enrollLesson
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/EnrollmentResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1314,7 +1316,7 @@ paths:
       operationId: unenrollLesson
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OkResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1327,7 +1329,7 @@ paths:
       operationId: setLessonCompletion
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the setLessonCompletion.
         required: true
@@ -1347,7 +1349,7 @@ paths:
       operationId: createTeacherVideo
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the createTeacherVideo.
         required: true
@@ -1367,7 +1369,7 @@ paths:
       operationId: getTeacherVideo
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TeacherVideoResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1380,7 +1382,7 @@ paths:
       operationId: deleteTeacherVideo
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OkResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1475,7 +1477,7 @@ paths:
       operationId: updateRoadmap
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the updateRoadmap.
         required: true
@@ -1494,7 +1496,7 @@ paths:
       operationId: deleteRoadmap
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OkIdResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1508,7 +1510,7 @@ paths:
       operationId: assignRoadmap
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the assignRoadmap.
         required: true
@@ -1528,7 +1530,7 @@ paths:
       operationId: listRoadmapAssignees
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LearningAssigneesResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1542,7 +1544,7 @@ paths:
       operationId: revokeRoadmapAssignments
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the revokeRoadmapAssignments.
         required: true
@@ -1562,7 +1564,7 @@ paths:
       operationId: enrollRoadmap
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/EnrollmentResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1575,7 +1577,7 @@ paths:
       operationId: unenrollRoadmap
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OkResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1589,7 +1591,7 @@ paths:
       operationId: listRoadmapTeamAssignments
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/RoadmapTeamAssignmentsListResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1602,7 +1604,7 @@ paths:
       operationId: assignRoadmapToTeam
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the assignRoadmapToTeam.
         required: true
@@ -1622,8 +1624,8 @@ paths:
       operationId: unassignRoadmapFromTeam
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
-        - { name: leadUserId, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: leadUserId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OkResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1637,7 +1639,7 @@ paths:
       operationId: listRoadmapGroupAssignments
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/RoadmapGroupAssignmentsListResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1650,7 +1652,7 @@ paths:
       operationId: assignRoadmapToGroup
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the assignRoadmapToGroup.
         required: true
@@ -1670,7 +1672,7 @@ paths:
       operationId: previewRoadmapGroupAssignment
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       requestBody:
         description: Request payload for the previewRoadmapGroupAssignment.
         required: true
@@ -1690,8 +1692,8 @@ paths:
       operationId: unassignRoadmapFromGroup
       security: [ { bearerAuth: [ ] } ]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
-        - { name: groupId, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: groupId, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OkResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
@@ -1847,10 +1849,12 @@ components:
         query:
           description: Free-text search matched against material title, description, body text, creator name, and tags.
           type: string
+          x-unconstrained-reason: Not persisted; matched with ILIKE against several unbounded PostgreSQL TEXT columns (materials.title, materials.description, materials.text_content — materials.sql), so no column width bounds it.
         tags:
           description: Restricts results to materials tagged with every one of the given values.
           type: array
           items: { type: string }
+          x-unconstrained-reason: Matched against materials.tags, an unbounded JSONB column with no declared item cap (materials.sql:24).
         createdByUserId:
           description: Restricts results to materials created by this internal user id.
           type: integer
@@ -1858,12 +1862,15 @@ components:
         hasAttachments:
           description: Restricts results to materials that have (true) or do not have (false) file attachments.
           type: boolean
+          x-unconstrained-reason: Boolean type already constrains the value domain to true/false; no additional bound applies.
         hasYoutube:
           description: Restricts results to materials that have (true) or do not have (false) YouTube links.
           type: boolean
+          x-unconstrained-reason: Boolean type already constrains the value domain to true/false; no additional bound applies.
         hasLinks:
           description: Restricts results to materials that have (true) or do not have (false) web links.
           type: boolean
+          x-unconstrained-reason: Boolean type already constrains the value domain to true/false; no additional bound applies.
     SearchLessonsV1:
       description: Lesson search, filter, sort, and pagination criteria.
       type: object
@@ -1895,10 +1902,12 @@ components:
         query:
           description: Free-text search matched against lesson title and tags.
           type: string
+          x-unconstrained-reason: Not persisted; matched with ILIKE against lessons.title, an unbounded PostgreSQL TEXT column (lessons.sql), so no column width bounds it.
         tags:
           description: Restricts results to lessons tagged with every one of the given values.
           type: array
           items: { type: string }
+          x-unconstrained-reason: Matched against lessons.tags, an unbounded JSONB column with no declared item cap (lessons.sql:96).
         status:
           description: Restricts results to lessons in this generation lifecycle status.
           allOf:
@@ -1914,9 +1923,11 @@ components:
         assignedToMe:
           description: When true, restricts results to lessons the current viewer is enrolled in.
           type: boolean
+          x-unconstrained-reason: Boolean type already constrains the value domain to true/false; no additional bound applies.
         readyOnly:
           description: When true, restricts results to lessons whose generation status is ready.
           type: boolean
+          x-unconstrained-reason: Boolean type already constrains the value domain to true/false; no additional bound applies.
         activityType:
           description: Restricts results to lessons that have at least one activity of this type.
           allOf:
@@ -1924,6 +1935,7 @@ components:
         hasActivities:
           description: Restricts results to lessons that have (true) or do not have (false) any activities.
           type: boolean
+          x-unconstrained-reason: Boolean type already constrains the value domain to true/false; no additional bound applies.
     SearchRoadmapsV1:
       description: Roadmap search, filter, sort, and pagination criteria.
       type: object
@@ -1955,10 +1967,12 @@ components:
         query:
           description: Free-text search matched against roadmap title, description, creator name, and tags.
           type: string
+          x-unconstrained-reason: Not persisted; matched with ILIKE against roadmaps.title, an unbounded PostgreSQL TEXT column (roadmaps.sql), so no column width bounds it.
         tags:
           description: Restricts results to roadmaps tagged with every one of the given values.
           type: array
           items: { type: string }
+          x-unconstrained-reason: Matched against roadmaps.tags, an unbounded JSONB column with no declared item cap (roadmaps.sql:8).
         createdByUserId:
           description: Restricts results to roadmaps created by this internal user id.
           type: integer
@@ -1966,6 +1980,7 @@ components:
         assignedToMe:
           description: When true, restricts results to roadmaps the current viewer is enrolled in.
           type: boolean
+          x-unconstrained-reason: Boolean type already constrains the value domain to true/false; no additional bound applies.
     UserRoleCodeV1:
       description: User role code.
       type: string
@@ -2165,15 +2180,19 @@ components:
         name:
           description: Display name.
           type: string
+          x-unconstrained-reason: users.name is an unbounded PostgreSQL TEXT column (users_dictionaries.sql) with no code-enforced blank check on this update path.
         position:
           description: Job position or title.
           type: string
+          x-unconstrained-reason: users.position is a nullable, unbounded PostgreSQL TEXT column (users_dictionaries.sql).
         avatarStorageKey:
           description: Storage key for the user's avatar image.
           type: string
+          x-unconstrained-reason: A blank value is a valid, currently-accepted request meaning "clear the avatar" (UserServiceImpl#updateProfile only calls StorageService#requireOwnership when the value is non-blank and changed); a length bound would reject that existing behavior.
         avatarColor:
           description: Fallback avatar color when no image is set.
           type: string
+          x-unconstrained-reason: users.avatar_color is a nullable, unbounded PostgreSQL TEXT column (users_dictionaries.sql).
     AvatarUploadFormV1:
       description: Multipart form for uploading a profile avatar image.
       type: object
@@ -2343,6 +2362,7 @@ components:
           description: Permission override map keyed by permission code.
           allOf:
             - $ref: '#/components/schemas/PermissionMapV1'
+          x-unconstrained-reason: Keys are validated against PermissionKeys.ALL in PermissionServiceImpl#setOverrides, which silently drops unrecognized keys rather than rejecting the request; an OpenAPI-level bound on key set or count would newly reject requests that succeed today.
     SetPermissionOverridesResponseV1:
       description: Set Permission Overrides Response payload.
       type: object
@@ -2486,9 +2506,11 @@ components:
         member:
           description: Member lookup reference such as email.
           type: string
+          x-unconstrained-reason: Freeform lookup key resolved server-side (TeamServiceImpl#addTeamMember); not a persisted column, and an unresolved value returns 404, not 400, so no length bound is enforced or safe to add.
         email:
           description: Email address.
           type: string
+          format: email
     AddTeamMemberResponseV1:
       description: Add Team Member Response payload.
       type: object
@@ -2533,7 +2555,10 @@ components:
           description: Members for this page.
           type: array
           items: { $ref: '#/components/schemas/GroupMemberV1' }
-        page: { $ref: '#/components/schemas/PageInfoV1' }
+        page:
+          description: Pagination metadata for this page of members.
+          allOf:
+            - $ref: '#/components/schemas/PageInfoV1'
     GroupCandidateUsersListResponseV1:
       description: Group Candidate Users List Response payload.
       type: object
@@ -2544,7 +2569,10 @@ components:
           description: Candidate users for this page.
           type: array
           items: { $ref: '#/components/schemas/UserSummaryV1' }
-        page: { $ref: '#/components/schemas/PageInfoV1' }
+        page:
+          description: Pagination metadata for this page of candidate users.
+          allOf:
+            - $ref: '#/components/schemas/PageInfoV1'
     GroupSummaryV1:
       description: A group list row, without the full member list.
       type: object
@@ -2561,6 +2589,7 @@ components:
         description:
           description: Optional free-text description.
           type: string
+          x-unconstrained-reason: groups.description is an unbounded PostgreSQL TEXT column (groups_grades.sql).
         leads:
           description: Every lead currently assigned to this group.
           type: array
@@ -2597,6 +2626,7 @@ components:
         description:
           description: Optional free-text description.
           type: string
+          x-unconstrained-reason: groups.description is an unbounded PostgreSQL TEXT column (groups_grades.sql).
         leads:
           description: Every lead currently assigned to this group.
           type: array
@@ -2675,6 +2705,7 @@ components:
         description:
           description: Optional free-text description.
           type: string
+          x-unconstrained-reason: groups.description is an unbounded PostgreSQL TEXT column (groups_grades.sql).
     UpdateGroupRequestV1:
       description: Update Group Request payload.
       type: object
@@ -2689,6 +2720,7 @@ components:
         description:
           description: Optional free-text description.
           type: string
+          x-unconstrained-reason: groups.description is an unbounded PostgreSQL TEXT column (groups_grades.sql).
     AddGroupMemberRequestV1:
       description: Add Group Member Request payload.
       type: object
@@ -3273,20 +3305,25 @@ components:
         title:
           description: Title text.
           type: string
+          x-unconstrained-reason: materials.title is an unbounded PostgreSQL TEXT column (materials.sql) with no code-enforced blank check on this path.
         description:
           type: string
           title: Human-readable description text.
+          x-unconstrained-reason: materials.description is an unbounded PostgreSQL TEXT column (materials.sql).
         text:
           description: Plain text body content.
           type: string
+          x-unconstrained-reason: materials.text_content is an unbounded PostgreSQL TEXT column (materials.sql).
         youtubeUrls:
           description: Youtube Urls for Create Material Request.
           type: array
           items: { type: string }
+          x-unconstrained-reason: Persisted one per row into material_youtube_urls.url, an unbounded PostgreSQL TEXT column (materials.sql); format:uri was tried and rejected because openapi-generator maps a format:uri array item to java.net.URI, breaking MaterialApiMapper's String mapping (verified by a failed build).
         links:
           description: Links for Create Material Request.
           type: array
           items: { type: string }
+          x-unconstrained-reason: Persisted one per row into material_links.url, an unbounded PostgreSQL TEXT column (materials.sql); format:uri was tried and rejected because openapi-generator maps a format:uri array item to java.net.URI, breaking MaterialApiMapper's String mapping (verified by a failed build).
         attachments:
           description: Attachments for Create Material Request.
           type: array
@@ -3295,15 +3332,19 @@ components:
           description: Tags for Create Material Request.
           type: array
           items: { type: string }
+          x-unconstrained-reason: Persisted to materials.tags, an unbounded JSONB column with no declared item cap (materials.sql:24).
         coverImageStorageKey:
           description: Storage key for the cover image.
           type: string
+          x-unconstrained-reason: materials.cover_image_storage_key is an unbounded PostgreSQL TEXT column (materials.sql); optional and not blank-checked on this path.
         coverImageOriginalName:
           description: Original filename of the cover image.
           type: string
+          x-unconstrained-reason: materials.cover_image_original_name is an unbounded PostgreSQL TEXT column (materials.sql).
         coverImageMimeType:
           description: MIME type of the cover image.
           type: string
+          x-unconstrained-reason: materials.cover_image_mime_type is an unbounded PostgreSQL TEXT column (materials.sql); recorded verbatim from the already-validated presign response.
     CreateMaterialResponseV1:
       description: Create Material Response payload.
       type: object
@@ -3324,20 +3365,25 @@ components:
         title:
           description: Title text.
           type: string
+          x-unconstrained-reason: materials.title is an unbounded PostgreSQL TEXT column (materials.sql) with no code-enforced blank check on this path.
         description:
           type: string
           title: Human-readable description text.
+          x-unconstrained-reason: materials.description is an unbounded PostgreSQL TEXT column (materials.sql).
         text:
           description: Plain text body content.
           type: string
+          x-unconstrained-reason: materials.text_content is an unbounded PostgreSQL TEXT column (materials.sql).
         youtubeUrls:
           description: Youtube Urls for Update Material Request.
           type: array
           items: { type: string }
+          x-unconstrained-reason: Persisted one per row into material_youtube_urls.url, an unbounded PostgreSQL TEXT column (materials.sql); format:uri was tried and rejected because openapi-generator maps a format:uri array item to java.net.URI, breaking MaterialApiMapper's String mapping (verified by a failed build).
         links:
           description: Links for Update Material Request.
           type: array
           items: { type: string }
+          x-unconstrained-reason: Persisted one per row into material_links.url, an unbounded PostgreSQL TEXT column (materials.sql); format:uri was tried and rejected because openapi-generator maps a format:uri array item to java.net.URI, breaking MaterialApiMapper's String mapping (verified by a failed build).
         attachments:
           description: Attachments for Update Material Request.
           type: array
@@ -3346,15 +3392,19 @@ components:
           description: Tags for Update Material Request.
           type: array
           items: { type: string }
+          x-unconstrained-reason: Persisted to materials.tags, an unbounded JSONB column with no declared item cap (materials.sql:24).
         coverImageStorageKey:
           description: Storage key of the cover image.
           type: string
+          x-unconstrained-reason: materials.cover_image_storage_key is an unbounded PostgreSQL TEXT column (materials.sql); optional and not blank-checked on this path.
         coverImageOriginalName:
           description: Original file name of the cover image.
           type: string
+          x-unconstrained-reason: materials.cover_image_original_name is an unbounded PostgreSQL TEXT column (materials.sql).
         coverImageMimeType:
           description: MIME type of the cover image.
           type: string
+          x-unconstrained-reason: materials.cover_image_mime_type is an unbounded PostgreSQL TEXT column (materials.sql); recorded verbatim from the already-validated presign response.
     UploadUrlRequestV1:
       description: Upload Url Request payload.
       type: object
@@ -3364,9 +3414,11 @@ components:
         fileName:
           description: File Name for Upload Url Request.
           type: string
+          x-unconstrained-reason: Not persisted verbatim; StorageService#sanitize strips disallowed characters rather than rejecting them, and the storage key's extension is derived from contentType, not fileName (P8, audit sec2.4), so no fileName shape gates the request.
         contentType:
           description: Content Type for Upload Url Request.
           type: string
+          pattern: ^(application/pdf|text/plain|image/[A-Za-z0-9.+-]+|video/[A-Za-z0-9.+-]+)$
         size:
           description: File size in bytes.
           type: integer
@@ -3909,18 +3961,23 @@ components:
         title:
           description: Title text.
           type: string
+          x-unconstrained-reason: lessons.title is an unbounded PostgreSQL TEXT column (lessons.sql); blank/absent is only rejected in create-manual mode (LessonGenerationInputValidator#validateManualLesson) and tolerated in generate mode, so a universal length bound would reject requests that succeed today.
         instructions:
           description: Author instructions used for generation.
           type: string
+          x-unconstrained-reason: lessons.user_instructions is an unbounded PostgreSQL TEXT column (lessons.sql); free-text AI prompt input with no natural bound.
         depth:
           description: Requested content depth.
           type: string
+          x-unconstrained-reason: lessons.depth is an unbounded PostgreSQL TEXT column (lessons.sql) with no CHECK constraint restricting its values; free-text AI prompt input.
         tone:
           description: Requested writing tone.
           type: string
+          x-unconstrained-reason: lessons.tone is an unbounded PostgreSQL TEXT column (lessons.sql) with no CHECK constraint restricting its values; free-text AI prompt input.
         desiredFormat:
           description: Requested output format.
           type: string
+          x-unconstrained-reason: lessons.desired_format is an unbounded PostgreSQL TEXT column (lessons.sql) with no CHECK constraint restricting its values; free-text AI prompt input.
         materialIds:
           description: IDs of materials to use as generation source.
           type: array
@@ -3932,12 +3989,15 @@ components:
           type: array
           items:
             type: string
+          x-unconstrained-reason: Persisted to lessons.tags, an unbounded JSONB column with no declared item cap (lessons.sql:96).
         description:
           description: Human-readable description for manually created lessons.
           type: string
+          x-unconstrained-reason: lessons.description is an unbounded PostgreSQL TEXT column (lessons.sql).
         contentHtml:
           description: Pre-rendered HTML content for manually created lessons.
           type: string
+          x-unconstrained-reason: lessons.content_html is an unbounded PostgreSQL TEXT column (lessons.sql); blank/absent is only rejected in create-manual mode (LessonGenerationInputValidator#validateManualLesson) together with title, so a universal length bound would reject requests that succeed today.
     LessonResponseV1:
       description: Lesson Response payload.
       type: object
@@ -4160,23 +4220,29 @@ components:
         contentMarkdown:
           description: Lesson content in Markdown. At least one of contentMarkdown or contentHtml must be non-empty plain text after HTML stripping.
           type: string
+          x-unconstrained-reason: lessons.content_markdown is an unbounded PostgreSQL TEXT column (lessons.sql); the non-empty requirement is a cross-field OR with contentHtml, so a per-field minLength would reject a request that legitimately supplies only the other field.
         contentHtml:
           description: Lesson content rendered as HTML. At least one of contentMarkdown or contentHtml must be non-empty plain text after HTML stripping.
           type: string
+          x-unconstrained-reason: lessons.content_html is an unbounded PostgreSQL TEXT column (lessons.sql); the non-empty requirement is a cross-field OR with contentMarkdown, so a per-field minLength would reject a request that legitimately supplies only the other field.
         tags:
           description: Tags for the lesson.
           type: array
           items:
             type: string
+          x-unconstrained-reason: Persisted to lessons.tags, an unbounded JSONB column with no declared item cap (lessons.sql:96).
         coverImageStorageKey:
           description: Object storage key for the cover image.
           type: string
+          x-unconstrained-reason: lessons.cover_image_storage_key is an unbounded PostgreSQL TEXT column (lessons.sql); optional and not blank-checked on this path.
         coverImageOriginalName:
           description: Original filename of the cover image.
           type: string
+          x-unconstrained-reason: lessons.cover_image_original_name is an unbounded PostgreSQL TEXT column (lessons.sql).
         coverImageMimeType:
           description: MIME type of the cover image.
           type: string
+          x-unconstrained-reason: lessons.cover_image_mime_type is an unbounded PostgreSQL TEXT column (lessons.sql); recorded verbatim from the already-validated presign response.
     ChangeLessonStatusRequestV1:
       description: Change Lesson Status Request payload.
       type: object
@@ -4195,10 +4261,12 @@ components:
         revisionRequest:
           description: Natural-language revision request.
           type: string
+          x-unconstrained-reason: Not persisted directly; free-text AI prompt input fed to lesson revision generation, with no natural bound.
         selectedOptions:
           description: Selected Options for Revise Lesson Request.
           type: array
           items: { type: string }
+          x-unconstrained-reason: Transient request payload consumed by lesson revision generation; not persisted, so no column bounds it.
     GenerateActivityRequestV1:
       description: Generate Activity Request payload.
       type: object
@@ -4211,6 +4279,7 @@ components:
         count:
           description: Requested number of generated items.
           type: integer
+          format: int32
     UpdateActivityRequestV1:
       description: Update Activity Request payload.
       type: object
@@ -4219,6 +4288,7 @@ components:
         title:
           description: Title text.
           type: string
+          x-unconstrained-reason: Transient activity-update payload; not backed by a fixed-width column, so no length bound is derivable.
         items:
           description: Collection of nested items.
           type: array
@@ -4227,6 +4297,7 @@ components:
           description: Cards for Update Activity Request.
           type: array
           items: { $ref: '#/components/schemas/FlashcardItemV1' }
+          x-unconstrained-reason: Transient activity-update payload; not backed by a JSONB column with a declared item cap.
     SubmitActivityProgressRequestV1:
       description: Submit Activity Progress Request payload.
       type: object
@@ -4243,9 +4314,11 @@ components:
           items:
             type: array
             items: { type: string }
+          x-unconstrained-reason: Transient progress-submission payload; not persisted as a bounded column, so no item cap is derivable.
         reviewedCards:
           description: Flashcard ids marked as reviewed.
           type: integer
+          format: int32
     ActivityPromptV1:
       description: Activity Prompt payload.
       type: object
@@ -4413,8 +4486,10 @@ components:
       required: [ question ]
       properties:
         question:
-          description: Question text.
+          description: Question text. Rejected blank or over 2000 characters after trimming (LessonAssistantServiceImpl#ask, MAX_QUESTION_LENGTH).
           type: string
+          minLength: 1
+          maxLength: 2000
         history:
           description: History for Ask Lesson Request.
           type: array
@@ -4461,15 +4536,19 @@ components:
         url:
           description: External URL.
           type: string
+          x-unconstrained-reason: lesson_assets.url is an unbounded PostgreSQL TEXT column (lessons.sql); format:uri was tried and rejected because openapi-generator maps a format:uri string property to java.net.URI, a breaking type change for existing String-typed callers (verified by a failed build on the equivalent materials fields).
         storageKey:
           description: Object storage key for an uploaded file.
           type: string
+          x-unconstrained-reason: lesson_assets.storage_key is an unbounded PostgreSQL TEXT column (lessons.sql); only relevant when kind selects an uploaded-file asset and is not blank-checked on this path.
         mimeType:
           description: MIME type of the uploaded file.
           type: string
+          x-unconstrained-reason: lesson_assets.mime_type is an unbounded PostgreSQL TEXT column (lessons.sql); recorded verbatim from the already-validated presign response.
         originalName:
           description: Original filename.
           type: string
+          x-unconstrained-reason: lesson_assets.original_name is an unbounded PostgreSQL TEXT column (lessons.sql).
         sizeBytes:
           description: File size in bytes.
           type: integer
@@ -4477,19 +4556,24 @@ components:
         title:
           description: Title text.
           type: string
+          x-unconstrained-reason: lesson_assets.title is an unbounded PostgreSQL TEXT column (lessons.sql), defaulted to '' and optional.
         description:
           type: string
           title: Human-readable description text.
+          x-unconstrained-reason: lesson_assets.description is an unbounded PostgreSQL TEXT column (lessons.sql).
         imageUrl:
           description: Preview image URL.
           type: string
+          x-unconstrained-reason: lesson_assets.image_url is an unbounded PostgreSQL TEXT column (lessons.sql); format:uri was tried and rejected because openapi-generator maps a format:uri string property to java.net.URI, a breaking type change for existing String-typed callers (verified by a failed build on the equivalent materials fields).
         siteName:
           description: Site name from link preview metadata.
           type: string
+          x-unconstrained-reason: lesson_assets.site_name is an unbounded PostgreSQL TEXT column (lessons.sql).
         metadata:
           description: Additional metadata map.
           allOf:
             - $ref: '#/components/schemas/JsonMetadataV1'
+          x-unconstrained-reason: Persisted to lesson_assets.metadata, an unbounded JSONB column with no declared property cap (lessons.sql).
     LessonAssetResponseV1:
       description: Lesson Asset Response payload.
       type: object
@@ -4674,7 +4758,10 @@ components:
         ok:
           description: Indicates whether the operation succeeded.
           type: boolean
-        assignment: { $ref: '#/components/schemas/RoadmapTeamAssignmentV1' }
+        assignment:
+          description: The team assignment that was created.
+          allOf:
+            - $ref: '#/components/schemas/RoadmapTeamAssignmentV1'
         enrollments:
           description: Enrollment records created for current team members.
           type: array
@@ -4765,7 +4852,10 @@ components:
         ok:
           description: Indicates whether the operation succeeded.
           type: boolean
-        assignment: { $ref: '#/components/schemas/RoadmapGroupAssignmentV1' }
+        assignment:
+          description: The group assignment that was created.
+          allOf:
+            - $ref: '#/components/schemas/RoadmapGroupAssignmentV1'
         enrollments:
           description: Enrollment records created or refreshed for currently matching group members.
           type: array
@@ -4865,6 +4955,7 @@ components:
         completed:
           description: Desired completion state.
           type: boolean
+          x-unconstrained-reason: Boolean type already constrains the value domain to true/false; no additional bound applies.
     CreateTeacherVideoRequestV1:
       description: Create Teacher Video Request payload.
       type: object
@@ -5039,11 +5130,13 @@ components:
       required: [ title, lessonIds ]
       properties:
         title:
-          description: Title text.
+          description: Title text. Rejected when blank (RoadmapServiceImpl#createRoadmap).
           type: string
+          minLength: 1
         description:
           type: string
           title: Human-readable description text.
+          x-unconstrained-reason: roadmaps.description is an unbounded PostgreSQL TEXT column (roadmaps.sql).
         lessonIds:
           description: Ordered lesson identifiers.
           type: array
@@ -5052,6 +5145,7 @@ components:
           description: Tags for the roadmap.
           type: array
           items: { type: string }
+          x-unconstrained-reason: Persisted to roadmaps.tags, an unbounded JSONB column with no declared item cap (roadmaps.sql:8).
     RoadmapResponseV1:
       description: Roadmap Response payload.
       type: object
@@ -5069,9 +5163,11 @@ components:
         title:
           description: Title text.
           type: string
+          x-unconstrained-reason: roadmaps.title is an unbounded PostgreSQL TEXT column (roadmaps.sql); RoadmapServiceImpl#updateRoadmap only sets it when present and does not blank-check it, so a length bound would reject a request that succeeds today.
         description:
           type: string
           title: Human-readable description text.
+          x-unconstrained-reason: roadmaps.description is an unbounded PostgreSQL TEXT column (roadmaps.sql).
         lessonIds:
           description: Ordered lesson identifiers.
           type: array
@@ -5080,6 +5176,7 @@ components:
           description: Tags for the roadmap.
           type: array
           items: { type: string }
+          x-unconstrained-reason: Persisted to roadmaps.tags, an unbounded JSONB column with no declared item cap (roadmaps.sql:8).
     TeamDashboardKpisV1:
       description: Team Dashboard Kpis payload.
       type: object
