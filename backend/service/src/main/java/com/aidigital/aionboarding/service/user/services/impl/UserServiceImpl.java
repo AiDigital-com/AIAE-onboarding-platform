@@ -3,14 +3,11 @@ package com.aidigital.aionboarding.service.user.services.impl;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.domain.common.dictionary.UserRoleCode;
 import com.aidigital.aionboarding.domain.common.dictionary.entities.UserRole;
-import com.aidigital.aionboarding.domain.grade.entities.Grade;
 import com.aidigital.aionboarding.domain.user.entities.User;
 import com.aidigital.aionboarding.service.common.dictionary.DictionaryLookupService;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
-import com.aidigital.aionboarding.service.grade.services.entity.GradeEntityService;
-import com.aidigital.aionboarding.service.group.support.GroupAccessPolicy;
 import com.aidigital.aionboarding.service.mappers.user.UserRecordMapper;
 import com.aidigital.aionboarding.service.permission.models.PermissionSnapshotRecord;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
@@ -18,9 +15,9 @@ import com.aidigital.aionboarding.service.storage.StorageService;
 import com.aidigital.aionboarding.service.team.services.TeamService;
 import com.aidigital.aionboarding.service.user.models.AdminUserStatsRecord;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
-import com.aidigital.aionboarding.service.user.services.UserGradeAssignmentSyncService;
 import com.aidigital.aionboarding.service.user.services.UserService;
 import com.aidigital.aionboarding.service.user.services.entity.UserEntityService;
+import com.aidigital.aionboarding.service.user.support.UserGradeUpdateSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -33,7 +30,6 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -42,13 +38,11 @@ public class UserServiceImpl implements UserService {
 
     private final UserEntityService userEntityService;
     private final DictionaryLookupService dictionaryLookupService;
-    private final GradeEntityService gradeEntityService;
-    private final GroupAccessPolicy groupAccessPolicy;
-    private final UserGradeAssignmentSyncService userGradeAssignmentSyncService;
     private final UserRecordMapper userMapper;
     private final TeamService teamService;
     private final PermissionService permissionService;
     private final StorageService storageService;
+    private final UserGradeUpdateSupport userGradeUpdateSupport;
     private final CurrentTime currentTime;
 
     @Override
@@ -171,12 +165,6 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<UserRecord> listAssignableUsers(AppUser viewer) {
-        return teamService.getAssignableLearningUsers(viewer);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public Page<UserRecord> listAssignableUsers(AppUser viewer, String query, Pageable pageable) {
         return teamService.getAssignableLearningUsers(viewer, query, pageable);
     }
@@ -184,27 +172,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public UserRecord updateGrade(AppUser viewer, Long userId, Long gradeId) {
-        if (!groupAccessPolicy.canEditMemberGrade(viewer, userId)) {
-            throw new AppException(ErrorReason.C004, "You can edit grades only for members of groups you lead.");
-        }
-        User user = userEntityService.findById(userId)
-            .orElseThrow(() -> new AppException(ErrorReason.C001, userId));
-        Long previousGradeId = user.getGrade() == null ? null : user.getGrade().getId();
-
-        if (gradeId == null) {
-            user.setGrade(null);
-        } else {
-            Grade grade = gradeEntityService.findById(gradeId)
-                .orElseThrow(() -> new AppException(ErrorReason.C001, "Grade not found: " + gradeId));
-            user.setGrade(grade);
-        }
-        user.setUpdatedAt(currentTime.utcDateTime());
-        UserRecord updated = userMapper.toRecord(userEntityService.save(user));
-
-        if (!Objects.equals(previousGradeId, gradeId)) {
-            userGradeAssignmentSyncService.onGradeChanged(userId, gradeId);
-        }
-        return updated;
+        return userGradeUpdateSupport.updateGrade(viewer, userId, gradeId);
     }
 
     @Override

@@ -84,14 +84,6 @@ public interface UserService {
     AdminUserStatsRecord getAdminUserStats();
 
     /**
-     * Returns users the caller may assign learning content to.
-     *
-     * @param viewer authenticated user; admins receive all other users, team leads receive their members
-     * @return assignable users, or an empty list when the caller is not an admin or team lead
-     */
-    List<UserRecord> listAssignableUsers(AppUser viewer);
-
-    /**
      * Returns a page of users the caller may assign learning content to.
      *
      * @param viewer authenticated user; admins receive all other users, team leads receive their members
