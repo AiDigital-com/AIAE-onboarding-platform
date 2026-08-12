@@ -6,7 +6,6 @@ import com.aidigital.aionboarding.domain.group.entities.GroupMember;
 import com.aidigital.aionboarding.domain.user.entities.User;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.security.AppUser;
-import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.group.models.CreateGroupInput;
 import com.aidigital.aionboarding.service.group.models.GroupDetailRecord;
 import com.aidigital.aionboarding.service.group.models.GroupMemberRecord;
@@ -18,7 +17,6 @@ import com.aidigital.aionboarding.service.group.services.entity.GroupMemberEntit
 import com.aidigital.aionboarding.service.group.support.GroupAccessPolicy;
 import com.aidigital.aionboarding.service.group.support.GroupRecordAssembler;
 import com.aidigital.aionboarding.service.group.support.GroupSpecificationBuilder;
-import com.aidigital.aionboarding.service.mappers.user.UserRecordMapper;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
 import com.aidigital.aionboarding.service.user.services.entity.UserEntityService;
@@ -64,11 +62,7 @@ class GroupServiceImplTest {
 	@Mock
 	private GroupRecordAssembler groupRecordAssembler;
 	@Mock
-	private UserRecordMapper userMapper;
-	@Mock
 	private PermissionService permissionService;
-	@Mock
-	private CurrentTime currentTime;
 
 	@InjectMocks
 	private GroupServiceImpl service;
@@ -119,12 +113,13 @@ class GroupServiceImplTest {
 			// Given:
 			AppUser admin = new AppUser(1L, "clerk-admin", "admin@test.com", "Admin", "admin", "Admin", null, null,
 					null);
+			Group builtGroup = new Group();
 			when(groupEntityService.existsByNormalizedName("cs campaign")).thenReturn(false);
 			when(userEntityService.getReference(1L)).thenReturn(null);
-			when(currentTime.utcDateTime()).thenReturn(LocalDateTime.of(2026, 1, 1, 0, 0));
-			when(groupEntityService.save(any(Group.class))).thenAnswer(invocation -> invocation.getArgument(0));
+			when(groupRecordAssembler.buildNewGroup("CS Campaign", "cs campaign", "", null)).thenReturn(builtGroup);
+			when(groupEntityService.save(builtGroup)).thenReturn(builtGroup);
 			GroupDetailRecord detail = new GroupDetailRecord(1L, "CS Campaign", "", List.of(), null, null);
-			when(groupRecordAssembler.toDetailRecord(any(Group.class))).thenReturn(detail);
+			when(groupRecordAssembler.toDetailRecord(builtGroup)).thenReturn(detail);
 
 			// When:
 			GroupDetailRecord result = service.createGroup(admin, new CreateGroupInput("CS Campaign", ""));
@@ -138,12 +133,13 @@ class GroupServiceImplTest {
 			// Given:
 			AppUser admin = new AppUser(1L, "clerk-admin", "admin@test.com", "Admin", "admin", "Admin", null, null,
 					null);
+			Group builtGroup = new Group();
 			when(groupEntityService.existsByNormalizedName("cs campaign")).thenReturn(false);
 			when(userEntityService.getReference(1L)).thenReturn(null);
-			when(currentTime.utcDateTime()).thenReturn(LocalDateTime.of(2026, 1, 1, 0, 0));
-			when(groupEntityService.save(any(Group.class))).thenAnswer(invocation -> invocation.getArgument(0));
+			when(groupRecordAssembler.buildNewGroup("CS Campaign", "cs campaign", "", null)).thenReturn(builtGroup);
+			when(groupEntityService.save(builtGroup)).thenReturn(builtGroup);
 			GroupDetailRecord detail = new GroupDetailRecord(1L, "CS Campaign", "", List.of(), null, null);
-			when(groupRecordAssembler.toDetailRecord(any(Group.class))).thenReturn(detail);
+			when(groupRecordAssembler.toDetailRecord(builtGroup)).thenReturn(detail);
 
 			// When:
 			service.createGroup(admin, new CreateGroupInput("CS Campaign", ""));
@@ -157,28 +153,26 @@ class GroupServiceImplTest {
 			// Given:
 			AppUser lead = new AppUser(2L, "clerk-lead", "lead@test.com", "Lead", "teamlead", "Lead", null, null,
 					null);
+			Group builtGroup = new Group();
+			GroupLead builtGroupLead = new GroupLead();
 			when(groupEntityService.existsByNormalizedName("cs campaign")).thenReturn(false);
 			when(userEntityService.getReference(2L)).thenReturn(null);
-			when(currentTime.utcDateTime()).thenReturn(LocalDateTime.of(2026, 1, 1, 0, 0));
-			when(groupEntityService.save(any(Group.class))).thenAnswer(invocation -> {
+			when(groupRecordAssembler.buildNewGroup("CS Campaign", "cs campaign", "", null)).thenReturn(builtGroup);
+			when(groupEntityService.save(builtGroup)).thenAnswer(invocation -> {
 				Group persisted = invocation.getArgument(0);
 				persisted.setId(5L);
 				return persisted;
 			});
+			when(groupRecordAssembler.buildGroupLead(eq(builtGroup), eq(2L), eq(null))).thenReturn(builtGroupLead);
 			GroupDetailRecord detail = new GroupDetailRecord(5L, "CS Campaign", "", List.of(), null, null);
-			when(groupRecordAssembler.toDetailRecord(any(Group.class))).thenReturn(detail);
+			when(groupRecordAssembler.toDetailRecord(builtGroup)).thenReturn(detail);
 
 			// When:
 			service.createGroup(lead, new CreateGroupInput("CS Campaign", ""));
 
 			// Then: the creating team lead is recorded as a lead of the new group so
 			// it appears in their scoped group list.
-			ArgumentCaptor<GroupLead> captor = ArgumentCaptor.forClass(GroupLead.class);
-			verify(groupLeadEntityService).save(captor.capture());
-			GroupLead savedLead = captor.getValue();
-			assertThat(savedLead.getId().getGroupId()).isEqualTo(5L);
-			assertThat(savedLead.getId().getLeadUserId()).isEqualTo(2L);
-			assertThat(savedLead.getCreatedAt()).isEqualTo(LocalDateTime.of(2026, 1, 1, 0, 0));
+			verify(groupLeadEntityService).save(builtGroupLead);
 		}
 	}
 
@@ -212,7 +206,6 @@ class GroupServiceImplTest {
 			when(groupEntityService.findById(7L)).thenReturn(Optional.of(group));
 			when(groupAccessPolicy.canManageGroup(lead, 7L)).thenReturn(true);
 			when(groupEntityService.existsByNormalizedNameExcluding("new name", 7L)).thenReturn(false);
-			when(currentTime.utcDateTime()).thenReturn(LocalDateTime.of(2026, 1, 1, 0, 0));
 			when(groupEntityService.save(any(Group.class))).thenAnswer(invocation -> invocation.getArgument(0));
 			GroupDetailRecord detail = new GroupDetailRecord(7L, "New Name", "", List.of(), null, null);
 			when(groupRecordAssembler.toDetailRecord(any(Group.class))).thenReturn(detail);
@@ -300,7 +293,7 @@ class GroupServiceImplTest {
 					.thenReturn(candidatePage);
 			UserRecord candidateRecord = new UserRecord(20L, "clerk-20", "Ana", "ana@test.com", "member", null, null,
 					null, null, null, null);
-			when(userMapper.toRecord(candidateUser)).thenReturn(candidateRecord);
+			when(groupRecordAssembler.toUserRecord(candidateUser)).thenReturn(candidateRecord);
 
 			// When:
 			Page<UserRecord> result = service.listCandidateUsers(admin, 7L, false, "ana", 0, 20);

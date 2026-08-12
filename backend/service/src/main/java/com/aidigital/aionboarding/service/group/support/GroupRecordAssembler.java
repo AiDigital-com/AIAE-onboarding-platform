@@ -3,6 +3,8 @@ package com.aidigital.aionboarding.service.group.support;
 import com.aidigital.aionboarding.domain.group.entities.Group;
 import com.aidigital.aionboarding.domain.group.entities.GroupLead;
 import com.aidigital.aionboarding.domain.group.entities.GroupMember;
+import com.aidigital.aionboarding.domain.user.entities.User;
+import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.group.models.GroupDetailRecord;
 import com.aidigital.aionboarding.service.group.models.GroupMemberRecord;
 import com.aidigital.aionboarding.service.group.models.GroupSummaryRecord;
@@ -15,6 +17,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,7 +26,8 @@ import java.util.Map;
 /**
  * Assembles {@link GroupSummaryRecord}/{@link GroupDetailRecord} from {@link Group} entities,
  * batching lead lookups and member counts across a page of groups so a group list never issues a
- * query per row.
+ * query per row; also builds new/updated {@link Group} and {@link GroupLead} entity shapes so
+ * timestamp stamping lives in one place rather than duplicated at each call site.
  */
 @Component
 @RequiredArgsConstructor
@@ -32,6 +36,7 @@ public class GroupRecordAssembler {
     private final GroupLeadEntityService groupLeadEntityService;
     private final GroupMemberEntityService groupMemberEntityService;
     private final UserRecordMapper userMapper;
+    private final CurrentTime currentTime;
 
     /**
      * Builds summary records for a page of groups, batching leads and member counts in one round
@@ -103,5 +108,74 @@ public class GroupRecordAssembler {
 
     GroupMemberRecord toMemberRecord(GroupMember groupMember) {
         return new GroupMemberRecord(userMapper.toRecord(groupMember.getMemberUser()), groupMember.getCreatedAt());
+    }
+
+    /**
+     * Maps a candidate user entity to its API record shape.
+     *
+     * @param user candidate user
+     * @return the mapped record
+     */
+    public UserRecord toUserRecord(User user) {
+        return userMapper.toRecord(user);
+    }
+
+    /**
+     * Builds a new, unsaved {@link Group} with normalized name, description, creator, and
+     * created/updated timestamps stamped to now.
+     *
+     * @param name            display name
+     * @param normalizedName  lowercase/trimmed name used for uniqueness checks
+     * @param description     description, already defaulted to {@code ""} when absent
+     * @param createdByUser   reference to the creating user
+     * @return the constructed (not yet persisted) group
+     */
+    public Group buildNewGroup(String name, String normalizedName, String description, User createdByUser) {
+        Group group = new Group();
+        group.setName(name);
+        group.setNormalizedName(normalizedName);
+        group.setDescription(description);
+        group.setCreatedByUser(createdByUser);
+        LocalDateTime now = currentTime.utcDateTime();
+        group.setCreatedAt(now);
+        group.setUpdatedAt(now);
+        return group;
+    }
+
+    /**
+     * Builds a new, unsaved {@link GroupLead} linking a group to its lead, stamped with the
+     * current time.
+     *
+     * @param group      the group being led
+     * @param leadUserId the lead's internal user id
+     * @param leadUser   reference to the lead user
+     * @return the constructed (not yet persisted) lead assignment
+     */
+    public GroupLead buildGroupLead(Group group, Long leadUserId, User leadUser) {
+        GroupLead groupLead = new GroupLead();
+        GroupLead.GroupLeadId id = new GroupLead.GroupLeadId();
+        id.setGroupId(group.getId());
+        id.setLeadUserId(leadUserId);
+        groupLead.setId(id);
+        groupLead.setGroup(group);
+        groupLead.setLeadUser(leadUser);
+        groupLead.setCreatedAt(currentTime.utcDateTime());
+        return groupLead;
+    }
+
+    /**
+     * Applies a rename/description update to an existing group in place and stamps its updated
+     * timestamp to now.
+     *
+     * @param group          the group being updated
+     * @param name           new display name
+     * @param normalizedName new lowercase/trimmed name used for uniqueness checks
+     * @param description    new description, already defaulted to {@code ""} when absent
+     */
+    public void applyUpdate(Group group, String name, String normalizedName, String description) {
+        group.setName(name);
+        group.setNormalizedName(normalizedName);
+        group.setDescription(description);
+        group.setUpdatedAt(currentTime.utcDateTime());
     }
 }
