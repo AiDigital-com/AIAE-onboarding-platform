@@ -4,29 +4,24 @@ import com.aidigital.aionboarding.domain.common.dictionary.ActivityProgressStatu
 import com.aidigital.aionboarding.domain.common.dictionary.ActivityTypeCode;
 import com.aidigital.aionboarding.domain.common.dictionary.entities.ActivityProgressStatus;
 import com.aidigital.aionboarding.domain.common.dictionary.entities.ActivityType;
-import com.aidigital.aionboarding.domain.learning.entities.UserLesson;
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.domain.lessonactivity.entities.LessonActivity;
 import com.aidigital.aionboarding.domain.lessonactivity.entities.UserLessonActivityAttempt;
 import com.aidigital.aionboarding.domain.lessonactivity.entities.UserLessonActivityProgress;
 import com.aidigital.aionboarding.domain.lessonactivity.repositories.UserLessonActivityProgressRepository;
-import com.aidigital.aionboarding.domain.user.entities.User;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
-import com.aidigital.aionboarding.service.learning.models.LessonEnrollmentRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityAttemptRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityCompletionResultRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityProgressRecord;
-import com.aidigital.aionboarding.service.lessonactivity.models.ActivityProgressViewRecord;
-import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.QuizAnswerResultRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.QuizGradingResultRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.QuizQuestionItemRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.SubmitActivityProgressInput;
-import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityAssemblyService;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityGradingService;
 import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityAccessPolicy;
+import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityCompletionSupport;
 import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityPayloadAssembler;
 import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityProgressPersistence;
 import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityRecordAssembler;
@@ -43,18 +38,14 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -67,13 +58,13 @@ class LessonActivityProgressServiceImplTest {
 	@Mock
 	private LessonActivityGradingService gradingService;
 	@Mock
-	private LessonActivityAssemblyService assemblyService;
-	@Mock
 	private LessonActivityPayloadAssembler payloadAssembler;
 	@Mock
 	private LessonActivityRecordAssembler lessonActivityMapper;
 	@Mock
 	private LessonActivityProgressPersistence progressPersistence;
+	@Mock
+	private LessonActivityCompletionSupport completionSupport;
 	@Mock
 	private UserLessonActivityProgressRepository progressRepository;
 	@Mock
@@ -105,19 +96,6 @@ class LessonActivityProgressServiceImplTest {
 		progress.setStatus(status);
 		progress.setMetadata(new java.util.HashMap<>());
 		return progress;
-	}
-
-	private LessonActivityRecord activityRecord(String type) {
-		return new LessonActivityRecord(
-				1L, 100L, type, "Activity", 1, Map.of(), Map.of(), "author", LocalDateTime.now(), null);
-	}
-
-	private LessonActivityRecord activityRecordWithProgress(String type, boolean completed, Integer score) {
-		ActivityProgressViewRecord view = new ActivityProgressViewRecord(
-				"completed", score, Map.of(), LocalDateTime.now(),
-				completed ? LocalDateTime.now() : null, completed);
-		return new LessonActivityRecord(
-				1L, 100L, type, "Activity", 1, Map.of(), Map.of(), "author", LocalDateTime.now(), view);
 	}
 
 	@Nested
@@ -232,13 +210,12 @@ class LessonActivityProgressServiceImplTest {
 			ActivityProgressRecord progressRecord = new ActivityProgressRecord(activityId, lessonId, "completed", null,
 					now, Map.of("reviewedCards", 5, "completedFrom", "flashcards-player"));
 			when(lessonActivityMapper.toProgressRecord(progress)).thenReturn(progressRecord);
-			LessonActivityProgressServiceImpl spy = spy(service);
 			ActivityCompletionResultRecord completion = new ActivityCompletionResultRecord(
 					progressRecord, List.of(), false, null, null);
-			doReturn(completion).when(spy).buildCompletionResult(viewer, lesson, progressRecord, null);
+			when(completionSupport.buildCompletionResult(viewer, lesson, progressRecord, null)).thenReturn(completion);
 
 			// When:
-			ActivityCompletionResultRecord result = spy.completeFlashcards(viewer, lesson, activityId, request);
+			ActivityCompletionResultRecord result = service.completeFlashcards(viewer, lesson, activityId, request);
 
 			// Then:
 			assertThat(result).isSameAs(completion);
@@ -308,13 +285,11 @@ class LessonActivityProgressServiceImplTest {
 			ActivityCompletionResultRecord completion = new ActivityCompletionResultRecord(
 					progressRecord, List.of(), false, null, attemptRecord);
 
-			LessonActivityProgressServiceImpl spy = spy(service);
 			when(lessonActivityPersistenceHelper.findByLessonIdAndId(lessonId, activityId)).thenReturn(activity);
 			when(payloadAssembler.parseQuizItems(activity.getPayload())).thenReturn(quizItems);
 			when(gradingService.gradeQuiz(quizItems, List.of(List.of("a")))).thenReturn(attempt);
 			when(currentTime.instantString()).thenReturn(submittedAt);
-			doReturn(savedAttempt).when(spy).saveQuizAttempt(viewer, lesson, activity, List.of(List.of("a")), attempt,
-					metadata);
+			when(progressPersistence.insertAttemptWithNextNumber(any())).thenReturn(savedAttempt);
 			when(progressPersistence.loadOrCreateProgress(viewer.internalId(), activity, lessonId)).thenReturn(progress);
 			when(accessPolicy.progressStatus(ActivityProgressStatusCode.COMPLETED)).thenReturn(completed);
 			when(currentTime.utcDateTime()).thenReturn(now);
@@ -323,10 +298,11 @@ class LessonActivityProgressServiceImplTest {
 			when(lessonActivityMapper.toProgressRecord(progress)).thenReturn(progressRecord);
 			when(lessonActivityMapper.toAttemptRecord(savedAttempt, 80, true, 4, 5, List.of(), List.of(List.of("a"))))
 					.thenReturn(attemptRecord);
-			doReturn(completion).when(spy).buildCompletionResult(viewer, lesson, progressRecord, attemptRecord);
+			when(completionSupport.buildCompletionResult(viewer, lesson, progressRecord, attemptRecord))
+					.thenReturn(completion);
 
 			// When:
-			ActivityCompletionResultRecord result = spy.completeQuiz(viewer, lesson, activityId, List.of(List.of("a")));
+			ActivityCompletionResultRecord result = service.completeQuiz(viewer, lesson, activityId, List.of(List.of("a")));
 
 			// Then:
 			assertThat(result).isSameAs(completion);
@@ -369,13 +345,11 @@ class LessonActivityProgressServiceImplTest {
 			ActivityCompletionResultRecord completion = new ActivityCompletionResultRecord(
 					progressRecord, List.of(), false, null, attemptRecord);
 
-			LessonActivityProgressServiceImpl spy = spy(service);
 			when(lessonActivityPersistenceHelper.findByLessonIdAndId(lessonId, activityId)).thenReturn(activity);
 			when(payloadAssembler.parseQuizItems(activity.getPayload())).thenReturn(quizItems);
 			when(gradingService.gradeQuiz(quizItems, List.of(List.of("a")))).thenReturn(attempt);
 			when(currentTime.instantString()).thenReturn(submittedAt);
-			doReturn(savedAttempt).when(spy).saveQuizAttempt(viewer, lesson, activity, List.of(List.of("a")), attempt,
-					metadata);
+			when(progressPersistence.insertAttemptWithNextNumber(any())).thenReturn(savedAttempt);
 			when(progressPersistence.loadOrCreateProgress(viewer.internalId(), activity, lessonId)).thenReturn(progress);
 			when(accessPolicy.progressStatus(ActivityProgressStatusCode.FAILED)).thenReturn(failed);
 			when(currentTime.utcDateTime()).thenReturn(now);
@@ -384,235 +358,15 @@ class LessonActivityProgressServiceImplTest {
 			when(lessonActivityMapper.toProgressRecord(progress)).thenReturn(progressRecord);
 			when(lessonActivityMapper.toAttemptRecord(savedAttempt, 60, false, 3, 5, List.of(), List.of(List.of("a"))))
 					.thenReturn(attemptRecord);
-			doReturn(completion).when(spy).buildCompletionResult(viewer, lesson, progressRecord, attemptRecord);
+			when(completionSupport.buildCompletionResult(viewer, lesson, progressRecord, attemptRecord))
+					.thenReturn(completion);
 
 			// When:
-			spy.completeQuiz(viewer, lesson, activityId, List.of(List.of("a")));
+			service.completeQuiz(viewer, lesson, activityId, List.of(List.of("a")));
 
 			// Then:
 			verify(progressPersistence).clearLessonCompletion(viewer.internalId(), lessonId);
 			assertThat(progress.getCompletedAt()).isNull();
-		}
-	}
-
-	@Nested
-	class BuildCompletionResult {
-
-		@Test
-		void shouldMarkLessonCompleteWhenAllActivitiesPassedTest() {
-			// Given:
-			AppUser viewer = viewer();
-			Long lessonId = 100L;
-			Long lessonCreatedByUserId = 50L;
-			Lesson lesson = new Lesson();
-			lesson.setId(lessonId);
-			User creator = new User();
-			creator.setId(lessonCreatedByUserId);
-			lesson.setCreatedByUser(creator);
-			LessonActivityRecord flashcard = activityRecordWithProgress(ActivityTypeCode.FLASHCARDS, true, null);
-			LessonActivityRecord quiz = activityRecordWithProgress(ActivityTypeCode.QUIZ, true, 80);
-			List<LessonActivityRecord> activities = List.of(flashcard, quiz);
-			ActivityProgressRecord progress = new ActivityProgressRecord(10L, lessonId, "completed", null, null,
-					Map.of());
-			LessonEnrollmentRecord enrollment = new LessonEnrollmentRecord(lessonId, LocalDateTime.now(),
-					LocalDateTime.now(), true);
-			when(assemblyService.getLessonActivitiesForUser(lessonId, viewer.internalId())).thenReturn(activities);
-			when(accessPolicy.redactQuizAnswersUnlessManager(activities, viewer, lessonCreatedByUserId))
-					.thenReturn(activities);
-			when(lessonActivityMapper.isActivityPassed(flashcard)).thenReturn(true);
-			when(lessonActivityMapper.isActivityPassed(quiz)).thenReturn(true);
-			LessonActivityProgressServiceImpl spy = spy(service);
-			doReturn(enrollment).when(spy).setLessonCompletionForUser(viewer.internalId(), lessonId, true);
-
-			// When:
-			ActivityCompletionResultRecord result = spy.buildCompletionResult(viewer, lesson, progress, null);
-
-			// Then:
-			assertThat(result.lessonCompleted()).isTrue();
-			assertThat(result.enrollment()).isSameAs(enrollment);
-			verify(spy).setLessonCompletionForUser(viewer.internalId(), lessonId, true);
-			verify(spy, never()).getLessonEnrollmentForUser(viewer.internalId(), lessonId);
-		}
-
-		@Test
-		void shouldNotMarkLessonCompleteWhenActivitiesListEmptyTest() {
-			// Given:
-			AppUser viewer = viewer();
-			Long lessonId = 100L;
-			Long lessonCreatedByUserId = 50L;
-			Lesson lesson = new Lesson();
-			lesson.setId(lessonId);
-			User creator = new User();
-			creator.setId(lessonCreatedByUserId);
-			lesson.setCreatedByUser(creator);
-			List<LessonActivityRecord> activities = List.of();
-			ActivityProgressRecord progress = new ActivityProgressRecord(10L, lessonId, "completed", null, null,
-					Map.of());
-			LessonEnrollmentRecord enrollment = new LessonEnrollmentRecord(lessonId, LocalDateTime.now(), null, false);
-			when(assemblyService.getLessonActivitiesForUser(lessonId, viewer.internalId())).thenReturn(activities);
-			when(accessPolicy.redactQuizAnswersUnlessManager(activities, viewer, lessonCreatedByUserId))
-					.thenReturn(activities);
-			LessonActivityProgressServiceImpl spy = spy(service);
-			doReturn(enrollment).when(spy).getLessonEnrollmentForUser(viewer.internalId(), lessonId);
-
-			// When:
-			ActivityCompletionResultRecord result = spy.buildCompletionResult(viewer, lesson, progress, null);
-
-			// Then:
-			assertThat(result.lessonCompleted()).isFalse();
-			verify(spy).getLessonEnrollmentForUser(viewer.internalId(), lessonId);
-			verify(spy, never()).setLessonCompletionForUser(viewer.internalId(), lessonId, true);
-		}
-
-		@Test
-		void shouldNotMarkLessonCompleteWhenSomeActivityNotPassedTest() {
-			// Given:
-			AppUser viewer = viewer();
-			Long lessonId = 100L;
-			Long lessonCreatedByUserId = 50L;
-			Lesson lesson = new Lesson();
-			lesson.setId(lessonId);
-			User creator = new User();
-			creator.setId(lessonCreatedByUserId);
-			lesson.setCreatedByUser(creator);
-			LessonActivityRecord flashcard = activityRecordWithProgress(ActivityTypeCode.FLASHCARDS, true, null);
-			LessonActivityRecord quiz = activityRecordWithProgress(ActivityTypeCode.QUIZ, false, 60);
-			List<LessonActivityRecord> activities = List.of(flashcard, quiz);
-			ActivityProgressRecord progress = new ActivityProgressRecord(10L, lessonId, "failed", 60, null, Map.of());
-			LessonEnrollmentRecord enrollment = new LessonEnrollmentRecord(lessonId, LocalDateTime.now(), null, false);
-			when(assemblyService.getLessonActivitiesForUser(lessonId, viewer.internalId())).thenReturn(activities);
-			when(accessPolicy.redactQuizAnswersUnlessManager(activities, viewer, lessonCreatedByUserId))
-					.thenReturn(activities);
-			when(lessonActivityMapper.isActivityPassed(flashcard)).thenReturn(true);
-			when(lessonActivityMapper.isActivityPassed(quiz)).thenReturn(false);
-			LessonActivityProgressServiceImpl spy = spy(service);
-			doReturn(enrollment).when(spy).getLessonEnrollmentForUser(viewer.internalId(), lessonId);
-
-			// When:
-			ActivityCompletionResultRecord result = spy.buildCompletionResult(viewer, lesson, progress, null);
-
-			// Then:
-			assertThat(result.lessonCompleted()).isFalse();
-			verify(spy).getLessonEnrollmentForUser(viewer.internalId(), lessonId);
-			verify(spy, never()).setLessonCompletionForUser(viewer.internalId(), lessonId, true);
-		}
-	}
-
-	@Nested
-	class SetLessonCompletionForUser {
-
-		@Test
-		void shouldSetCompletedAtWhenAllActivitiesPassedTest() {
-			// Given:
-			Long userId = 1L;
-			Long lessonId = 100L;
-			LocalDateTime now = LocalDateTime.of(2026, 1, 1, 0, 0);
-			UserLesson enrollment = new UserLesson();
-			LessonEnrollmentRecord record = new LessonEnrollmentRecord(lessonId, now, now, true);
-			LessonActivityRecord flashcard = activityRecordWithProgress(ActivityTypeCode.FLASHCARDS, true, null);
-			LessonActivityRecord quiz = activityRecordWithProgress(ActivityTypeCode.QUIZ, true, 80);
-			when(assemblyService.getLessonActivitiesForUser(lessonId, userId)).thenReturn(List.of(flashcard, quiz));
-			when(lessonActivityMapper.isActivityPassed(flashcard)).thenReturn(true);
-			when(lessonActivityMapper.isActivityPassed(quiz)).thenReturn(true);
-			when(progressPersistence.findUserLesson(userId, lessonId)).thenReturn(Optional.of(enrollment));
-			when(currentTime.utcDateTime()).thenReturn(now);
-			when(progressPersistence.saveUserLesson(enrollment)).thenReturn(enrollment);
-			when(lessonActivityMapper.toEnrollmentRecord(enrollment)).thenReturn(record);
-
-			// When:
-			LessonEnrollmentRecord result = service.setLessonCompletionForUser(userId, lessonId, true);
-
-			// Then:
-			assertThat(result).isSameAs(record);
-			assertThat(enrollment.getCompletedAt()).isEqualTo(now);
-		}
-
-		@Test
-		void shouldThrowWhenMarkingCompleteButNotAllActivitiesPassedTest() {
-			// Given:
-			Long userId = 1L;
-			Long lessonId = 100L;
-			LessonActivityRecord flashcard = activityRecordWithProgress(ActivityTypeCode.FLASHCARDS, true, null);
-			LessonActivityRecord quiz = activityRecordWithProgress(ActivityTypeCode.QUIZ, false, 60);
-			when(assemblyService.getLessonActivitiesForUser(lessonId, userId)).thenReturn(List.of(flashcard, quiz));
-			when(lessonActivityMapper.isActivityPassed(flashcard)).thenReturn(true);
-			when(lessonActivityMapper.isActivityPassed(quiz)).thenReturn(false);
-
-			// When-Then:
-			assertThatThrownBy(() -> service.setLessonCompletionForUser(userId, lessonId, true))
-					.isInstanceOf(AppException.class)
-					.hasMessageContaining("Complete all lesson activities");
-			verifyNoInteractions(progressPersistence);
-		}
-
-		@Test
-		void shouldClearCompletedAtWhenMarkingIncompleteTest() {
-			// Given:
-			Long userId = 1L;
-			Long lessonId = 100L;
-			UserLesson enrollment = new UserLesson();
-			enrollment.setCompletedAt(LocalDateTime.of(2025, 1, 1, 0, 0));
-			LessonEnrollmentRecord record = new LessonEnrollmentRecord(lessonId, null, null, false);
-			when(progressPersistence.findUserLesson(userId, lessonId)).thenReturn(Optional.of(enrollment));
-			when(progressPersistence.saveUserLesson(enrollment)).thenReturn(enrollment);
-			when(lessonActivityMapper.toEnrollmentRecord(enrollment)).thenReturn(record);
-
-			// When:
-			LessonEnrollmentRecord result = service.setLessonCompletionForUser(userId, lessonId, false);
-
-			// Then:
-			assertThat(result).isSameAs(record);
-			assertThat(enrollment.getCompletedAt()).isNull();
-		}
-
-		@Test
-		void shouldReturnNullWhenEnrollmentMissingTest() {
-			// Given:
-			Long userId = 1L;
-			Long lessonId = 100L;
-			when(progressPersistence.findUserLesson(userId, lessonId)).thenReturn(Optional.empty());
-
-			// When:
-			LessonEnrollmentRecord result = service.setLessonCompletionForUser(userId, lessonId, false);
-
-			// Then:
-			assertThat(result).isNull();
-			verify(progressPersistence, never()).saveUserLesson(any());
-		}
-	}
-
-	@Nested
-	class GetLessonEnrollmentForUser {
-
-		@Test
-		void shouldReturnRecordWhenEnrollmentExistsTest() {
-			// Given:
-			Long userId = 1L;
-			Long lessonId = 100L;
-			UserLesson enrollment = new UserLesson();
-			LessonEnrollmentRecord record = new LessonEnrollmentRecord(lessonId, null, null, false);
-			when(progressPersistence.findUserLesson(userId, lessonId)).thenReturn(Optional.of(enrollment));
-			when(lessonActivityMapper.toEnrollmentRecord(enrollment)).thenReturn(record);
-
-			// When:
-			LessonEnrollmentRecord result = service.getLessonEnrollmentForUser(userId, lessonId);
-
-			// Then:
-			assertThat(result).isSameAs(record);
-		}
-
-		@Test
-		void shouldReturnNullWhenEnrollmentMissingTest() {
-			// Given:
-			Long userId = 1L;
-			Long lessonId = 100L;
-			when(progressPersistence.findUserLesson(userId, lessonId)).thenReturn(Optional.empty());
-
-			// When:
-			LessonEnrollmentRecord result = service.getLessonEnrollmentForUser(userId, lessonId);
-
-			// Then:
-			assertThat(result).isNull();
 		}
 	}
 

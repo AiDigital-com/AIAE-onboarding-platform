@@ -2,7 +2,6 @@ package com.aidigital.aionboarding.service.lessonactivity.services.impl;
 
 import com.aidigital.aionboarding.domain.common.dictionary.ActivityProgressStatusCode;
 import com.aidigital.aionboarding.domain.common.dictionary.ActivityTypeCode;
-import com.aidigital.aionboarding.domain.learning.entities.UserLesson;
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.domain.lessonactivity.entities.LessonActivity;
 import com.aidigital.aionboarding.domain.lessonactivity.entities.UserLessonActivityAttempt;
@@ -11,17 +10,14 @@ import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
-import com.aidigital.aionboarding.service.learning.models.LessonEnrollmentRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityAttemptRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityCompletionResultRecord;
-import com.aidigital.aionboarding.service.lessonactivity.models.ActivityProgressRecord;
-import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.QuizGradingResultRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.SubmitActivityProgressInput;
-import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityAssemblyService;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityGradingService;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityProgressService;
 import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityAccessPolicy;
+import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityCompletionSupport;
 import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityPayloadAssembler;
 import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityProgressPersistence;
 import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityRecordAssembler;
@@ -43,10 +39,10 @@ public class LessonActivityProgressServiceImpl implements LessonActivityProgress
 	private final LessonActivityPersistenceHelper lessonActivityPersistenceHelper;
 	private final LessonActivityAccessPolicy accessPolicy;
 	private final LessonActivityGradingService gradingService;
-	private final LessonActivityAssemblyService assemblyService;
 	private final LessonActivityPayloadAssembler payloadAssembler;
 	private final LessonActivityRecordAssembler lessonActivityMapper;
 	private final LessonActivityProgressPersistence progressPersistence;
+	private final LessonActivityCompletionSupport completionSupport;
 	private final CurrentTime currentTime;
 
 	@Override
@@ -93,7 +89,7 @@ public class LessonActivityProgressServiceImpl implements LessonActivityProgress
 		progress.setUpdatedAt(currentTime.utcDateTime());
 		progressPersistence.progressRepository().save(progress);
 
-		return buildCompletionResult(viewer, lesson, lessonActivityMapper.toProgressRecord(progress), null);
+		return completionSupport.buildCompletionResult(viewer, lesson, lessonActivityMapper.toProgressRecord(progress), null);
 	}
 
 	@Override
@@ -148,65 +144,8 @@ public class LessonActivityProgressServiceImpl implements LessonActivityProgress
 				attempt.results(),
 				submittedAnswers
 		);
-		return buildCompletionResult(viewer, lesson, lessonActivityMapper.toProgressRecord(progress), attemptRecord);
-	}
-
-	/**
-	 * Builds the response after an activity changes progress and refreshes lesson completion state.
-	 */
-	ActivityCompletionResultRecord buildCompletionResult(
-			AppUser viewer,
-			Lesson lesson,
-			ActivityProgressRecord progress,
-			ActivityAttemptRecord attempt
-	) {
-		Long lessonId = lesson.getId();
-		Long lessonCreatedByUserId = lesson.getCreatedByUser() == null ? null : lesson.getCreatedByUser().getId();
-		List<LessonActivityRecord> activities = accessPolicy.redactQuizAnswersUnlessManager(
-				assemblyService.getLessonActivitiesForUser(lessonId, viewer.internalId()),
-				viewer,
-				lessonCreatedByUserId
-		);
-		boolean lessonCompleted = !activities.isEmpty()
-				&& activities.stream().allMatch(lessonActivityMapper::isActivityPassed);
-		LessonEnrollmentRecord enrollment = lessonCompleted
-				? setLessonCompletionForUser(viewer.internalId(), lessonId, true)
-				: getLessonEnrollmentForUser(viewer.internalId(), lessonId);
-
-		return new ActivityCompletionResultRecord(progress, activities, lessonCompleted, enrollment, attempt);
-	}
-
-	/**
-	 * Updates a user's lesson completion timestamp after verifying activity completion.
-	 */
-	LessonEnrollmentRecord setLessonCompletionForUser(Long userId, Long lessonId, boolean isCompleted) {
-		if (isCompleted) {
-			List<LessonActivityRecord> activities = assemblyService.getLessonActivitiesForUser(lessonId, userId);
-			if (!activities.isEmpty() && activities.stream().anyMatch(activity -> !lessonActivityMapper.isActivityPassed(activity))) {
-				throw new AppException(
-						ErrorReason.C002,
-						"Complete all lesson activities before marking this lesson complete."
-				);
-			}
-		}
-
-		UserLesson enrollment = progressPersistence.findUserLesson(userId, lessonId)
-				.orElse(null);
-		if (enrollment == null) {
-			return null;
-		}
-		enrollment.setCompletedAt(isCompleted ? currentTime.utcDateTime() : null);
-		progressPersistence.saveUserLesson(enrollment);
-		return getLessonEnrollmentForUser(userId, lessonId);
-	}
-
-	/**
-	 * Returns the current lesson enrollment record for the user when one exists.
-	 */
-	LessonEnrollmentRecord getLessonEnrollmentForUser(Long userId, Long lessonId) {
-		return progressPersistence.findUserLesson(userId, lessonId)
-				.map(lessonActivityMapper::toEnrollmentRecord)
-				.orElse(null);
+		return completionSupport.buildCompletionResult(
+				viewer, lesson, lessonActivityMapper.toProgressRecord(progress), attemptRecord);
 	}
 
 	/**
