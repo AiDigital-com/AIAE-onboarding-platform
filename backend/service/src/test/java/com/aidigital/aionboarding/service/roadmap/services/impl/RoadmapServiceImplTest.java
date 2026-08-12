@@ -14,8 +14,6 @@ import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
-import com.aidigital.aionboarding.service.learning.services.entity.LearningEnrollmentEntityService;
-import com.aidigital.aionboarding.service.learning.support.LearningEnrollmentSupport;
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import com.aidigital.aionboarding.service.roadmap.models.CreateRoadmapInput;
@@ -25,6 +23,7 @@ import com.aidigital.aionboarding.service.roadmap.models.RoadmapSortField;
 import com.aidigital.aionboarding.service.roadmap.models.UpdateRoadmapInput;
 import com.aidigital.aionboarding.service.roadmap.services.entity.RoadmapEntityService;
 import com.aidigital.aionboarding.service.roadmap.support.RoadmapAccessPolicy;
+import com.aidigital.aionboarding.service.roadmap.support.RoadmapEnrollmentFanOutSupport;
 import com.aidigital.aionboarding.service.roadmap.support.RoadmapLessonValidator;
 import com.aidigital.aionboarding.service.roadmap.support.RoadmapRecordAssembler;
 import com.aidigital.aionboarding.service.user.services.entity.UserEntityService;
@@ -64,19 +63,17 @@ class RoadmapServiceImplTest {
 	@Mock
 	private RoadmapEntityService roadmapEntityService;
 	@Mock
-	private LearningEnrollmentEntityService learningEnrollmentEntityService;
-	@Mock
 	private RoadmapAccessPolicy roadmapAccessPolicy;
 	@Mock
 	private RoadmapLessonValidator roadmapLessonValidator;
 	@Mock
 	private RoadmapRecordAssembler roadmapRecordAssembler;
 	@Mock
+	private RoadmapEnrollmentFanOutSupport roadmapEnrollmentFanOutSupport;
+	@Mock
 	private PermissionService permissionService;
 	@Mock
 	private UserEntityService userEntityService;
-	@Mock
-	private LearningEnrollmentSupport learningEnrollmentSupport;
 
 	@Spy
 	private CurrentTime currentTime = new CurrentTimeImpl();
@@ -135,7 +132,7 @@ class RoadmapServiceImplTest {
 
 			// Then:
 			assertThat(result.getContent()).isEmpty();
-			verify(learningEnrollmentEntityService, never()).findUserRoadmapsByUserIdAndRoadmapIds(eq(viewer.internalId()), Mockito.any());
+			verify(roadmapEnrollmentFanOutSupport, never()).getViewerEnrollmentsByRoadmapId(eq(viewer), Mockito.any());
 			verify(roadmapEntityService, never()).findAllByRoadmapIdsWithLessons(List.of());
 		}
 
@@ -150,9 +147,8 @@ class RoadmapServiceImplTest {
 			when(roadmapEntityService.search(defaultQuery, viewer.internalId(), 0, 20))
 					.thenReturn(new PageImpl<>(List.of(roadmap)));
 			when(roadmapAccessPolicy.getManageableRoadmapIds(viewer, List.of(roadmap))).thenReturn(null);
-			when(learningEnrollmentEntityService.findUserRoadmapsByUserIdAndRoadmapIds(viewer.internalId(),
-					List.of(10L)))
-					.thenReturn(List.of());
+			when(roadmapEnrollmentFanOutSupport.getViewerEnrollmentsByRoadmapId(viewer, List.of(roadmap)))
+					.thenReturn(Map.of());
 			when(roadmapEntityService.findAllByRoadmapIdsWithLessons(List.of(10L))).thenReturn(List.of());
 			when(roadmapRecordAssembler.lessonCompletionMap(viewer, List.of())).thenReturn(Map.of());
 			when(roadmapRecordAssembler.toRecord(eq(roadmap), eq((Set<Long>) null), eq(null), eq(List.of()),
@@ -184,9 +180,8 @@ class RoadmapServiceImplTest {
 					.thenReturn(new PageImpl<>(List.of(manageable, notManageable)));
 			when(roadmapAccessPolicy.getManageableRoadmapIds(viewer, List.of(manageable, notManageable)))
 					.thenReturn(Set.of(20L));
-			when(learningEnrollmentEntityService.findUserRoadmapsByUserIdAndRoadmapIds(viewer.internalId(),
-					List.of(20L, 21L)))
-					.thenReturn(List.of());
+			when(roadmapEnrollmentFanOutSupport.getViewerEnrollmentsByRoadmapId(viewer, List.of(manageable, notManageable)))
+					.thenReturn(Map.of());
 			when(roadmapEntityService.findAllByRoadmapIdsWithLessons(List.of(20L, 21L))).thenReturn(List.of());
 			when(roadmapRecordAssembler.lessonCompletionMap(viewer, List.of())).thenReturn(Map.of());
 			when(roadmapRecordAssembler.toRecord(eq(manageable), eq(Set.of(20L)), eq(null), eq(List.of()),
@@ -229,9 +224,8 @@ class RoadmapServiceImplTest {
 			when(roadmapEntityService.search(defaultQuery, viewer.internalId(), 0, 20))
 					.thenReturn(new PageImpl<>(List.of(roadmap)));
 			when(roadmapAccessPolicy.getManageableRoadmapIds(viewer, List.of(roadmap))).thenReturn(null);
-			when(learningEnrollmentEntityService.findUserRoadmapsByUserIdAndRoadmapIds(viewer.internalId(),
-					List.of(30L)))
-					.thenReturn(List.of(enrollment));
+			when(roadmapEnrollmentFanOutSupport.getViewerEnrollmentsByRoadmapId(viewer, List.of(roadmap)))
+					.thenReturn(Map.of(30L, enrollment));
 			when(roadmapEntityService.findAllByRoadmapIdsWithLessons(List.of(30L))).thenReturn(List.of());
 			when(roadmapRecordAssembler.lessonCompletionMap(viewer, List.of())).thenReturn(Map.of());
 			when(roadmapRecordAssembler.toRecord(eq(roadmap), eq((Set<Long>) null), eq(enrollment), eq(List.of()),
@@ -287,9 +281,8 @@ class RoadmapServiceImplTest {
 			when(roadmapEntityService.search(defaultQuery, viewer.internalId(), 0, 20))
 					.thenReturn(new PageImpl<>(List.of(roadmapOne, roadmapTwo)));
 			when(roadmapAccessPolicy.getManageableRoadmapIds(viewer, List.of(roadmapOne, roadmapTwo))).thenReturn(null);
-			when(learningEnrollmentEntityService.findUserRoadmapsByUserIdAndRoadmapIds(viewer.internalId(),
-					List.of(40L, 41L)))
-					.thenReturn(List.of());
+			when(roadmapEnrollmentFanOutSupport.getViewerEnrollmentsByRoadmapId(viewer, List.of(roadmapOne, roadmapTwo)))
+					.thenReturn(Map.of());
 			when(roadmapEntityService.findAllByRoadmapIdsWithLessons(List.of(40L, 41L)))
 					.thenReturn(List.of(roadmapLessonOne, roadmapLessonTwo));
 			when(roadmapRecordAssembler.lessonCompletionMap(viewer, List.of(100L))).thenReturn(Map.of(100L, true));
@@ -337,9 +330,8 @@ class RoadmapServiceImplTest {
 			when(roadmapEntityService.search(defaultQuery, viewer.internalId(), 0, 20))
 					.thenReturn(new PageImpl<>(List.of(roadmap)));
 			when(roadmapAccessPolicy.getManageableRoadmapIds(viewer, List.of(roadmap))).thenReturn(null);
-			when(learningEnrollmentEntityService.findUserRoadmapsByUserIdAndRoadmapIds(viewer.internalId(),
-					List.of(50L)))
-					.thenReturn(List.of());
+			when(roadmapEnrollmentFanOutSupport.getViewerEnrollmentsByRoadmapId(viewer, List.of(roadmap)))
+					.thenReturn(Map.of());
 			when(roadmapEntityService.findAllByRoadmapIdsWithLessons(List.of(50L))).thenReturn(List.of(roadmapLesson));
 			when(roadmapRecordAssembler.lessonCompletionMap(viewer, List.of(200L))).thenReturn(Map.of());
 			when(roadmapRecordAssembler.toRecord(eq(roadmap), eq((Set<Long>) null), eq(null),
@@ -687,7 +679,6 @@ class RoadmapServiceImplTest {
 			when(roadmapLessonValidator.validateReadyPublishedLessons(List.of(5L))).thenReturn(List.of(lesson));
 			when(roadmapLessonValidator.mergeTags(List.of("new-tag"), List.of(lesson))).thenReturn(List.of("new-tag",
 					"lesson-tag"));
-			when(learningEnrollmentEntityService.findUserRoadmapsByRoadmapId(id)).thenReturn(List.of());
 			when(roadmapEntityService.save(roadmap)).thenReturn(roadmap);
 			when(roadmapEntityService.findByIdRoadmapIdOrderBySortOrderAsc(id)).thenReturn(List.of());
 			when(roadmapRecordAssembler.toRecord(eq(roadmap), eq(viewer), eq(Set.of(id)), eq(null), eq(List.of())))
@@ -701,7 +692,7 @@ class RoadmapServiceImplTest {
 			ArgumentCaptor<RoadmapLesson> rowCaptor = ArgumentCaptor.forClass(RoadmapLesson.class);
 			verify(roadmapEntityService).saveRoadmapLesson(rowCaptor.capture());
 			assertThat(rowCaptor.getValue().getId().getLessonId()).isEqualTo(5L);
-			verify(learningEnrollmentEntityService).findUserRoadmapsByRoadmapId(id);
+			verify(roadmapEnrollmentFanOutSupport).fanOutLessonsToEnrolledUsers(id, List.of(lesson));
 			assertThat(roadmap.getTags()).isEqualTo(List.of("new-tag", "lesson-tag"));
 			verify(roadmapLessonValidator).mergeTags(List.of("new-tag"), List.of(lesson));
 		}
