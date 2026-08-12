@@ -4,7 +4,7 @@ import com.aidigital.aionboarding.error.mapper.GlobalExceptionResponseHelperImpl
 import com.aidigital.aionboarding.mappers.team.TeamApiMapper;
 import com.aidigital.aionboarding.service.common.security.RequestAuthenticationCache;
 import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
-import com.aidigital.aionboarding.service.learning.services.LearningService;
+import com.aidigital.aionboarding.service.learning.services.RoadmapAssignmentService;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import com.aidigital.aionboarding.service.team.services.TeamService;
 import com.aidigital.aionboarding.support.ApiResponses;
@@ -44,7 +44,7 @@ class TeamsControllerValidationTest {
 	@MockitoBean
 	private TeamService teamService;
 	@MockitoBean
-	private LearningService learningService;
+	private RoadmapAssignmentService roadmapAssignmentService;
 	@MockitoBean
 	private PermissionService permissionService;
 	@MockitoBean

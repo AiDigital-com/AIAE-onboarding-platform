@@ -6,7 +6,7 @@ import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
-import com.aidigital.aionboarding.service.learning.services.LearningService;
+import com.aidigital.aionboarding.service.learning.services.RoadmapEnrollmentSyncService;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityAttemptRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.GenerateActivityResultRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
@@ -33,7 +33,7 @@ import java.util.List;
 public class LessonActivityServiceImpl implements LessonActivityService {
 
 	private final PermissionService permissionService;
-	private final LearningService learningService;
+	private final RoadmapEnrollmentSyncService roadmapEnrollmentSyncService;
 	private final LessonActivityAccessPolicy accessPolicy;
 	private final LessonActivityProgressService progressService;
 	private final LessonActivityManagementService managementService;
@@ -123,7 +123,7 @@ public class LessonActivityServiceImpl implements LessonActivityService {
 				result.lessonCompleted(),
 				result.attempt(),
 				result.lessonCompleted()
-						? learningService.getCompletedRoadmapsForUserLesson(viewer.internalId(), lessonId)
+						? roadmapEnrollmentSyncService.getCompletedRoadmapsForUserLesson(viewer.internalId(), lessonId)
 						: List.of()
 		);
 	}

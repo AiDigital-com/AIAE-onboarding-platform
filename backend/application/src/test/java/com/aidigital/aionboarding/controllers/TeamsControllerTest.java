@@ -8,7 +8,7 @@ import com.aidigital.aionboarding.api.v1.model.TeamsResponseV1;
 import com.aidigital.aionboarding.mappers.team.TeamApiMapper;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.security.AppUser;
-import com.aidigital.aionboarding.service.learning.services.LearningService;
+import com.aidigital.aionboarding.service.learning.services.RoadmapAssignmentService;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import com.aidigital.aionboarding.service.team.models.TeamRecord;
 import com.aidigital.aionboarding.service.team.services.TeamService;
@@ -48,7 +48,7 @@ class TeamsControllerTest {
 	@Mock
 	private TeamService teamService;
 	@Mock
-	private LearningService learningService;
+	private RoadmapAssignmentService roadmapAssignmentService;
 	@Mock
 	private PermissionService permissionService;
 	@Spy

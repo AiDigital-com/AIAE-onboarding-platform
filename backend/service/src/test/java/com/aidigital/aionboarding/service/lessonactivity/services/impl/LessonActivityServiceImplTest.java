@@ -6,7 +6,7 @@ import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
-import com.aidigital.aionboarding.service.learning.services.LearningService;
+import com.aidigital.aionboarding.service.learning.services.RoadmapEnrollmentSyncService;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityAttemptRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityAssemblyService;
@@ -38,7 +38,7 @@ class LessonActivityServiceImplTest {
 	@Mock
 	private PermissionService permissionService;
 	@Mock
-	private LearningService learningService;
+	private RoadmapEnrollmentSyncService roadmapEnrollmentSyncService;
 	@Mock
 	private LessonActivityAccessPolicy accessPolicy;
 	@Mock

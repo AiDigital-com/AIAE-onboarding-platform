@@ -6,7 +6,7 @@ import com.aidigital.aionboarding.mappers.roadmap.RoadmapApiMapper;
 import com.aidigital.aionboarding.mappers.roadmap.RoadmapGroupAssignmentApiMapper;
 import com.aidigital.aionboarding.service.common.security.RequestAuthenticationCache;
 import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
-import com.aidigital.aionboarding.service.learning.services.LearningService;
+import com.aidigital.aionboarding.service.learning.services.RoadmapAssignmentService;
 import com.aidigital.aionboarding.service.roadmap.services.RoadmapGroupAssignmentService;
 import com.aidigital.aionboarding.service.roadmap.services.RoadmapService;
 import com.aidigital.aionboarding.support.ApiResponses;
@@ -46,7 +46,7 @@ class RoadmapsControllerValidationTest {
 	@MockitoBean
 	private RoadmapService roadmapService;
 	@MockitoBean
-	private LearningService learningService;
+	private RoadmapAssignmentService roadmapAssignmentService;
 	@MockitoBean
 	private RoadmapGroupAssignmentService roadmapGroupAssignmentService;
 	@MockitoBean
