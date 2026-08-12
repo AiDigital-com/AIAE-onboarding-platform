@@ -4,7 +4,6 @@ import com.aidigital.aionboarding.domain.common.dictionary.LessonStatusCode;
 import com.aidigital.aionboarding.domain.common.dictionary.entities.LessonStatus;
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.service.common.security.AppUser;
-import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.lesson.models.LessonDetailRecord;
 import com.aidigital.aionboarding.service.lesson.models.LessonRevisionPromptRecord;
 import com.aidigital.aionboarding.service.lesson.models.ReviseLessonInput;
@@ -22,7 +21,6 @@ import com.aidigital.aionboarding.service.lessongen.services.LessonGenService;
 import com.aidigital.aionboarding.service.material.models.PreparedMaterialsResult;
 import com.aidigital.aionboarding.service.material.services.MaterialPreparationService;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -31,7 +29,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -64,16 +61,9 @@ class LessonRevisionServiceImplTest {
 	private LessonRevisionRequestValidator lessonRevisionRequestValidator;
 	@Mock
 	private LessonRevisionMetadataMapper lessonRevisionMetadataMapper;
-	@Mock
-	private CurrentTime currentTime;
 
 	@InjectMocks
 	private LessonRevisionServiceImpl service;
-
-	@BeforeEach
-	void setUpCurrentTime() {
-		lenient().when(currentTime.utcDateTime()).thenReturn(LocalDateTime.parse("2026-07-03T12:00:00"));
-	}
 
 	@Test
 	void shouldCallLessonGenServiceForBothAiStepsTest() {

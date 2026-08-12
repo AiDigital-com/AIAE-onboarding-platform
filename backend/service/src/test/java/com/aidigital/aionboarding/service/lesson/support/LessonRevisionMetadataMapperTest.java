@@ -1,6 +1,8 @@
 package com.aidigital.aionboarding.service.lesson.support;
 
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
+import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.lesson.models.LessonRevisionPromptRecord;
 import com.aidigital.aionboarding.service.lesson.models.RevisionBriefRecord;
 import com.aidigital.aionboarding.service.lesson.models.RevisionHistoryEntryRecord;
@@ -10,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.LinkedHashMap;
@@ -28,6 +31,8 @@ class LessonRevisionMetadataMapperTest {
 	private LessonContentUtil lessonContentUtil;
 	@Mock
 	private LessonHtmlSanitizer lessonHtmlSanitizer;
+	@Spy
+	private CurrentTime currentTime = new CurrentTimeImpl();
 
 	@InjectMocks
 	private LessonRevisionMetadataMapper mapper;
@@ -300,6 +305,32 @@ class LessonRevisionMetadataMapperTest {
 		// Then:
 		assertThat(result.provider()).isEqualTo("openai");
 		assertThat(result.rawOutput()).isEqualTo("raw");
+	}
+
+	@Test
+	void buildRevisionEntryShouldStampCurrentTimeAndCarryAllFieldsTest() {
+		// Given:
+		RevisionBriefRecord brief = new RevisionBriefRecord("targeted", "fix typos", List.of(), List.of(), List.of());
+		LessonRevisionPromptRecord plannerPrompt = new LessonRevisionPromptRecord("v1", "ck-plan", "plan", "input");
+		LessonRevisionPromptRecord writerPrompt = new LessonRevisionPromptRecord("v1", "ck-write", "write", "input");
+		RevisionProviderMetadataRecord plannerMeta = new RevisionProviderMetadataRecord(
+				"openai", "gpt-4o", "v1", "ck-plan", "{}");
+		RevisionProviderMetadataRecord writerMeta = new RevisionProviderMetadataRecord(
+				"openai", "gpt-4o", "v1", "ck-write", "");
+
+		// When:
+		RevisionHistoryEntryRecord result = mapper.buildRevisionEntry(
+				"fix typos", List.of("tone"), brief, plannerPrompt, writerPrompt, plannerMeta, writerMeta);
+
+		// Then:
+		assertThat(result.revisedAt()).isNotBlank();
+		assertThat(result.revisionRequest()).isEqualTo("fix typos");
+		assertThat(result.selectedOptions()).containsExactly("tone");
+		assertThat(result.revisionBrief()).isSameAs(brief);
+		assertThat(result.plannerPrompt()).isSameAs(plannerPrompt);
+		assertThat(result.writerPrompt()).isSameAs(writerPrompt);
+		assertThat(result.planner()).isSameAs(plannerMeta);
+		assertThat(result.writer()).isSameAs(writerMeta);
 	}
 
 	private static Map.Entry<String, Object> entry(String key, Object value) {
