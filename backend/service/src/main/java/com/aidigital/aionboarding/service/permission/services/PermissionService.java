@@ -82,15 +82,6 @@ public interface PermissionService {
 	void resetOverrides(Long userId);
 
 	/**
-	 * Checks whether one user is the team lead of another.
-	 *
-	 * @param leadUserId   team lead internal user id
-	 * @param memberUserId team member internal user id
-	 * @return {@code true} when the lead-member relationship exists
-	 */
-	boolean isTeamLeadForMember(Long leadUserId, Long memberUserId);
-
-	/**
 	 * Checks whether a user may manage a lesson created by another user.
 	 *
 	 * @param user            authenticated user

@@ -5,6 +5,7 @@ import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
+import com.aidigital.aionboarding.service.permission.services.TeamLeadershipService;
 import com.aidigital.aionboarding.service.team.services.TeamService;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
 import com.aidigital.aionboarding.service.user.services.UserService;
@@ -34,6 +35,8 @@ class PermissionManagementPolicyTest {
 	private TeamService teamService;
 	@Mock
 	private PermissionService permissionService;
+	@Mock
+	private TeamLeadershipService teamLeadershipService;
 
 	@InjectMocks
 	private PermissionManagementPolicy policy;
@@ -175,7 +178,7 @@ class PermissionManagementPolicyTest {
 					"");
 			UserRecord member = new UserRecord(4L, "clerk-4", "Member", "member@test.com", UserRoleCode.MEMBER, "", "",
 					"", null, null, null);
-			when(permissionService.isTeamLeadForMember(3L, 4L)).thenReturn(true);
+			when(teamLeadershipService.isTeamLeadForMember(3L, 4L)).thenReturn(true);
 
 			// When-Then:
 			assertThatCode(() -> policy.validateCanManageTarget(lead, member)).doesNotThrowAnyException();
@@ -188,7 +191,7 @@ class PermissionManagementPolicyTest {
 					"");
 			UserRecord member = new UserRecord(4L, "clerk-4", "Member", "member@test.com", UserRoleCode.MEMBER, "", "",
 					"", null, null, null);
-			when(permissionService.isTeamLeadForMember(3L, 4L)).thenReturn(false);
+			when(teamLeadershipService.isTeamLeadForMember(3L, 4L)).thenReturn(false);
 
 			// When-Then:
 			assertThatThrownBy(() -> policy.validateCanManageTarget(lead, member))

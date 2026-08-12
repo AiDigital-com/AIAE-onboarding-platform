@@ -6,6 +6,7 @@ import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
+import com.aidigital.aionboarding.service.permission.services.TeamLeadershipService;
 import com.aidigital.aionboarding.service.team.services.TeamService;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
 import com.aidigital.aionboarding.service.user.services.UserService;
@@ -30,6 +31,7 @@ public class PermissionManagementPolicy {
     private final UserService userService;
     private final TeamService teamService;
     private final PermissionService permissionService;
+    private final TeamLeadershipService teamLeadershipService;
 
     /**
      * Resolves every user the viewer may manage: the whole workspace for an admin, the viewer's
@@ -94,7 +96,7 @@ public class PermissionManagementPolicy {
         }
         if (viewer.isTeamLead()
                 && UserRoleCode.MEMBER.equals(target.roleCode())
-                && permissionService.isTeamLeadForMember(viewer.internalId(), target.id())) {
+                && teamLeadershipService.isTeamLeadForMember(viewer.internalId(), target.id())) {
             return;
         }
         throw new AppException(ErrorReason.C004);
