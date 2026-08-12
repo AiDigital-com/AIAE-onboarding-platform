@@ -1,5 +1,6 @@
 package com.aidigital.aionboarding.mappers.teamdashboard;
 
+import com.aidigital.aionboarding.api.v1.model.DashboardPeriodV1;
 import com.aidigital.aionboarding.api.v1.model.TeamDashboardIndividualLessonV1;
 import com.aidigital.aionboarding.api.v1.model.TeamDashboardIndividualRoadmapV1;
 import com.aidigital.aionboarding.api.v1.model.TeamDashboardKpisV1;
@@ -82,4 +83,14 @@ public interface TeamDashboardApiMapper {
     List<TeamDashboardIndividualRoadmapV1> mapIndividualRoadmapList(
         List<TeamDashboardIndividualRoadmapRecord> source
     );
+
+    /**
+     * Resolves an optional dashboard period filter to its wire value.
+     *
+     * @param period the requested period, or {@code null}
+     * @return the period's wire value, or {@code null} when unset
+     */
+    default String periodCode(DashboardPeriodV1 period) {
+        return period == null ? null : period.getValue();
+    }
 }

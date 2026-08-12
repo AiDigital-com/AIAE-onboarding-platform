@@ -24,20 +24,4 @@ public enum QuizQuestionType {
 		return value;
 	}
 
-	/**
-	 * Converts an API/storage question type value to the service enum, defaulting to
-	 * {@code MULTIPLE_CHOICE} when the value is missing or unrecognized. This keeps quiz payloads
-	 * persisted before question types existed rendering and grading as multiple choice.
-	 *
-	 * @param value API/storage question type value, possibly {@code null}
-	 * @return matching question type, defaulting to {@code MULTIPLE_CHOICE}
-	 */
-	public static QuizQuestionType fromValue(String value) {
-		for (QuizQuestionType type : values()) {
-			if (type.value.equalsIgnoreCase(value)) {
-				return type;
-			}
-		}
-		return MULTIPLE_CHOICE;
-	}
 }

@@ -1,11 +1,13 @@
 package com.aidigital.aionboarding.service.lessonactivity.support;
 
 import com.aidigital.aionboarding.service.lessonactivity.enums.QuizQuestionType;
+import com.aidigital.aionboarding.service.lessonactivity.enums.QuizQuestionTypeResolver;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
@@ -13,7 +15,10 @@ import org.springframework.stereotype.Component;
  * payload shape, applying type-specific option and correct-answer rules.
  */
 @Component
+@RequiredArgsConstructor
 public class QuizQuestionValidator {
+
+    private final QuizQuestionTypeResolver quizQuestionTypeResolver;
 
     /** Blank marker shown to authors as the canonical example for fill-in-the-blanks questions. */
     public static final String FILL_IN_BLANKS_MARKER = "_____";
@@ -63,7 +68,7 @@ public class QuizQuestionValidator {
         List<String> rawCorrectAnswers,
         String rawExplanation
     ) {
-        QuizQuestionType type = QuizQuestionType.fromValue(rawType);
+        QuizQuestionType type = quizQuestionTypeResolver.resolve(rawType);
         String question = rawQuestion == null ? "" : rawQuestion.trim();
         if (question.isBlank()) {
             return null;
@@ -139,7 +144,7 @@ public class QuizQuestionValidator {
         String rawCorrectAnswer,
         List<String> rawCorrectAnswers
     ) {
-        QuizQuestionType type = QuizQuestionType.fromValue(rawType);
+        QuizQuestionType type = quizQuestionTypeResolver.resolve(rawType);
         String question = rawQuestion == null ? "" : rawQuestion.trim();
         if (question.isBlank()) {
             return "add a question";

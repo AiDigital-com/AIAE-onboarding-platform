@@ -14,7 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import java.util.List;
+import java.util.ArrayList;
 
 @RestController
 @RequiredArgsConstructor
@@ -43,8 +43,7 @@ public class FilesController implements FilesApi {
 	@Override
 	public ResponseEntity<FilePreviewsResponseV1> getFilePreviews(FilePreviewsRequestV1 request) {
 		AppUser appUser = currentUser.requireUser();
-		List<String> storageKeys = request.getStorageKeys().stream().distinct().toList();
-		storageKeys.forEach(storageKey -> authService.requireAccess(appUser, storageKey));
-		return ResponseEntity.ok(apiResponses.filePreviews(storageService.presignGet(storageKeys)));
+		request.getStorageKeys().forEach(storageKey -> authService.requireAccess(appUser, storageKey));
+		return ResponseEntity.ok(apiResponses.filePreviews(storageService.presignGet(new ArrayList<>(request.getStorageKeys()))));
 	}
 }

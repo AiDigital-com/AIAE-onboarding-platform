@@ -7,7 +7,7 @@ import com.aidigital.aionboarding.mappers.permission.PermissionApiMapper;
 import com.aidigital.aionboarding.service.common.security.RequestAuthenticationCache;
 import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
-import com.aidigital.aionboarding.service.team.services.TeamService;
+import com.aidigital.aionboarding.service.permission.support.PermissionManagementPolicy;
 import com.aidigital.aionboarding.service.user.services.UserService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -44,7 +44,7 @@ class PermissionsControllerValidationTest {
 	@MockitoBean
 	private UserService userService;
 	@MockitoBean
-	private TeamService teamService;
+	private PermissionManagementPolicy permissionManagementPolicy;
 	@MockitoBean
 	private PermissionApiMapper permissionApiMapper;
 	@MockitoBean

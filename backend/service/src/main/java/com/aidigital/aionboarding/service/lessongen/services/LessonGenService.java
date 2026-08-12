@@ -6,8 +6,6 @@ import com.aidigital.aionboarding.service.lessongen.model.GeneratedContentResult
 import com.aidigital.aionboarding.service.lessongen.model.GeneratedRevisionBriefResult;
 import com.aidigital.aionboarding.service.lessongen.model.LessonGenPrompt;
 
-import java.util.Map;
-
 /**
  * Low-level OpenAI integration for lesson generation, revision planning, activity payloads, and file uploads.
  */
@@ -56,14 +54,6 @@ public interface LessonGenService {
 	 *                                                                      invalid JSON
 	 */
 	GeneratedActivityResult generateLessonActivityPayload(LessonGenPrompt prompt);
-
-	/**
-	 * Extracts the first JSON object from a model response string.
-	 *
-	 * @param value raw model output that may contain JSON
-	 * @return parsed JSON map, or {@code null} when no valid JSON object is found
-	 */
-	Map<String, Object> extractJsonPayload(String value);
 
 	/**
 	 * Uploads a file to OpenAI for use in lesson-generation prompts.

@@ -1,5 +1,6 @@
 package com.aidigital.aionboarding.mappers.team;
 
+import com.aidigital.aionboarding.api.v1.model.AddTeamMemberRequestV1;
 import com.aidigital.aionboarding.api.v1.model.AddTeamMemberResponseV1;
 import com.aidigital.aionboarding.api.v1.model.TeamLeadAdminViewV1;
 import com.aidigital.aionboarding.api.v1.model.TeamV1;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.Named;
 import org.springframework.data.domain.Page;
 
 @Mapper(config = ApplicationMapperConfig.class, uses = { UserApiMapper.class, PageInfoApiMapper.class })
@@ -38,39 +40,50 @@ public interface TeamApiMapper extends PageInfoApiMapper {
         );
     }
 
-    default TeamsResponseV1 toTeamsResponseV1(
+    @Mapping(target = "teams", expression = "java(teams.stream().map(this::toTeamV1).toList())")
+    @Mapping(target = "teamsPage", expression = "java(toPageInfoV1(teams))")
+    @Mapping(target = "users", expression = "java(users.stream().map(this::toUserSummaryForPage).toList())")
+    @Mapping(target = "usersPage", expression = "java(toPageInfoV1(users))")
+    @Mapping(target = "permissions", source = "permissions")
+    TeamsResponseV1 toTeamsResponseV1(
         Page<TeamRecord> teams,
         Page<UserRecord> users,
         Map<String, Boolean> permissions
-    ) {
-        TeamsResponseV1 response = new TeamsResponseV1();
-        response.setTeams(teams.stream().map(this::toTeamV1).toList());
-        response.setTeamsPage(toPageInfoV1(teams));
-        response.setUsers(users.stream().map(this::toUserSummaryForPage).toList());
-        response.setUsersPage(toPageInfoV1(users));
-        response.setPermissions(permissions);
-        return response;
-    }
+    );
 
     @Mapping(target = "member", source = "member")
     AddTeamMemberResponseV1 toAddTeamMemberResponseV1(UserRecord member);
 
-    private UserSummaryV1 toUserSummaryForPage(UserRecord user) {
-        UserSummaryV1 summary = new UserSummaryV1();
-        summary.setId(user.id());
-        summary.setName(user.name());
-        summary.setEmail(user.email());
-        summary.setRole(toUserRoleCodeV1(user.roleCode()));
-        summary.setPosition(user.position());
-        summary.setAvatarStorageKey(user.avatarStorageKey());
-        summary.setAvatarColor(user.avatarColor());
-        summary.setGradeId(user.gradeId());
-        summary.setGradeCode(user.gradeCode());
-        summary.setGradeName(user.gradeName());
-        return summary;
+    /**
+     * Resolves an add-team-member request's member reference, preferring the explicit
+     * {@code member} field and falling back to {@code email}.
+     *
+     * @param request the add-team-member request
+     * @return the member reference to resolve against
+     */
+    default String resolveMemberRef(AddTeamMemberRequestV1 request) {
+        return request.getMember() != null ? request.getMember() : request.getEmail();
     }
 
-    private UserRoleCodeV1 toUserRoleCodeV1(String roleCode) {
+    /**
+     * Builds a team-candidate user summary, resolving the role with a safe fallback rather than
+     * failing on an unrecognized stored role code.
+     *
+     * @param user the candidate user
+     * @return the summary, with {@link UserRoleCodeV1#MEMBER} substituted for an unknown role
+     */
+    @Named("teamCandidateUserSummary")
+    @Mapping(target = "role", expression = "java(toUserRoleCodeV1(user.roleCode()))")
+    UserSummaryV1 toUserSummaryForPage(UserRecord user);
+
+    /**
+     * Resolves a stored role code to its wire enum, defaulting to {@link UserRoleCodeV1#MEMBER}
+     * when the code is blank or unrecognized.
+     *
+     * @param roleCode the stored role code, or {@code null}
+     * @return the resolved role, never {@code null}
+     */
+    default UserRoleCodeV1 toUserRoleCodeV1(String roleCode) {
         if (roleCode == null || roleCode.isBlank()) {
             return UserRoleCodeV1.MEMBER;
         }

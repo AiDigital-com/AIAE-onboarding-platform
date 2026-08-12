@@ -7,6 +7,7 @@ import com.aidigital.aionboarding.domain.lessonactivity.entities.UserLessonActiv
 import com.aidigital.aionboarding.domain.learning.entities.UserLesson;
 import com.aidigital.aionboarding.service.learning.models.LessonEnrollmentRecord;
 import com.aidigital.aionboarding.service.lessonactivity.enums.QuizQuestionType;
+import com.aidigital.aionboarding.service.lessonactivity.enums.QuizQuestionTypeResolver;
 import com.aidigital.aionboarding.service.lessongen.model.LessonGenPrompt;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityAttemptRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityProgressRecord;
@@ -15,6 +16,7 @@ import com.aidigital.aionboarding.service.lessonactivity.models.ActivityPromptRe
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonWithActivitiesRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.QuizAnswerResultRecord;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.math.RoundingMode;
@@ -24,7 +26,10 @@ import java.util.List;
 import java.util.Map;
 
 @Component
+@RequiredArgsConstructor
 public class LessonActivityRecordAssembler {
+
+    private final QuizQuestionTypeResolver quizQuestionTypeResolver;
 
     public LessonActivityRecord toActivityRecord(LessonActivity activity, UserLessonActivityProgress progress) {
         return new LessonActivityRecord(
@@ -155,7 +160,7 @@ public class LessonActivityRecordAssembler {
 
     public QuizAnswerResultRecord toQuizAnswerResult(Map<String, Object> result) {
         return new QuizAnswerResultRecord(
-            QuizQuestionType.fromValue(stringVal(result.get("type"))).value(),
+            quizQuestionTypeResolver.resolve(stringVal(result.get("type"))).value(),
             stringVal(result.get("question")),
             stringList(result.get("options")),
             stringList(result.get("selectedAnswers")),

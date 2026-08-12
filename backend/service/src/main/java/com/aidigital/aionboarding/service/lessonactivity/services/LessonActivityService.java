@@ -4,12 +4,12 @@ import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.lessonactivity.models.GenerateActivityResultRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityWithAttemptsRecord;
+import com.aidigital.aionboarding.service.lessonactivity.models.SubmitActivityProgressInput;
 import com.aidigital.aionboarding.service.lessonactivity.models.SubmitActivityProgressResultRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.UpdateActivityInput;
 import com.aidigital.aionboarding.service.lessonactivity.models.UpdateActivityResultRecord;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Coordinates lesson activity generation, editing, and learner progress submission.
@@ -86,7 +86,7 @@ public interface LessonActivityService {
 			AppUser viewer,
 			Long lessonId,
 			Long activityId,
-			Map<String, Object> request
+			SubmitActivityProgressInput request
 	);
 
 	/**

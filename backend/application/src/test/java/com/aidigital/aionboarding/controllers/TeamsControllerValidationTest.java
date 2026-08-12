@@ -8,6 +8,7 @@ import com.aidigital.aionboarding.service.learning.services.LearningService;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import com.aidigital.aionboarding.service.team.services.TeamService;
 import com.aidigital.aionboarding.support.ApiResponses;
+import com.aidigital.aionboarding.support.PaginationSupport;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,8 @@ class TeamsControllerValidationTest {
 	private TeamApiMapper teamApiMapper;
 	@MockitoBean
 	private ApiResponses apiResponses;
+	@MockitoBean
+	private PaginationSupport paginationSupport;
 	@MockitoBean
 	private RequestAuthenticationCache requestAuthenticationCache;
 

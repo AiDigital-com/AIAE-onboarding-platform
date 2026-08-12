@@ -25,6 +25,7 @@ import com.aidigital.aionboarding.service.group.services.GroupService;
 import com.aidigital.aionboarding.service.roadmap.services.RoadmapGroupAssignmentService;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
 import com.aidigital.aionboarding.support.ApiResponses;
+import com.aidigital.aionboarding.support.PaginationSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -39,6 +40,7 @@ public class GroupsController implements GroupsApi {
 	private final GroupService groupService;
 	private final GroupMembershipService groupMembershipService;
 	private final RoadmapGroupAssignmentService roadmapGroupAssignmentService;
+	private final PaginationSupport paginationSupport;
 	private final GroupApiMapper groupApiMapper;
 	private final UserApiMapper userApiMapper;
 	private final RoadmapGroupAssignmentApiMapper roadmapGroupAssignmentApiMapper;
@@ -48,10 +50,8 @@ public class GroupsController implements GroupsApi {
 	@Transactional(readOnly = true)
 	public ResponseEntity<GroupsListResponseV1> listGroups(String search, Integer page, Integer size) {
 		AppUser viewer = currentUser.requireUser();
-		int pageIndex = page == null ? 0 : page;
-		int pageSize = size == null ? 20 : size;
 		return ResponseEntity.ok(groupApiMapper.toGroupsListResponseV1(groupService.listGroups(viewer, search,
-				pageIndex, pageSize)));
+				paginationSupport.page(page), paginationSupport.size(size))));
 	}
 
 	@Override
@@ -99,10 +99,8 @@ public class GroupsController implements GroupsApi {
 	public ResponseEntity<GroupMembersListResponseV1> listGroupMembers(Long id, String search, Integer page,
 																	   Integer size) {
 		AppUser viewer = currentUser.requireUser();
-		int pageIndex = page == null ? 0 : page;
-		int pageSize = size == null ? 20 : size;
 		return ResponseEntity.ok(groupApiMapper.toGroupMembersListResponseV1(
-				groupService.listGroupMembers(viewer, id, search, pageIndex, pageSize)
+				groupService.listGroupMembers(viewer, id, search, paginationSupport.page(page), paginationSupport.size(size))
 		));
 	}
 
@@ -116,15 +114,9 @@ public class GroupsController implements GroupsApi {
 			Integer size
 	) {
 		AppUser viewer = currentUser.requireUser();
-		int pageIndex = page == null ? 0 : page;
-		int pageSize = size == null ? 20 : size;
-		boolean leadsOnly = Boolean.TRUE.equals(forLeads);
-		Page<UserRecord> candidates = groupService.listCandidateUsers(viewer, id, leadsOnly, search, pageIndex,
-				pageSize);
-		return ResponseEntity.ok(groupApiMapper.toGroupCandidateUsersListResponseV1(
-				candidates.stream().map(userApiMapper::toUserSummaryV1).toList(),
-				candidates
-		));
+		Page<UserRecord> candidates = groupService.listCandidateUsers(viewer, id, Boolean.TRUE.equals(forLeads),
+				search, paginationSupport.page(page), paginationSupport.size(size));
+		return ResponseEntity.ok(groupApiMapper.toGroupCandidateUsersListResponseV1(candidates, userApiMapper));
 	}
 
 	@Override

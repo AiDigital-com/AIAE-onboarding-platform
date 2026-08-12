@@ -13,7 +13,6 @@ import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivity
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityManagementService;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityProgressService;
 import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityAccessPolicy;
-import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityPayloadAssembler;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -48,8 +47,6 @@ class LessonActivityServiceImplTest {
 	private LessonActivityManagementService managementService;
 	@Mock
 	private LessonActivityAssemblyService assemblyService;
-	@Mock
-	private LessonActivityPayloadAssembler payloadAssembler;
 
 	@InjectMocks
 	private LessonActivityServiceImpl service;

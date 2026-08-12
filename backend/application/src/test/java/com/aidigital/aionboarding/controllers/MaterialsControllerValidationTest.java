@@ -5,8 +5,10 @@ import com.aidigital.aionboarding.mappers.material.MaterialApiMapper;
 import com.aidigital.aionboarding.service.common.security.RequestAuthenticationCache;
 import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.material.services.MaterialService;
+import com.aidigital.aionboarding.service.material.services.UploadValidator;
 import com.aidigital.aionboarding.service.storage.StorageService;
 import com.aidigital.aionboarding.support.ApiResponses;
+import com.aidigital.aionboarding.support.MultipartFileUploadSupport;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
@@ -33,6 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({
 		GlobalExceptionResponseHelperImpl.class,
 		CurrentTimeImpl.class,
+		UploadValidator.class,
+		MultipartFileUploadSupport.class,
 		MaterialsControllerValidationTest.MeterRegistryTestConfig.class
 })
 class MaterialsControllerValidationTest {

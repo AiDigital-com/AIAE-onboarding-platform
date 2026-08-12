@@ -26,10 +26,9 @@ public record LinkFetchResult(
      *
      * @param body        the fetched response body
      * @param contentType the response {@code Content-Type}
-     * @return a successful result
      */
-    public static LinkFetchResult success(String body, String contentType) {
-        return new LinkFetchResult(true, body, contentType, "", null);
+    public LinkFetchResult(String body, String contentType) {
+        this(true, body, contentType, "", null);
     }
 
     /**
@@ -37,19 +36,17 @@ public record LinkFetchResult(
      *
      * @param reason  the specific policy reason
      * @param message a human-readable failure reason
-     * @return a security-blocked result
      */
-    public static LinkFetchResult securityBlocked(LinkFetchFailureReason reason, String message) {
-        return new LinkFetchResult(false, "", "", message, reason);
+    public LinkFetchResult(LinkFetchFailureReason reason, String message) {
+        this(false, "", "", message, reason);
     }
 
     /**
      * Builds a result for an ordinary, non-security-related fetch failure.
      *
      * @param message a human-readable failure reason
-     * @return a failed result with no security-block reason
      */
-    public static LinkFetchResult failure(String message) {
-        return new LinkFetchResult(false, "", "", message, null);
+    public LinkFetchResult(String message) {
+        this(false, "", "", message, null);
     }
 }

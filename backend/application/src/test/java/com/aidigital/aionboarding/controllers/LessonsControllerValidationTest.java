@@ -12,10 +12,12 @@ import com.aidigital.aionboarding.service.learning.services.LearningService;
 import com.aidigital.aionboarding.service.lesson.services.LessonAssistantService;
 import com.aidigital.aionboarding.service.lesson.services.LessonRevisionService;
 import com.aidigital.aionboarding.service.lesson.services.LessonService;
+import com.aidigital.aionboarding.service.lesson.enums.LessonStatusActionResolver;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityService;
 import com.aidigital.aionboarding.service.storage.StorageService;
 import com.aidigital.aionboarding.service.teachervideo.services.TeacherVideoService;
 import com.aidigital.aionboarding.support.ApiResponses;
+import com.aidigital.aionboarding.support.MultipartFileUploadSupport;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
@@ -79,6 +81,10 @@ class LessonsControllerValidationTest {
 	private LearningApiMapper learningApiMapper;
 	@MockitoBean
 	private ApiResponses apiResponses;
+	@MockitoBean
+	private MultipartFileUploadSupport multipartFileUploadSupport;
+	@MockitoBean
+	private LessonStatusActionResolver lessonStatusActionResolver;
 	@MockitoBean
 	private RequestAuthenticationCache requestAuthenticationCache;
 

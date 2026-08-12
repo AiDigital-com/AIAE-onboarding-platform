@@ -10,6 +10,7 @@ import com.aidigital.aionboarding.service.group.services.GroupMembershipService;
 import com.aidigital.aionboarding.service.group.services.GroupService;
 import com.aidigital.aionboarding.service.roadmap.services.RoadmapGroupAssignmentService;
 import com.aidigital.aionboarding.support.ApiResponses;
+import com.aidigital.aionboarding.support.PaginationSupport;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
@@ -57,6 +58,8 @@ class GroupsControllerValidationTest {
 	private RoadmapGroupAssignmentApiMapper roadmapGroupAssignmentApiMapper;
 	@MockitoBean
 	private ApiResponses apiResponses;
+	@MockitoBean
+	private PaginationSupport paginationSupport;
 	@MockitoBean
 	private RequestAuthenticationCache requestAuthenticationCache;
 

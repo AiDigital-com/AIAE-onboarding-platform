@@ -8,6 +8,7 @@ import com.aidigital.aionboarding.api.v1.model.TeamLeadAdminViewV1;
 import com.aidigital.aionboarding.api.v1.model.TeamLeadEmailRequestV1;
 import com.aidigital.aionboarding.api.v1.model.UserProfileV1;
 import com.aidigital.aionboarding.api.v1.model.UserRoleCodeV1;
+import com.aidigital.aionboarding.mappers.common.UserRoleCodeApiMapper;
 import com.aidigital.aionboarding.mappers.team.TeamApiMapper;
 import com.aidigital.aionboarding.mappers.user.UserApiMapper;
 import com.aidigital.aionboarding.service.common.error.AppException;
@@ -17,6 +18,7 @@ import com.aidigital.aionboarding.service.permission.PermissionKeys;
 import com.aidigital.aionboarding.service.team.services.TeamService;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
 import com.aidigital.aionboarding.service.user.services.UserService;
+import com.aidigital.aionboarding.support.PaginationSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,6 +32,8 @@ public class AdminController implements AdminApi {
 	private final CurrentUserSupport currentUser;
 	private final TeamService teamService;
 	private final UserService userService;
+	private final PaginationSupport paginationSupport;
+	private final UserRoleCodeApiMapper userRoleCodeApiMapper;
 	private final TeamApiMapper teamApiMapper;
 	private final UserApiMapper userApiMapper;
 
@@ -67,11 +71,10 @@ public class AdminController implements AdminApi {
 	@Transactional(readOnly = true)
 	public ResponseEntity<AdminUsersListResponseV1> listAdminUsers(String search, UserRoleCodeV1 role, Integer page,
 																   Integer size) {
-		int pageIndex = page == null ? 0 : page;
-		int pageSize = size == null ? 20 : size;
-		String roleCode = role == null ? null : role.getValue();
 		return ResponseEntity.ok(
-				userApiMapper.toAdminUsersListResponseV1(userService.listUsers(roleCode, search, pageIndex, pageSize))
+				userApiMapper.toAdminUsersListResponseV1(userService.listUsers(
+						userRoleCodeApiMapper.fromUserRoleCode(role), search,
+						paginationSupport.page(page), paginationSupport.size(size)))
 		);
 	}
 

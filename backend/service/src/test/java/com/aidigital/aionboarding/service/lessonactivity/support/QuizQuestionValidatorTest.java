@@ -1,5 +1,6 @@
 package com.aidigital.aionboarding.service.lessonactivity.support;
 
+import com.aidigital.aionboarding.service.lessonactivity.enums.QuizQuestionTypeResolver;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -9,7 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class QuizQuestionValidatorTest {
 
-	private final QuizQuestionValidator validator = new QuizQuestionValidator();
+	private final QuizQuestionValidator validator = new QuizQuestionValidator(new QuizQuestionTypeResolver());
 
 	@Test
 	void normalizeMultipleChoiceQuestionShouldReturnNormalizedPayloadTest() {

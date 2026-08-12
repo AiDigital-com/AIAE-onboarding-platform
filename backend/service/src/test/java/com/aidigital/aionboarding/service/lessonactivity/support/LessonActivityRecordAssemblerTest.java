@@ -15,6 +15,7 @@ import com.aidigital.aionboarding.domain.lessonactivity.entities.UserLessonActiv
 import com.aidigital.aionboarding.domain.lessonactivity.entities.UserLessonActivityProgress;
 import com.aidigital.aionboarding.domain.user.entities.User;
 import com.aidigital.aionboarding.service.learning.models.LessonEnrollmentRecord;
+import com.aidigital.aionboarding.service.lessonactivity.enums.QuizQuestionTypeResolver;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityAttemptRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityProgressRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityProgressViewRecord;
@@ -37,7 +38,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class LessonActivityRecordAssemblerTest {
 
-	private final LessonActivityRecordAssembler assembler = new LessonActivityRecordAssembler();
+	private final LessonActivityRecordAssembler assembler =
+			new LessonActivityRecordAssembler(new QuizQuestionTypeResolver());
 
 	private ActivityType activityType(String code) {
 		ActivityType type = new ActivityType();

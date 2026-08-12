@@ -1,6 +1,7 @@
 package com.aidigital.aionboarding.service.teamdashboard.services.impl;
 
 import com.aidigital.aionboarding.domain.common.dictionary.UserRoleCode;
+import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -70,6 +72,19 @@ class TeamDashboardServiceImplTest {
 		assertThat(result.individualRoadmapsByMemberId()).isEmpty();
 		assertThat(result.kpis()).isSameAs(kpis);
 		verifyNoInteractions(teamDashboardQueryEntityService);
+	}
+
+	@Test
+	void getTeamDashboardDataShouldRejectAViewerWhoIsNeitherAdminNorTeamLeadTest() {
+		// Given: an ordinary member, who TeamDashboardScopeResolver would otherwise resolve to
+		// an empty scope rather than denying access
+		AppUser viewer = new AppUser(3L, "clerk-member", "member@test.com", "Member", UserRoleCode.MEMBER, "Member",
+				null, null, null);
+
+		// When-Then:
+		assertThatThrownBy(() -> service.getTeamDashboardData(viewer, TeamDashboardPeriod.WEEK))
+				.isInstanceOf(AppException.class);
+		verifyNoInteractions(teamDashboardScopeResolver, teamDashboardQueryEntityService);
 	}
 
 	@Test

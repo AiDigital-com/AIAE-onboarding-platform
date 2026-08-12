@@ -163,6 +163,13 @@ public class GroupMemberEntityService {
         return toCountMap(groupIds, groupMemberRepository::countMembersWithoutGradeByIdGroupIdIn);
     }
 
+    /**
+     * Runs a batched per-group count query and collects the rows into a map keyed by group id.
+     *
+     * @param groupIds group primary keys
+     * @param query    batched count query returning {@code [groupId, count]} row pairs
+     * @return count per group id; groups with no matching rows are absent from the map
+     */
     Map<Long, Long> toCountMap(Collection<Long> groupIds, java.util.function.Function<Collection<Long>, List<Object[]>> query) {
         if (groupIds == null || groupIds.isEmpty()) {
             return Map.of();

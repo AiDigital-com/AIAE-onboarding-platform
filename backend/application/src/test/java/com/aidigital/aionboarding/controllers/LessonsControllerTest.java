@@ -8,7 +8,6 @@ import com.aidigital.aionboarding.api.v1.model.AskLessonResponseV1;
 import com.aidigital.aionboarding.api.v1.model.AssignmentRequestV1;
 import com.aidigital.aionboarding.api.v1.model.AssignmentResponseV1;
 import com.aidigital.aionboarding.api.v1.model.ChangeLessonStatusRequestV1;
-import com.aidigital.aionboarding.api.v1.model.ChatMessageV1;
 import com.aidigital.aionboarding.api.v1.model.CountResponseV1;
 import com.aidigital.aionboarding.api.v1.model.CreateLessonRequestV1;
 import com.aidigital.aionboarding.api.v1.model.EnrollmentResponseV1;
@@ -47,8 +46,8 @@ import com.aidigital.aionboarding.service.learning.services.LearningEnrollmentSe
 import com.aidigital.aionboarding.service.learning.services.LearningService;
 import com.aidigital.aionboarding.service.lesson.enums.LessonAssistantPreset;
 import com.aidigital.aionboarding.service.lesson.enums.LessonStatusAction;
+import com.aidigital.aionboarding.service.lesson.enums.LessonStatusActionResolver;
 import com.aidigital.aionboarding.service.lesson.models.AskLessonResultRecord;
-import com.aidigital.aionboarding.service.lesson.models.ChatTurn;
 import com.aidigital.aionboarding.service.lesson.models.CreateLessonAssetInput;
 import com.aidigital.aionboarding.service.lesson.models.CreateLessonInput;
 import com.aidigital.aionboarding.service.lesson.models.LessonAssetDeleteResultRecord;
@@ -57,6 +56,7 @@ import com.aidigital.aionboarding.service.lesson.models.LessonAssistantConversat
 import com.aidigital.aionboarding.service.lesson.models.LessonDetailRecord;
 import com.aidigital.aionboarding.service.lesson.models.LessonDetailResultRecord;
 import com.aidigital.aionboarding.service.lesson.models.LessonListQuery;
+import com.aidigital.aionboarding.service.lesson.models.LessonSearchSummaryRecord;
 import com.aidigital.aionboarding.service.lesson.models.LessonSummaryRecord;
 import com.aidigital.aionboarding.service.lesson.models.ReviseLessonInput;
 import com.aidigital.aionboarding.service.lesson.models.RevisionResultRecord;
@@ -76,6 +76,7 @@ import com.aidigital.aionboarding.service.storage.StorageService;
 import com.aidigital.aionboarding.service.storage.enums.UploadPurpose;
 import com.aidigital.aionboarding.service.teachervideo.services.TeacherVideoService;
 import com.aidigital.aionboarding.support.ApiResponses;
+import com.aidigital.aionboarding.support.MultipartFileUploadSupport;
 import org.instancio.Instancio;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -88,7 +89,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockMultipartFile;
 
-import java.io.InputStream;
 import java.util.List;
 import java.util.Optional;
 
@@ -122,6 +122,10 @@ class LessonsControllerTest {
 	private StorageService storageService;
 	@Mock
 	private UploadValidator uploadValidator;
+	@Mock
+	private MultipartFileUploadSupport multipartFileUploadSupport;
+	@Mock
+	private LessonStatusActionResolver lessonStatusActionResolver;
 	@Mock
 	private LessonApiMapper lessonApiMapper;
 	@Mock
@@ -209,9 +213,7 @@ class LessonsControllerTest {
 		UploadedFileResponseV1 expectedBody = Instancio.create(UploadedFileResponseV1.class);
 		when(currentUser.requireUser()).thenReturn(viewer);
 		when(uploadValidator.validate("diagram.png", "image/png", 7L)).thenReturn(uploadMeta);
-		when(storageService.putObjectStreaming(
-				eq(viewer), eq(UploadPurpose.LESSON_ASSET), any(InputStream.class), eq(7L), eq("diagram.png"), eq(
-						"image/png")))
+		when(multipartFileUploadSupport.putStreaming(viewer, UploadPurpose.LESSON_ASSET, file, uploadMeta))
 				.thenReturn("uploads/def/diagram.png");
 		when(lessonApiMapper.toUploadedFileResponseV1("uploads/def/diagram.png", "diagram.png", "image/png", 7L))
 				.thenReturn(expectedBody);
@@ -242,14 +244,17 @@ class LessonsControllerTest {
 			when(lessonApiMapper.toLessonListQuery(request)).thenReturn(query);
 			when(lessonApiMapper.page(request)).thenReturn(0);
 			when(lessonApiMapper.size(request)).thenReturn(20);
-			when(lessonService.getAllLessons(viewer, query, 0, 20)).thenReturn(mock(Page.class));
-			when(lessonApiMapper.toLessonsListResponseV1(any())).thenReturn(responseV1);
-			when(learningEnrollmentService.getEnrolledLessonIds(1L, List.of(10L))).thenReturn(java.util.Set.of(10L));
+			@SuppressWarnings("unchecked")
+			Page<LessonSearchSummaryRecord> lessonsPage = mock(Page.class);
+			when(lessonService.getAllLessons(viewer, query, 0, 20)).thenReturn(lessonsPage);
+			when(lessonApiMapper.toLessonsListResponseV1(lessonsPage, 1L, learningEnrollmentService))
+					.thenReturn(responseV1);
 
 			// When:
 			ResponseEntity<LessonsListResponseV1> response = controller.searchLessons(request);
 
-			// Then:
+			// Then: enrollment marking now lives inside the mapper (mocked here); the controller's
+			// only job is to pass the viewer id and the enrollment service through
 			assertThat(response.getBody()).isSameAs(responseV1);
 		}
 	}
@@ -340,8 +345,10 @@ class LessonsControllerTest {
 					.create();
 			LessonDetailRecord changed = Instancio.create(LessonDetailRecord.class);
 			LessonResponseV1 expected = Instancio.create(LessonResponseV1.class);
+			LessonStatusAction resolvedAction = LessonStatusAction.PUBLISH;
 			when(currentUser.requireUser()).thenReturn(viewer);
-			when(lessonService.changeLessonStatus(eq(viewer), eq(1L), any(LessonStatusAction.class))).thenReturn(changed);
+			when(lessonStatusActionResolver.resolve(actionV1.getValue())).thenReturn(resolvedAction);
+			when(lessonService.changeLessonStatus(eq(viewer), eq(1L), eq(resolvedAction))).thenReturn(changed);
 			when(lessonApiMapper.toLessonResponseV1(changed)).thenReturn(expected);
 
 			// When:
@@ -799,43 +806,6 @@ class LessonsControllerTest {
 
 			// Then:
 			assertThat(response.getBody()).isSameAs(expected);
-		}
-	}
-
-	@Nested
-	class ToChatHistory {
-
-		@Test
-		void shouldReturnEmptyForNullTest() {
-			// When:
-			List<ChatTurn> result = controller.toChatHistory(null);
-
-			// Then:
-			assertThat(result).isEmpty();
-		}
-
-		@Test
-		void shouldMapMessagesTest() {
-			// Given:
-			ChatMessageV1 msg = Instancio.of(ChatMessageV1.class)
-					.set(field("content"), "Hello")
-					.create();
-
-			// When:
-			List<ChatTurn> result = controller.toChatHistory(List.of(msg));
-
-			// Then:
-			assertThat(result).hasSize(1);
-			assertThat(result.get(0).content()).isEqualTo("Hello");
-		}
-
-		@Test
-		void shouldSkipNullMessagesTest() {
-			// When:
-			List<ChatTurn> result = controller.toChatHistory(java.util.Arrays.asList(null, null));
-
-			// Then:
-			assertThat(result).isEmpty();
 		}
 	}
 

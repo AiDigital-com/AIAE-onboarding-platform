@@ -6,12 +6,12 @@ import com.aidigital.aionboarding.mappers.lesson.LessonApiMapper;
 import com.aidigital.aionboarding.mappers.lessonactivity.LessonActivityApiMapper;
 import com.aidigital.aionboarding.mappers.learning.LearningApiMapper;
 import com.aidigital.aionboarding.support.ApiResponses;
+import com.aidigital.aionboarding.support.MultipartFileUploadSupport;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.learning.services.LearningEnrollmentService;
 import com.aidigital.aionboarding.service.learning.services.LearningService;
 import com.aidigital.aionboarding.mappers.common.LessonAssistantPresetApiMapper;
-import com.aidigital.aionboarding.service.lesson.enums.LessonStatusAction;
-import com.aidigital.aionboarding.service.lesson.models.ChatTurn;
+import com.aidigital.aionboarding.service.lesson.enums.LessonStatusActionResolver;
 import com.aidigital.aionboarding.service.lesson.services.LessonAssistantService;
 import com.aidigital.aionboarding.service.lesson.services.LessonRevisionService;
 import com.aidigital.aionboarding.service.lesson.services.LessonService;
@@ -21,11 +21,6 @@ import com.aidigital.aionboarding.service.material.services.UploadValidator;
 import com.aidigital.aionboarding.service.storage.StorageService;
 import com.aidigital.aionboarding.service.storage.enums.UploadPurpose;
 import com.aidigital.aionboarding.service.teachervideo.services.TeacherVideoService;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -48,6 +43,8 @@ public class LessonsController implements LessonsApi {
     private final LearningEnrollmentService learningEnrollmentService;
     private final StorageService storageService;
     private final UploadValidator uploadValidator;
+    private final MultipartFileUploadSupport multipartFileUploadSupport;
+    private final LessonStatusActionResolver lessonStatusActionResolver;
     private final LessonApiMapper lessonApiMapper;
     private final LessonAssistantPresetApiMapper lessonAssistantPresetApiMapper;
     private final LessonActivityApiMapper lessonActivityApiMapper;
@@ -58,20 +55,16 @@ public class LessonsController implements LessonsApi {
     @Transactional(readOnly = true)
     public ResponseEntity<LessonsListResponseV1> searchLessons(SearchLessonsV1 request) {
         AppUser viewer = currentUser.requireUser();
-        LessonsListResponseV1 response = lessonApiMapper.toLessonsListResponseV1(
+        return ResponseEntity.ok(lessonApiMapper.toLessonsListResponseV1(
             lessonService.getAllLessons(
                 viewer,
                 lessonApiMapper.toLessonListQuery(request),
                 lessonApiMapper.page(request),
                 lessonApiMapper.size(request)
-            )
-        );
-        if (response.getLessons() != null && !response.getLessons().isEmpty()) {
-            List<Long> pageLessonIds = response.getLessons().stream().map(LessonSummaryV1::getId).toList();
-            Set<Long> enrolledIds = learningEnrollmentService.getEnrolledLessonIds(viewer.internalId(), pageLessonIds);
-            response.getLessons().forEach(lesson -> lesson.setIsEnrolled(enrolledIds.contains(lesson.getId())));
-        }
-        return ResponseEntity.ok(response);
+            ),
+            viewer.internalId(),
+            learningEnrollmentService
+        ));
     }
 
     @Override
@@ -148,7 +141,7 @@ public class LessonsController implements LessonsApi {
     public ResponseEntity<LessonResponseV1> changeLessonStatus(Long id, ChangeLessonStatusRequestV1 request) {
         AppUser viewer = currentUser.requireUser();
         return ResponseEntity.ok(lessonApiMapper.toLessonResponseV1(
-            lessonService.changeLessonStatus(viewer, id, LessonStatusAction.fromValue(request.getAction().getValue()))));
+            lessonService.changeLessonStatus(viewer, id, lessonStatusActionResolver.resolve(request.getAction().getValue()))));
     }
 
     @Override
@@ -174,15 +167,9 @@ public class LessonsController implements LessonsApi {
         AppUser viewer = currentUser.requireUser();
         UploadValidator.UploadValidationRecord uploadMeta =
             uploadValidator.validate(file.getOriginalFilename(), file.getContentType(), file.getSize());
-        try (java.io.InputStream content = file.getInputStream()) {
-            String storageKey = storageService.putObjectStreaming(
-                viewer, UploadPurpose.LESSON_ASSET, content, uploadMeta.sizeBytes(), uploadMeta.originalName(), uploadMeta.mimeType());
-            return ResponseEntity.ok(lessonApiMapper.toUploadedFileResponseV1(
-                storageKey, uploadMeta.originalName(), uploadMeta.mimeType(), uploadMeta.sizeBytes()));
-        } catch (java.io.IOException ex) {
-            throw new com.aidigital.aionboarding.service.common.error.AppException(
-                com.aidigital.aionboarding.service.common.error.ErrorReason.C000, ex.getMessage());
-        }
+        String storageKey = multipartFileUploadSupport.putStreaming(viewer, UploadPurpose.LESSON_ASSET, file, uploadMeta);
+        return ResponseEntity.ok(lessonApiMapper.toUploadedFileResponseV1(
+            storageKey, uploadMeta.originalName(), uploadMeta.mimeType(), uploadMeta.sizeBytes()));
     }
 
     @Override
@@ -205,7 +192,7 @@ public class LessonsController implements LessonsApi {
             lessonActivityService.generateActivity(
                 currentUser.requireUser(),
                 id,
-                request.getType() != null ? request.getType().getValue() : null,
+                lessonActivityApiMapper.activityType(request),
                 request.getCount())
         ));
     }
@@ -239,7 +226,7 @@ public class LessonsController implements LessonsApi {
     ) {
         return ResponseEntity.ok(lessonActivityApiMapper.toActivityProgressResponseV1(
             lessonActivityService.submitActivityProgress(
-                currentUser.requireUser(), id, activityId, toSubmitActivityProgressRequest(request))
+                currentUser.requireUser(), id, activityId, lessonActivityApiMapper.toSubmitActivityProgressInput(request))
         ));
     }
 
@@ -261,7 +248,7 @@ public class LessonsController implements LessonsApi {
                 currentUser.requireUser(),
                 id,
                 request.getQuestion(),
-                toChatHistory(request.getHistory()),
+                lessonApiMapper.toChatHistory(request.getHistory()),
                 lessonAssistantPresetApiMapper.mapAssistantPreset(request.getPreset()))
         ));
     }
@@ -380,30 +367,4 @@ public class LessonsController implements LessonsApi {
         return ResponseEntity.ok(apiResponses.ok());
     }
 
-    Map<String, Object> toSubmitActivityProgressRequest(SubmitActivityProgressRequestV1 request) {
-        Map<String, Object> map = new LinkedHashMap<>();
-        if (request.getType() != null) {
-            map.put("type", request.getType().getValue());
-        }
-        if (request.getAnswers() != null) {
-            map.put("answers", request.getAnswers());
-        }
-        if (request.getReviewedCards() != null) {
-            map.put("reviewedCards", request.getReviewedCards());
-        }
-        return map;
-    }
-
-    List<ChatTurn> toChatHistory(List<ChatMessageV1> history) {
-        if (history == null) {
-            return List.of();
-        }
-        return history.stream()
-            .filter(Objects::nonNull)
-            .map(message -> new ChatTurn(
-                message.getRole() == null ? null : message.getRole().getValue(),
-                message.getContent() == null ? "" : message.getContent()
-            ))
-            .toList();
-    }
 }

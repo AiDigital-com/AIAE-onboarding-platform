@@ -7,11 +7,13 @@ import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.learning.models.MyLessonSummaryRecord;
 import com.aidigital.aionboarding.service.learning.services.LearningEnrollmentService;
 import com.aidigital.aionboarding.service.user.services.UserService;
+import com.aidigital.aionboarding.support.PaginationSupport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -34,6 +36,10 @@ class LearningControllerTest {
 	private UserService userService;
 	@Mock
 	private LearningEnrollmentService learningEnrollmentService;
+	// Spied, not mocked: PaginationSupport has no dependencies of its own, and this exercises
+	// its clamping arithmetic for real rather than through a canned stub.
+	@Spy
+	private PaginationSupport paginationSupport = new PaginationSupport();
 	@Mock
 	private UserApiMapper userApiMapper;
 	@Mock
@@ -67,15 +73,5 @@ class LearningControllerTest {
 		assertThat(pageableCaptor.getValue().getPageNumber()).isEqualTo(2);
 		assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(15);
 		assertThat(pageableCaptor.getValue().getSort().isUnsorted()).isTrue();
-	}
-
-	@Test
-	void unsortedPageableShouldClampNullAndOutOfRangeInputsTest() {
-		// When / Then: negative/null page normalizes to 0, size clamps into [1, 100]
-		assertThat(controller.unsortedPageable(null, null).getPageNumber()).isEqualTo(0);
-		assertThat(controller.unsortedPageable(null, null).getPageSize()).isEqualTo(20);
-		assertThat(controller.unsortedPageable(-5, 500).getPageNumber()).isEqualTo(0);
-		assertThat(controller.unsortedPageable(-5, 500).getPageSize()).isEqualTo(100);
-		assertThat(controller.unsortedPageable(3, 0).getPageSize()).isEqualTo(1);
 	}
 }

@@ -22,6 +22,8 @@ import com.aidigital.aionboarding.service.lessonactivity.models.ActivityProgress
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.QuizAnswerResultRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.QuizGradingResultRecord;
+import com.aidigital.aionboarding.service.lessonactivity.models.QuizQuestionItemRecord;
+import com.aidigital.aionboarding.service.lessonactivity.models.SubmitActivityProgressInput;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityAssemblyService;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityGradingService;
 import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityAccessPolicy;
@@ -220,9 +222,8 @@ class LessonActivityProgressServiceImplTest {
 			ActivityProgressStatus completed = new ActivityProgressStatus();
 			completed.setCode(ActivityProgressStatusCode.COMPLETED);
 			LocalDateTime now = LocalDateTime.of(2026, 1, 1, 0, 0);
-			Map<String, Object> request = Map.of("reviewedCards", 5);
+			SubmitActivityProgressInput request = new SubmitActivityProgressInput("flashcards", List.of(), 5);
 			when(lessonActivityPersistenceHelper.findByLessonIdAndId(lessonId, activityId)).thenReturn(activity);
-			when(payloadAssembler.parseInt(request.get("reviewedCards"), 0)).thenReturn(5);
 			when(progressPersistence.loadOrCreateProgress(viewer.internalId(), activity, lessonId)).thenReturn(progress);
 			when(accessPolicy.progressStatus(ActivityProgressStatusCode.COMPLETED)).thenReturn(completed);
 			when(currentTime.utcDateTime()).thenReturn(now);
@@ -262,8 +263,10 @@ class LessonActivityProgressServiceImplTest {
 			lesson.setId(lessonId);
 			LessonActivity activity = activityOfType(ActivityTypeCode.QUIZ);
 			activity.setLesson(lesson);
+			List<QuizQuestionItemRecord> quizItems = List.of();
 			when(lessonActivityPersistenceHelper.findByLessonIdAndId(lessonId, activityId)).thenReturn(activity);
-			when(gradingService.gradeQuiz(activity.getPayload(), List.of())).thenReturn(
+			when(payloadAssembler.parseQuizItems(activity.getPayload())).thenReturn(quizItems);
+			when(gradingService.gradeQuiz(quizItems, List.of())).thenReturn(
 					new QuizGradingResultRecord(0, false, 0, 0, List.of()));
 
 			// When-Then:
@@ -283,6 +286,7 @@ class LessonActivityProgressServiceImplTest {
 			LessonActivity activity = activityOfType(ActivityTypeCode.QUIZ);
 			activity.setLesson(lesson);
 			QuizGradingResultRecord attempt = new QuizGradingResultRecord(80, true, 4, 5, List.of());
+			List<QuizQuestionItemRecord> quizItems = List.of();
 			UserLessonActivityAttempt savedAttempt = new UserLessonActivityAttempt();
 			savedAttempt.setId(1L);
 			LocalDateTime now = LocalDateTime.of(2026, 1, 1, 0, 0);
@@ -306,7 +310,8 @@ class LessonActivityProgressServiceImplTest {
 
 			LessonActivityProgressServiceImpl spy = spy(service);
 			when(lessonActivityPersistenceHelper.findByLessonIdAndId(lessonId, activityId)).thenReturn(activity);
-			when(gradingService.gradeQuiz(activity.getPayload(), List.of(List.of("a")))).thenReturn(attempt);
+			when(payloadAssembler.parseQuizItems(activity.getPayload())).thenReturn(quizItems);
+			when(gradingService.gradeQuiz(quizItems, List.of(List.of("a")))).thenReturn(attempt);
 			when(currentTime.instantString()).thenReturn(submittedAt);
 			doReturn(savedAttempt).when(spy).saveQuizAttempt(viewer, lesson, activity, List.of(List.of("a")), attempt,
 					metadata);
@@ -342,6 +347,7 @@ class LessonActivityProgressServiceImplTest {
 			LessonActivity activity = activityOfType(ActivityTypeCode.QUIZ);
 			activity.setLesson(lesson);
 			QuizGradingResultRecord attempt = new QuizGradingResultRecord(60, false, 3, 5, List.of());
+			List<QuizQuestionItemRecord> quizItems = List.of();
 			UserLessonActivityAttempt savedAttempt = new UserLessonActivityAttempt();
 			savedAttempt.setId(1L);
 			LocalDateTime now = LocalDateTime.of(2026, 1, 1, 0, 0);
@@ -365,7 +371,8 @@ class LessonActivityProgressServiceImplTest {
 
 			LessonActivityProgressServiceImpl spy = spy(service);
 			when(lessonActivityPersistenceHelper.findByLessonIdAndId(lessonId, activityId)).thenReturn(activity);
-			when(gradingService.gradeQuiz(activity.getPayload(), List.of(List.of("a")))).thenReturn(attempt);
+			when(payloadAssembler.parseQuizItems(activity.getPayload())).thenReturn(quizItems);
+			when(gradingService.gradeQuiz(quizItems, List.of(List.of("a")))).thenReturn(attempt);
 			when(currentTime.instantString()).thenReturn(submittedAt);
 			doReturn(savedAttempt).when(spy).saveQuizAttempt(viewer, lesson, activity, List.of(List.of("a")), attempt,
 					metadata);

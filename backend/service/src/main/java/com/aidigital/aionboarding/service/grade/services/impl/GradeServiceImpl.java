@@ -45,6 +45,12 @@ public class GradeServiceImpl implements GradeService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
+	public List<GradeRecord> listGrades(AppUser viewer, boolean includeInactive) {
+		return includeInactive ? listAll(viewer) : listActive();
+	}
+
+	@Override
 	@Transactional
 	public GradeRecord create(AppUser viewer, CreateGradeInput input) {
 		permissionService.requirePermission(viewer, PermissionKeys.GRADES_MANAGE);

@@ -17,6 +17,7 @@ import com.aidigital.aionboarding.service.lessonactivity.models.ActivityCompleti
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityProgressRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.QuizGradingResultRecord;
+import com.aidigital.aionboarding.service.lessonactivity.models.SubmitActivityProgressInput;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityAssemblyService;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityGradingService;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityProgressService;
@@ -72,11 +73,11 @@ public class LessonActivityProgressServiceImpl implements LessonActivityProgress
 			AppUser viewer,
 			Lesson lesson,
 			Long activityId,
-			Map<String, Object> request
+			SubmitActivityProgressInput request
 	) {
 		LessonActivity activity = requireFlashcardsActivity(lesson.getId(), activityId);
 		Map<String, Object> metadata = new HashMap<>();
-		metadata.put("reviewedCards", payloadAssembler.parseInt(request.get("reviewedCards"), 0));
+		metadata.put("reviewedCards", request.reviewedCards() == null ? 0 : request.reviewedCards());
 		metadata.put("completedFrom", "flashcards-player");
 
 		UserLessonActivityProgress progress = progressPersistence.loadOrCreateProgress(
@@ -104,7 +105,8 @@ public class LessonActivityProgressServiceImpl implements LessonActivityProgress
 			List<List<String>> submittedAnswers
 	) {
 		LessonActivity activity = requireQuizActivity(lesson.getId(), activityId);
-		QuizGradingResultRecord attempt = gradingService.gradeQuiz(activity.getPayload(), submittedAnswers);
+		QuizGradingResultRecord attempt = gradingService.gradeQuiz(
+				payloadAssembler.parseQuizItems(activity.getPayload()), submittedAnswers);
 		if (attempt.totalCount() == 0) {
 			throw new AppException(ErrorReason.C002, "This quiz has no questions.");
 		}

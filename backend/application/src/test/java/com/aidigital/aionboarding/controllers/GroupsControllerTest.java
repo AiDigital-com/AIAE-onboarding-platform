@@ -13,7 +13,6 @@ import com.aidigital.aionboarding.api.v1.model.GroupsListResponseV1;
 import com.aidigital.aionboarding.api.v1.model.OkResponseV1;
 import com.aidigital.aionboarding.api.v1.model.RoadmapGroupAssignmentsListResponseV1;
 import com.aidigital.aionboarding.api.v1.model.UpdateGroupRequestV1;
-import com.aidigital.aionboarding.api.v1.model.UserSummaryV1;
 import com.aidigital.aionboarding.mappers.group.GroupApiMapper;
 import com.aidigital.aionboarding.mappers.roadmap.RoadmapGroupAssignmentApiMapper;
 import com.aidigital.aionboarding.mappers.user.UserApiMapper;
@@ -30,11 +29,13 @@ import com.aidigital.aionboarding.service.roadmap.models.RoadmapGroupAssignmentR
 import com.aidigital.aionboarding.service.roadmap.services.RoadmapGroupAssignmentService;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
 import com.aidigital.aionboarding.support.ApiResponses;
+import com.aidigital.aionboarding.support.PaginationSupport;
 import org.instancio.Instancio;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -44,7 +45,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.instancio.Select.field;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -59,6 +59,8 @@ class GroupsControllerTest {
 	private GroupMembershipService groupMembershipService;
 	@Mock
 	private RoadmapGroupAssignmentService roadmapGroupAssignmentService;
+	@Spy
+	private PaginationSupport paginationSupport = new PaginationSupport();
 	@Mock
 	private GroupApiMapper groupApiMapper;
 	@Mock
@@ -202,14 +204,10 @@ class GroupsControllerTest {
 		AppUser viewer = viewer();
 		UserRecord candidate = Instancio.create(UserRecord.class);
 		Page<UserRecord> candidates = new PageImpl<>(List.of(candidate));
-		UserSummaryV1 summary = Instancio.create(UserSummaryV1.class);
 		GroupCandidateUsersListResponseV1 expectedBody = Instancio.create(GroupCandidateUsersListResponseV1.class);
 		when(currentUser.requireUser()).thenReturn(viewer);
 		when(groupService.listCandidateUsers(viewer, 5L, true, "search", 0, 20)).thenReturn(candidates);
-		when(userApiMapper.toUserSummaryV1(candidate)).thenReturn(summary);
-		when(groupApiMapper.toGroupCandidateUsersListResponseV1(anyList(),
-				org.mockito.ArgumentMatchers.eq(candidates)))
-				.thenReturn(expectedBody);
+		when(groupApiMapper.toGroupCandidateUsersListResponseV1(candidates, userApiMapper)).thenReturn(expectedBody);
 
 		// When:
 		ResponseEntity<GroupCandidateUsersListResponseV1> response =
@@ -225,14 +223,10 @@ class GroupsControllerTest {
 		AppUser viewer = viewer();
 		UserRecord candidate = Instancio.create(UserRecord.class);
 		Page<UserRecord> candidates = new PageImpl<>(List.of(candidate));
-		UserSummaryV1 summary = Instancio.create(UserSummaryV1.class);
 		GroupCandidateUsersListResponseV1 expectedBody = Instancio.create(GroupCandidateUsersListResponseV1.class);
 		when(currentUser.requireUser()).thenReturn(viewer);
 		when(groupService.listCandidateUsers(viewer, 5L, false, "search", 0, 20)).thenReturn(candidates);
-		when(userApiMapper.toUserSummaryV1(candidate)).thenReturn(summary);
-		when(groupApiMapper.toGroupCandidateUsersListResponseV1(anyList(),
-				org.mockito.ArgumentMatchers.eq(candidates)))
-				.thenReturn(expectedBody);
+		when(groupApiMapper.toGroupCandidateUsersListResponseV1(candidates, userApiMapper)).thenReturn(expectedBody);
 
 		// When:
 		ResponseEntity<GroupCandidateUsersListResponseV1> response =

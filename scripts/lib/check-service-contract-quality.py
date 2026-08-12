@@ -16,7 +16,8 @@ MAX_PRIVATE_METHOD_LINES = 35
 
 METHOD_START = re.compile(
     r"^\s*(?:(public|private|protected)\s+)?"
-    r"(?!class\b|interface\b|enum\b|record\b)"
+    r"(?!class\b|interface\b|enum\b|record\b"
+    r"|throw\b|return\b|if\b|for\b|while\b|switch\b|new\b|super\b|this\b)"
     r"(?:[\w.<>,?\[\]]+\s+)+(\w+)\s*\(([^)]*)\)"
     r"\s*(?:throws\s+[\w.,\s]+)?\s*(?:[;{]|\{).*$"
 )

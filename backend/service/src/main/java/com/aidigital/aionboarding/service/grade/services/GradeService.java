@@ -31,6 +31,20 @@ public interface GradeService {
 	List<GradeRecord> listAll(AppUser viewer);
 
 	/**
+	 * Lists grades for the caller, including deactivated ones only when requested.
+	 *
+	 * @param viewer         authenticated caller
+	 * @param includeInactive when {@code true}, delegates to {@link #listAll}, which enforces
+	 *                        {@code grades.manage}; when {@code false}, delegates to the
+	 *                        unrestricted {@link #listActive}
+	 * @return active grades, or all grades when {@code includeInactive} is {@code true}
+	 * @throws com.aidigital.aionboarding.service.common.error.AppException when {@code includeInactive}
+	 *                                                                      is {@code true} and the caller lacks
+	 *                                                                      {@code grades.manage}
+	 */
+	List<GradeRecord> listGrades(AppUser viewer, boolean includeInactive);
+
+	/**
 	 * Creates a new grade.
 	 *
 	 * @param viewer authenticated caller

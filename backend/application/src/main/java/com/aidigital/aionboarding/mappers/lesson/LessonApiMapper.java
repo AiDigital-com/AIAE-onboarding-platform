@@ -60,6 +60,7 @@ import com.aidigital.aionboarding.service.lesson.models.ReviseLessonInput;
 import com.aidigital.aionboarding.service.lesson.models.TeacherVideoRecord;
 import com.aidigital.aionboarding.service.lesson.models.TeacherVideoResultRecord;
 import com.aidigital.aionboarding.service.lesson.models.UpdateLessonContentInput;
+import com.aidigital.aionboarding.service.learning.services.LearningEnrollmentService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -67,7 +68,9 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.springframework.data.domain.Page;
@@ -144,10 +147,33 @@ public interface LessonApiMapper extends PageInfoApiMapper {
 
     LessonRoadmapContextV1 toRoadmapContextV1(LessonRoadmapContextRecord record);
 
-    default LessonsListResponseV1 toLessonsListResponseV1(Page<LessonSearchSummaryRecord> lessons) {
-        LessonsListResponseV1 response = new LessonsListResponseV1();
-        response.setLessons(lessons.getContent().stream().map(this::toLessonSummaryV1).toList());
-        response.setPage(toPageInfoV1(lessons));
+    @Mapping(target = "lessons", expression = "java(lessons.getContent().stream().map(this::toLessonSummaryV1).toList())")
+    @Mapping(target = "page", expression = "java(toPageInfoV1(lessons))")
+    LessonsListResponseV1 toLessonsListResponseV1(Page<LessonSearchSummaryRecord> lessons);
+
+    /**
+     * Builds the lessons list response and, only when the page is non-empty, marks each lesson's
+     * {@code isEnrolled} flag for the viewer — skipping the enrollment lookup entirely for an
+     * empty page.
+     *
+     * @param lessons                 paged lesson search results
+     * @param viewerId                viewer's internal user id
+     * @param learningEnrollmentService service used to resolve which of the page's lessons the
+     *                                   viewer is enrolled in
+     * @return the lessons list response with enrollment flags set
+     */
+    default LessonsListResponseV1 toLessonsListResponseV1(
+        Page<LessonSearchSummaryRecord> lessons,
+        Long viewerId,
+        LearningEnrollmentService learningEnrollmentService
+    ) {
+        LessonsListResponseV1 response = toLessonsListResponseV1(lessons);
+        List<LessonSummaryV1> body = response.getLessons();
+        if (body != null && !body.isEmpty()) {
+            List<Long> pageLessonIds = body.stream().map(LessonSummaryV1::getId).toList();
+            Set<Long> enrolledIds = learningEnrollmentService.getEnrolledLessonIds(viewerId, pageLessonIds);
+            body.forEach(lesson -> lesson.setIsEnrolled(enrolledIds.contains(lesson.getId())));
+        }
         return response;
     }
 
@@ -295,6 +321,26 @@ public interface LessonApiMapper extends PageInfoApiMapper {
                 }
             }
         }
+    }
+
+    /**
+     * Converts the assistant conversation history from its API shape to the service-layer
+     * {@link ChatTurn} shape, dropping {@code null} entries.
+     *
+     * @param history caller-supplied chat history, or {@code null}
+     * @return chat turns in order; empty when {@code history} is {@code null}
+     */
+    default List<ChatTurn> toChatHistory(List<ChatMessageV1> history) {
+        if (history == null) {
+            return List.of();
+        }
+        return history.stream()
+            .filter(Objects::nonNull)
+            .map(message -> new ChatTurn(
+                message.getRole() == null ? null : message.getRole().getValue(),
+                message.getContent() == null ? "" : message.getContent()
+            ))
+            .toList();
     }
 
     default BigDecimal toBigDecimal(Object raw) {

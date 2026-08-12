@@ -49,4 +49,26 @@ public class UploadValidator {
 		}
 		return new UploadValidationRecord(originalName, mimeType, sizeBytes);
 	}
+
+	/**
+	 * Validates a presigned-upload request's declared metadata before a URL is issued.
+	 *
+	 * @param fileName    client-declared file name
+	 * @param contentType client-declared MIME type
+	 * @param sizeBytes   client-declared file size in bytes, or {@code null}
+	 * @throws AppException with {@link ErrorReason#C002} when the file name is blank or missing,
+	 *                       the content type is blank or missing, or the size is missing or not
+	 *                       positive
+	 */
+	public void validatePresignRequest(String fileName, String contentType, Long sizeBytes) {
+		if (fileName == null || fileName.isBlank()) {
+			throw new AppException(ErrorReason.C002, "fileName is required");
+		}
+		if (contentType == null || contentType.isBlank()) {
+			throw new AppException(ErrorReason.C002, "contentType is required");
+		}
+		if (sizeBytes == null || sizeBytes <= 0) {
+			throw new AppException(ErrorReason.C002, "size must be greater than 0");
+		}
+	}
 }

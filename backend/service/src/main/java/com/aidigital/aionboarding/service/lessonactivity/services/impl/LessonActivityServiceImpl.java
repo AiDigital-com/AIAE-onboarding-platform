@@ -11,6 +11,7 @@ import com.aidigital.aionboarding.service.lessonactivity.models.ActivityAttemptR
 import com.aidigital.aionboarding.service.lessonactivity.models.GenerateActivityResultRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityWithAttemptsRecord;
+import com.aidigital.aionboarding.service.lessonactivity.models.SubmitActivityProgressInput;
 import com.aidigital.aionboarding.service.lessonactivity.models.SubmitActivityProgressResultRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.UpdateActivityInput;
 import com.aidigital.aionboarding.service.lessonactivity.models.UpdateActivityResultRecord;
@@ -19,7 +20,6 @@ import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivity
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityProgressService;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityService;
 import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityAccessPolicy;
-import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityPayloadAssembler;
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +27,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -39,7 +38,6 @@ public class LessonActivityServiceImpl implements LessonActivityService {
 	private final LessonActivityProgressService progressService;
 	private final LessonActivityManagementService managementService;
 	private final LessonActivityAssemblyService assemblyService;
-	private final LessonActivityPayloadAssembler payloadAssembler;
 
 	@Override
 	@Transactional(readOnly = true)
@@ -97,10 +95,10 @@ public class LessonActivityServiceImpl implements LessonActivityService {
 			AppUser viewer,
 			Long lessonId,
 			Long activityId,
-			Map<String, Object> request
+			SubmitActivityProgressInput request
 	) {
 		permissionService.requirePermission(viewer, PermissionKeys.LEARNING_COMPLETE);
-		String type = payloadAssembler.stringVal(request.get("type"));
+		String type = request.type() == null ? "" : request.type();
 		if (!ActivityTypeCode.QUIZ.equals(type) && !ActivityTypeCode.FLASHCARDS.equals(type)) {
 			throw new AppException(ErrorReason.C002, "Unsupported activity type.");
 		}
@@ -113,7 +111,7 @@ public class LessonActivityServiceImpl implements LessonActivityService {
 				viewer,
 				lesson,
 				activityId,
-				payloadAssembler.asListOfStringLists(request.get("answers"))
+				request.answers() == null ? List.of() : request.answers()
 		)
 				: progressService.completeFlashcards(viewer, lesson, activityId, request);
 

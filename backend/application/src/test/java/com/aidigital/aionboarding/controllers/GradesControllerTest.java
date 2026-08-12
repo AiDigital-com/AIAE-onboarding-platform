@@ -49,7 +49,7 @@ class GradesControllerTest {
 		List<GradeRecord> grades = Instancio.ofList(GradeRecord.class).create();
 		GradesListResponseV1 expectedBody = Instancio.create(GradesListResponseV1.class);
 		when(currentUser.requireUser()).thenReturn(viewer);
-		when(gradeService.listActive()).thenReturn(grades);
+		when(gradeService.listGrades(viewer, false)).thenReturn(grades);
 		when(gradeApiMapper.toGradesListResponseV1(grades)).thenReturn(expectedBody);
 
 		// When:
@@ -66,7 +66,7 @@ class GradesControllerTest {
 		List<GradeRecord> grades = Instancio.ofList(GradeRecord.class).create();
 		GradesListResponseV1 expectedBody = Instancio.create(GradesListResponseV1.class);
 		when(currentUser.requireUser()).thenReturn(viewer);
-		when(gradeService.listAll(viewer)).thenReturn(grades);
+		when(gradeService.listGrades(viewer, true)).thenReturn(grades);
 		when(gradeApiMapper.toGradesListResponseV1(grades)).thenReturn(expectedBody);
 
 		// When:

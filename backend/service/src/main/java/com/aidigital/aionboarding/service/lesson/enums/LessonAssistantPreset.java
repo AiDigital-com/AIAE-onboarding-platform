@@ -22,19 +22,4 @@ public enum LessonAssistantPreset {
         return value;
     }
 
-    /**
-     * Converts an API preset value to the service enum, defaulting to {@code REGULAR} when the
-     * value is missing or unrecognized.
-     *
-     * @param value API preset value, possibly {@code null}
-     * @return matching preset, defaulting to {@code REGULAR}
-     */
-    public static LessonAssistantPreset fromValue(String value) {
-        for (LessonAssistantPreset preset : values()) {
-            if (preset.value.equalsIgnoreCase(value)) {
-                return preset;
-            }
-        }
-        return REGULAR;
-    }
 }

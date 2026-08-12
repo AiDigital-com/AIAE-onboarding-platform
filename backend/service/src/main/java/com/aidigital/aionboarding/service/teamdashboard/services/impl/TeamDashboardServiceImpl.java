@@ -1,5 +1,7 @@
 package com.aidigital.aionboarding.service.teamdashboard.services.impl;
 
+import com.aidigital.aionboarding.service.common.error.AppException;
+import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.teamdashboard.models.TeamDashboardIndividualRoadmapRecord;
@@ -41,6 +43,7 @@ public class TeamDashboardServiceImpl implements TeamDashboardService {
 	@Override
 	@Transactional(readOnly = true)
 	public TeamDashboardRecord getTeamDashboardData(AppUser viewer, TeamDashboardPeriod period) {
+		requireAdminOrTeamLead(viewer);
 		TeamDashboardScope scope = teamDashboardScopeResolver.resolveVisibleTeamScope(viewer);
 		List<Long> memberIds = scope.members().stream().map(UserRecord::id).filter(Objects::nonNull).toList();
 
@@ -65,6 +68,22 @@ public class TeamDashboardServiceImpl implements TeamDashboardService {
 				individualRoadmapsByMemberId,
 				teamDashboardMapper.toKpisRecord(members)
 		);
+	}
+
+	/**
+	 * Rejects a viewer who is neither an admin nor a team lead before any scope is resolved.
+	 * {@link com.aidigital.aionboarding.service.teamdashboard.support.TeamDashboardScopeResolver}
+	 * cannot make this distinction on its own — an ordinary member simply resolves to an empty
+	 * scope, which would otherwise render an empty dashboard instead of denying access.
+	 *
+	 * @param viewer authenticated caller
+	 * @throws AppException with {@link ErrorReason#C004} when the viewer is neither an admin nor
+	 *                       a team lead
+	 */
+	void requireAdminOrTeamLead(AppUser viewer) {
+		if (!viewer.isAdmin() && !viewer.isTeamLead()) {
+			throw new AppException(ErrorReason.C004);
+		}
 	}
 
 	List<TeamDashboardMemberRecord> getMemberStats(List<Long> memberIds, TeamDashboardPeriod period, Long leadId) {
