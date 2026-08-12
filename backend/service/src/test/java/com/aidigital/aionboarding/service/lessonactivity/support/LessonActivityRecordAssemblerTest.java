@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LessonActivityRecordAssemblerTest {
 
 	private final LessonActivityRecordAssembler assembler =
-			new LessonActivityRecordAssembler(new QuizQuestionTypeResolver());
+			new LessonActivityRecordAssembler(new QuizQuestionTypeResolver(), new com.aidigital.aionboarding.service.common.time.CurrentTimeImpl());
 
 	private ActivityType activityType(String code) {
 		ActivityType type = new ActivityType();
@@ -860,6 +860,33 @@ class LessonActivityRecordAssemblerTest {
 			// When-Then:
 			assertThat(assembler.stringVal(42)).isEqualTo("42");
 			assertThat(assembler.stringVal(true)).isEqualTo("true");
+		}
+	}
+
+	@Nested
+	class BuildNewActivity {
+
+		@Test
+		void shouldStampAllFieldsAndCreatedAtTest() {
+			// Given:
+			Lesson lesson = new Lesson();
+			lesson.setId(5L);
+			ActivityType type = activityType(ActivityTypeCode.QUIZ);
+			Map<String, Object> payload = Map.of("title", "Quiz 1");
+			Map<String, Object> metadata = Map.of("model", "gpt-4o-mini");
+
+			// When:
+			LessonActivity result = assembler.buildNewActivity(lesson, type, "Quiz 1", 3, payload, metadata, "Admin");
+
+			// Then:
+			assertThat(result.getLesson()).isSameAs(lesson);
+			assertThat(result.getType()).isSameAs(type);
+			assertThat(result.getTitle()).isEqualTo("Quiz 1");
+			assertThat(result.getItemCount()).isEqualTo(3);
+			assertThat(result.getPayload()).isSameAs(payload);
+			assertThat(result.getGenerationMetadata()).isSameAs(metadata);
+			assertThat(result.getCreatedBy()).isEqualTo("Admin");
+			assertThat(result.getCreatedAt()).isNotNull();
 		}
 	}
 }
