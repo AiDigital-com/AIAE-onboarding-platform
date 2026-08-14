@@ -15,6 +15,7 @@ import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
+import com.aidigital.aionboarding.service.team.services.TeamLeadPromotionService;
 import com.aidigital.aionboarding.service.team.services.TeamService;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
 import com.aidigital.aionboarding.service.user.services.UserService;
@@ -31,6 +32,7 @@ public class AdminController implements AdminApi {
 
 	private final CurrentUserSupport currentUser;
 	private final TeamService teamService;
+	private final TeamLeadPromotionService teamLeadPromotionService;
 	private final UserService userService;
 	private final PaginationSupport paginationSupport;
 	private final UserRoleCodeApiMapper userRoleCodeApiMapper;
@@ -52,7 +54,7 @@ public class AdminController implements AdminApi {
 	@PreAuthorize("@perm.has('" + PermissionKeys.ADMIN_MANAGE_ROLES + "')")
 	@Transactional
 	public ResponseEntity<UserProfileV1> promoteTeamLead(TeamLeadEmailRequestV1 request) {
-		UserRecord user = teamService.promoteTeamLeadByEmail(request.getEmail())
+		UserRecord user = teamLeadPromotionService.promoteTeamLeadByEmail(request.getEmail())
 				.orElseThrow(() -> new AppException(ErrorReason.C001, request.getEmail()));
 		return ResponseEntity.ok(userApiMapper.toUserProfileV1(user));
 	}
@@ -61,7 +63,7 @@ public class AdminController implements AdminApi {
 	@PreAuthorize("@perm.has('" + PermissionKeys.ADMIN_MANAGE_ROLES + "')")
 	@Transactional
 	public ResponseEntity<UserProfileV1> demoteTeamLead(TeamLeadEmailRequestV1 request) {
-		UserRecord user = teamService.demoteTeamLeadByEmail(request.getEmail())
+		UserRecord user = teamLeadPromotionService.demoteTeamLeadByEmail(request.getEmail())
 				.orElseThrow(() -> new AppException(ErrorReason.C001, request.getEmail()));
 		return ResponseEntity.ok(userApiMapper.toUserProfileV1(user));
 	}

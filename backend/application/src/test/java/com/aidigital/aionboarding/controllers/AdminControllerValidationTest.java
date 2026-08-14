@@ -6,6 +6,7 @@ import com.aidigital.aionboarding.mappers.team.TeamApiMapper;
 import com.aidigital.aionboarding.mappers.user.UserApiMapper;
 import com.aidigital.aionboarding.service.common.security.RequestAuthenticationCache;
 import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
+import com.aidigital.aionboarding.service.team.services.TeamLeadPromotionService;
 import com.aidigital.aionboarding.service.team.services.TeamService;
 import com.aidigital.aionboarding.service.user.services.UserService;
 import com.aidigital.aionboarding.support.PaginationSupport;
@@ -44,6 +45,8 @@ class AdminControllerValidationTest {
 	private CurrentUserSupport currentUser;
 	@MockitoBean
 	private TeamService teamService;
+	@MockitoBean
+	private TeamLeadPromotionService teamLeadPromotionService;
 	@MockitoBean
 	private UserService userService;
 	@MockitoBean
