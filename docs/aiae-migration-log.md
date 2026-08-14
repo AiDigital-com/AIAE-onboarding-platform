@@ -3058,3 +3058,55 @@ recorded here is a defect.
 | 2 | `check-frontend-ui-rules.sh` | **2222** | §6 — no frontend visual work |
 | 3 | `verify-gates.sh` sidebar | fails | §6 / CR-2 — navigation preserved |
 | 4 | `structure-lint` `changes/0001-usage-events.xml` | fails | §2.7 / CR-8 — telemetry kept |
+
+---
+
+## P11 — Thin controllers and service shape · **IN PROGRESS**
+
+Interrupted three times by API budget limits, most recently the weekly one
+(resets 2026-08-14). Recorded here so the state survives independently of any
+agent transcript or conversation.
+
+**Branch:** `mig/p11-controllers-services`, 14 commits ahead of `migration` @ `e15d1c3`.
+
+**Committed and safe:**
+
+| Commit | Aggregate |
+|---|---|
+| `40ce39e` | thin controllers, MapStruct-constructed mappers, static factories |
+| `125809b` | `LearningServiceImpl` split into `LearningService` + `RoadmapAssignmentService` |
+| `fba7b1a` | `GroupServiceImpl` to 8 injected fields |
+| `615d0c7` | `LessonAssistantServiceImpl` to 5 |
+| `94e80f9` | `LessonInitialGenerationServiceImpl` to 5 |
+| `16be349` | `LessonRevisionServiceImpl` to 8 |
+| `899a644` | `LessonActivityManagementServiceImpl` to 8 |
+| `fe0593b` | `RoadmapGroupAssignmentServiceImpl` to 7 |
+| `769b074` | `TeacherVideoServiceImpl` to 7 |
+| `808b618` | `LessonServiceImpl` to 199 lines / 8 fields (was 332 / 11) |
+| `d3df96f` | `RoadmapServiceImpl` to 197 lines / 8 fields |
+| `08aa16b` | `LessonActivityProgressServiceImpl` to 230 lines |
+| `c1aa7cc` | `PermissionServiceImpl` to 10 public methods |
+| `96977dd` | `UserServiceImpl` to 10 public methods / 8 fields |
+
+**Uncommitted, mid-aggregate** — the `TeamServiceImpl` split: modified
+`AdminController`, `TeamService`, `TeamServiceImpl`; new `TeamLeadPromotionService`,
+`TeamLeadPromotionServiceImpl`, and a `team/support/` directory.
+
+**Still outstanding after that:**
+- structure-lint item 14, `Service interfaces must not expose Map<String,Object>` — named
+  in no source document and owned by no phase.
+- **C9, the Logbook sink decision.** `verify-gates` items 6 and 7 want literal expressions;
+  this project has configurable `resolveFormatter()` / `resolveStrategy()` with tests, which
+  the plan assesses as stricter than the scaffold's. Either match the literals or carry the
+  two assertions as a documented exception — CR-5 exists upstream for exactly this. The
+  choice must be stated, not made silently.
+- Full `mvn -f backend/pom.xml clean verify` with no profile flag, and the gate before/after.
+
+**Targets:** `verify-gates` 10 → 8 (or 6 with the Logbook literals); `structure-lint`
+14 → 1, with item 1 (`usage-events migration`, carried CR-8) still failing.
+
+**What this phase already proves about the process.** Committing per aggregate was written
+into the plan for rollback granularity. Across three interruptions it turned out to matter
+far more as protection against losing work: fourteen aggregates survived budget exhaustion
+that would otherwise have cost the entire phase. Earlier phases that batched their work lost
+an hour each to the same failure.
