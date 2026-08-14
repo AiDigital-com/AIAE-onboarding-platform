@@ -3254,3 +3254,120 @@ data-carrying migration was touched.
 - **C9 resolved by keeping the stricter, configurable Logbook design** and carrying
   `verify-gates` items 6–7 as a documented exception per CR-5, rather than flattening to the
   literal the gate wants.
+
+---
+
+## P11a — MaterialFileServiceImpl method count vs. the entity-repository boundary · **COMPLETE**
+
+Completed 2026-08-14 on branch `mig/p11a-material-file` (from `migration` @ `a15c94a`),
+single commit `073c33b`. Follow-up to the one violation P11 declined:
+`check-service-contract-quality.py` flagged `MaterialFileServiceImpl` at 11 public methods
+(max 10), declined because it is the paired entity service for `MaterialFile` and shrinking
+its interface looked like it would require a second class touching the same entity.
+
+**The declined reasoning was only half the picture.** Two other classes were already
+injecting `MaterialFileRepository` directly, silently, with no gate catching it:
+`MaterialFileQuerySupport` (a query pass-through extracted from `MaterialFileServiceImpl` in
+P11 purely to relieve the line-count gate) and `StorageKeyAuthorizationService` (a genuine
+six-entity cross-cutting authorization lookup, one of whose six repository injections was
+`MaterialFileRepository`). `10-architecture.md`: *"Only the paired entity service
+implementation may inject that entity's repository."* Neither `structure-lint.sh` nor
+`verify-gates.sh` has any assertion for this rule — it is enforced by nothing.
+
+### The 12 methods (not 11) and who called each
+
+Before any change, `MaterialFileService` had 12 public methods — one more than the gate
+reported, because the gate's `METHOD_START` regex requires `{` on the declaration line and
+`findRemovedStorageKeys`'s multi-line signature has none, so the gate silently undercounts
+by one. Every method had a live caller; none were dead:
+
+| Method | Caller(s) |
+|---|---|
+| `saveAttachments` | `MaterialPersistenceService.create` |
+| `reconcileAttachments` | `MaterialPersistenceService.update` |
+| `updateMaterialFileOpenAIUpload` | `MaterialOpenAiFilePreparationServiceImpl`, `MaterialServiceImpl` |
+| `deleteStorageKeysQuietly` | `MaterialPersistenceService.update`, `MaterialServiceImpl.delete` — zero `MaterialFile`/repository coupling; a generic filter/dedupe/swallow-and-log storage wrapper |
+| `collectStorageKeys` | `MaterialServiceImpl.update`/`delete` |
+| `findRemovedStorageKeys` | `MaterialPersistenceService.update` |
+| `deleteByMaterialId` | `MaterialServiceImpl.delete` |
+| `findAttachmentsForMaterials` | `MaterialOpenAiFilePreparationServiceImpl` |
+| `findByMaterialId` (unordered, single id) | `MaterialPreparationMapBuilder` — caller order-agnostic |
+| `findByMaterialIdOrderByCreatedAtAsc` (single id) | `MaterialRecordQueryServiceImpl.loadRecord` — a strict single-id specialization of the next row |
+| `findByMaterialIdsOrderByCreatedAtAsc` (collection) | `MaterialRecordQueryServiceImpl.groupFiles` |
+| `findSummariesByMaterialIds` | `MaterialRecordQueryServiceImpl.groupFileSummaries` |
+
+### What was fixed
+
+Both illegitimate `MaterialFileRepository` injections closed, and the method count resolved
+to exactly 10 by verified caller count — not by exploiting the gate's blind spot:
+
+1. **`MaterialFileQuerySupport` folded back into `MaterialFileServiceImpl` and deleted.** It
+   existed only to dodge the line-count gate; folding its five remaining methods back in
+   left the impl at 237 lines (max 260), with `MaterialFileRepository` injected by exactly
+   one class again.
+2. **`StorageKeyAuthorizationService`'s `MaterialFileRepository` injection replaced** with a
+   new `MaterialFileService.existsByStorageKey(String)` — one narrow method, matching what
+   the caller actually needed (a presence check, not the entity). Its other five direct
+   repository injections (`LessonAssetRepository`, `UserRepository`, `LessonRepository`,
+   `MaterialRepository`, `UserLessonRepository`) are the same rule gap at wider scope and
+   were left untouched — fixing them means adding a public method to five *other* entity
+   services, which is a different, larger phase, not a follow-up. Recorded here as a new,
+   undocumented finding for that future phase: its `EXCEPTION-003`/`DEC-05-03` code comment
+   cites `.planning/EXCEPTIONS.md`, and **that file does not exist anywhere in this
+   repository** — grepped for both the path and the decision id, zero hits outside the
+   comment itself. The exception is unratified.
+3. **`deleteStorageKeysQuietly` moved to `StorageService.deleteObjectsQuietly`,** its correct
+   home given (1). `MaterialServiceImpl` was already at the 8-field cap, so it could not take
+   a new `StorageService` field; `MaterialPersistenceService` (already holding
+   `StorageService`) grew a one-line passthrough `deleteStorageKeysQuietly` for it instead.
+4. **`findByMaterialId(Long)` and `findByMaterialIdOrderByCreatedAtAsc(Long)` removed,**
+   consolidated into `findByMaterialIdsOrderByCreatedAtAsc(Collection<Long>)`, which already
+   returns identical rows for a one-element collection (`IN` with one id, same `JOIN FETCH
+   f.kind`). Their two call sites (`MaterialPreparationMapBuilder`,
+   `MaterialRecordQueryServiceImpl.loadRecord`) now pass `List.of(id)`.
+5. **`MaterialFileRepository.findByStorageKey` removed** (its only caller was the class fixed
+   in step 2) and replaced with a derived `existsByStorageKey`.
+
+Net: 12 real methods → 10 (`existsByStorageKey` added; `deleteStorageKeysQuietly`,
+`findByMaterialId`, `findByMaterialIdOrderByCreatedAtAsc` removed). Confirmed by counting
+`@Override public` methods directly in the final file — 10 — not by trusting the gate's
+regex, which would have shown 9 (still missing `findRemovedStorageKeys`).
+
+**One thing tried and reverted.** Removing the `try { … } catch (RuntimeException e) {
+log.warn(…) }` wrapper around the two moved `deleteStorageKeysQuietly`/`deleteObjectsQuietly`
+call sites looked like dead-code cleanup — the callee already swallows `RuntimeException`
+internally — but `MaterialServiceImplTest.afterCommitCallbackSwallowsRuntimeException` mocks
+`materialPersistenceService.deleteStorageKeysQuietly` to throw regardless of what the real
+implementation does. The outer catch is real defense-in-depth against whatever an injected
+collaborator does, not redundant with its current implementation. Restored in both callers
+(`MaterialServiceImpl.delete`, `MaterialPersistenceService.update`) rather than changing the
+test's expectation to fit a "simplification."
+
+**The two rules did not conflict once the repository-injection violations were fixed.**
+CR-12 is not filed — resolving (1)–(2) removed the pressure that made shrinking the interface
+look like it would require a second injector; the remaining consolidations in (4) were
+ordinary duplicate-query removal, not architecture change.
+
+### Verification
+
+| Gate | Before (`a15c94a`) | After (`073c33b`) |
+|---|---|---|
+| `bash scripts/verify-gates.sh` | **9** | **8** — `check-service-contract-quality.sh` cleared; the other 8 are byte-identical to the P11 list (4 frontend items, `check-maven-dependency-analysis.py`, Logbook items 6–7 carried per CR-5, `check-frontend-ui-rules.sh`) |
+| `bash scripts/structure-lint.sh` | **2** | **2** — unchanged, both carried (usage-events CR-8, `Map<String,Object>` declined in P11) |
+| `python3 scripts/lib/check-service-contract-quality.py backend/service/src/main/java` | 1 violation (`MaterialFileServiceImpl`, 11 public methods) | **0 violations** (107 files scanned) |
+| `mvn -f backend/pom.xml clean verify` (no profile flag) | BUILD SUCCESS, 2204 tests | **BUILD SUCCESS**, **2212 tests**, 0 failures/0 errors, all 8 modules' `jacoco-check` "All coverage checks have been met" (`migrations` has no test sources, as before) |
+| Fixture manifest (`.claude/.aiae-fixtures-manifest`) | 80/80 | **80/80** — re-hashed against the committed tree; nothing under `.claude/**` touched |
+
+Per-module test counts: `domain` 2, `migrations` 0, `event-logging-to-db-feature` 48,
+`observability` 11, `external-services` 177, `cache-management` 19, `service` 1242
+(was 1234 — net +8: −4 for the deleted `MaterialFileQuerySupportTest`, −2 for two removed
+delegate tests in `MaterialFileServiceImplTest`, +9 for its folded-in and new
+`existsByStorageKey`/`findByMaterialIdsOrderByCreatedAtAsc` tests, +5 for a new
+`StorageServiceTest.DeleteObjectsQuietlyTests` nested class), `application` 713
+(45 skipped, unchanged). All numbers measured against the committed tree
+(`073c33b`), re-run after commit rather than trusted from the pre-commit session.
+
+**Rollback** `git revert 073c33b` restores the P11-end shape (`MaterialFileQuerySupport`,
+the two single-id methods, `deleteStorageKeysQuietly` on `MaterialFileService`, and the
+direct `MaterialFileRepository` injection in `StorageKeyAuthorizationService`) in one step.
+No out-of-repo action — nothing deployed, no migration touched.
