@@ -29,6 +29,25 @@
 		<skip.frontend>false</skip.frontend>
 	</properties>
 
+	<!-- commons-csv was removed: zero usage anywhere in backend/ (verified by
+		 grep for CSVFormat/CSVPrinter/commons.csv) — the "CSV export endpoints"
+		 comment described a feature that was never implemented. Every other
+		 spring-boot-starter-* below stays: each is a POM-only aggregator, always
+		 "unused declared" to a bytecode-reference analyzer once the classes this
+		 module references directly (below) are declared, but each also supplies
+		 real autoconfiguration/classpath-driven behaviour no direct import can
+		 stand in for (embedded Tomcat/MVC, the security filter chain, AOP
+		 proxying, actuator endpoints, bean validation). `migrations` and
+		 `observability` likewise stay declared with no direct class reference:
+		 `migrations` puts Liquibase changelog *resources* on the fat-jar
+		 classpath, and `observability`'s two classes are consumed only inside
+		 `external-services`' PooledRestClientFactory, never imported here.
+		 logstash-logback-encoder, springdoc-openapi-starter-webmvc-ui,
+		 hibernate-jcache and ehcache are picked up by class-name string
+		 (logback.xml) or classpath presence (Hibernate's
+		 hibernate.javax.cache.uri, SpringDoc's classpath scan), never by a
+		 direct Java import either. All documented in
+		 backend/DEPENDENCY-ANALYSIS.md. -->
 	<dependencies>
 		<!-- REQUIRED edges (drop either → broken):
 			   application → service (transitively brings domain)
@@ -47,6 +66,16 @@
 		<dependency>
 			<groupId>${project.groupId}</groupId>
 			<artifactId>observability</artifactId>
+		</dependency>
+
+		<!-- application never imports a class from external-services directly
+			 in earlier layers, but SpaFallbackController / lesson & material
+			 upload flows do — declared explicitly per
+			 maven-dependency-plugin:analyze-only (previously reached only
+			 transitively via `service`). -->
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>external-services</artifactId>
 		</dependency>
 
 		<!-- Web + security + AOP + actuator -->
@@ -95,11 +124,8 @@
 			<artifactId>logbook-spring-boot-starter</artifactId>
 		</dependency>
 
-		<!-- CSV export endpoints -->
-		<dependency>
-			<groupId>org.apache.commons</groupId>
-			<artifactId>commons-csv</artifactId>
-		</dependency>
+		<!-- commons-csv removed P15 (2026-08-14): zero usage anywhere in
+			 backend/ — see backend/DEPENDENCY-ANALYSIS.md. -->
 
 		<!-- Lombok + MapStruct (for ServiceRecord ↔ ApiDto mappers) -->
 		<dependency>
@@ -183,6 +209,212 @@
 		<dependency>
 			<groupId>org.instancio</groupId>
 			<artifactId>instancio-junit</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- Direct types used by controllers/config/security/mappers/generated
+			 OpenAPI sources, declared explicitly per
+			 maven-dependency-plugin:analyze-only. Versions come from the Spring
+			 Boot BOM (spring-boot-starter-parent). -->
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-actuator</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-autoconfigure</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-web</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-webmvc</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-context</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-beans</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-tx</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-orm</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-web</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-config</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-oauth2-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-oauth2-jose</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-oauth2-resource-server</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.hibernate.orm</groupId>
+			<artifactId>hibernate-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>jakarta.validation</groupId>
+			<artifactId>jakarta.validation-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-annotations</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.zalando</groupId>
+			<artifactId>logbook-api</artifactId>
+			<version>${logbook.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.zalando</groupId>
+			<artifactId>logbook-core</artifactId>
+			<version>${logbook.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.zalando</groupId>
+			<artifactId>logbook-json</artifactId>
+			<version>${logbook.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.swagger.core.v3</groupId>
+			<artifactId>swagger-annotations-jakarta</artifactId>
+			<version>2.2.27</version>
+		</dependency>
+		<!-- Tomcat 10.1's embed-core vendors the jakarta.servlet API classes
+			 directly (no separate jakarta.servlet-api jar is resolved on this
+			 classpath) — HttpServletRequest/HttpServletResponse used throughout
+			 the filter chain and GlobalExceptionHandler resolve from here. -->
+		<dependency>
+			<groupId>org.apache.tomcat.embed</groupId>
+			<artifactId>tomcat-embed-core</artifactId>
+		</dependency>
+
+		<!-- Kept at COMPILE scope, not test — verified empirically. The
+			 analyzer's "non-test scoped test only" signal was wrong for all
+			 four: scoping them to test broke main compilation (javac needs
+			 domain/cache-management/jakarta.persistence-api/spring-data-jpa
+			 present on the compile classpath to resolve supertypes and
+			 Spring config classes that application's main sources never name
+			 directly by import). Documented as ignoredNonTestScopedDependencies
+			 in the parent pom; see backend/DEPENDENCY-ANALYSIS.md. -->
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>domain</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>cache-management</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>jakarta.persistence</groupId>
+			<artifactId>jakarta.persistence-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.data</groupId>
+			<artifactId>spring-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.data</groupId>
+			<artifactId>spring-data-commons</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-core</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-api</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-params</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.assertj</groupId>
+			<artifactId>assertj-core</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.hamcrest</groupId>
+			<artifactId>hamcrest</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-test-autoconfigure</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.instancio</groupId>
+			<artifactId>instancio-core</artifactId>
+			<version>${instancio.version}</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

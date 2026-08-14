@@ -17,6 +17,13 @@
     <artifactId>migrations</artifactId>
     <name>AIAE Onboarding Platform — migrations</name>
 
+    <!-- liquibase-core is declared here, not in `application`, so it travels
+         with the changelog resources and application's Liquibase autoconfig
+         finds it transitively via the module dependency. This module owns no
+         Java class referencing liquibase-core today (see the header comment),
+         so maven-dependency-plugin:analyze-only always reports it "unused
+         declared" — ignored with a documented reason, see
+         backend/DEPENDENCY-ANALYSIS.md. -->
     <dependencies>
         <dependency>
             <groupId>org.liquibase</groupId>

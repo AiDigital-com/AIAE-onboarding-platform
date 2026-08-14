@@ -28,7 +28,17 @@
 		<jacoco.branch.coverage>0.0714</jacoco.branch.coverage>
 	</properties>
 
-	<!-- Leaf module. Depends on JPA + validation only. NO other internal modules. -->
+	<!-- Leaf module. Depends on JPA only. NO other internal modules.
+
+		 spring-boot-starter-data-jpa is a POM-only aggregator: it carries no
+		 classes of its own, so `maven-dependency-plugin:analyze-only` always
+		 reports it "unused declared" once the JPA/Hibernate types this module
+		 references directly (below) are declared explicitly. It stays declared
+		 anyway — see backend/DEPENDENCY-ANALYSIS.md — because it supplies the
+		 JPA/DataSource autoconfiguration this module's own Testcontainers
+		 repository tests need (P15 step 3), which no directly-referenced class
+		 can represent to the analyzer. spring-boot-starter-validation was
+		 removed: zero jakarta.validation usage anywhere under domain/src. -->
 	<dependencies>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
@@ -38,13 +48,43 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
 		</dependency>
+
+		<!-- Direct JPA/Hibernate types used by entities and repositories:
+			 @Entity/@Id/@Column (jakarta.persistence-api), @Immutable/@Cache
+			 (hibernate-core), JpaRepository (spring-data-jpa), Page/Sort/
+			 Specification (spring-data-commons). -->
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-validation</artifactId>
+			<groupId>jakarta.persistence</groupId>
+			<artifactId>jakarta.persistence-api</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>org.hibernate.orm</groupId>
+			<artifactId>hibernate-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.data</groupId>
+			<artifactId>spring-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.data</groupId>
+			<artifactId>spring-data-commons</artifactId>
+		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- Direct JUnit/AssertJ types used by IdAwareEntityTest and the
+			 EqualsVerifier/repository tests added in P15 step 3. -->
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-api</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.assertj</groupId>
+			<artifactId>assertj-core</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

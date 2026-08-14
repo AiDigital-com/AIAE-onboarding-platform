@@ -24,7 +24,14 @@
 	<name>AIAE Onboarding Platform — observability</name>
 
 	<!-- Leaf module. Depends on Spring web/context + Micrometer only. NO other
-		 internal module (see structure-lint.sh). -->
+		 internal module (see structure-lint.sh).
+
+		 spring-boot-starter is a POM-only aggregator, so
+		 maven-dependency-plugin:analyze-only always reports it "unused declared"
+		 once spring-context (below) is declared explicitly for the classes this
+		 module actually references. Kept anyway for the autoconfiguration
+		 surface consumers of this module rely on; see
+		 backend/DEPENDENCY-ANALYSIS.md. -->
 	<dependencies>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
@@ -39,6 +46,10 @@
 			<artifactId>spring-web</artifactId>
 		</dependency>
 		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-context</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>io.micrometer</groupId>
 			<artifactId>micrometer-core</artifactId>
 		</dependency>
@@ -47,6 +58,21 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-api</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.assertj</groupId>
+			<artifactId>assertj-core</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
