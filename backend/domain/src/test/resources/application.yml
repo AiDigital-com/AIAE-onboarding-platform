@@ -1,0 +1,13 @@
+# Test-only datasource for @DataJpaTest repository tests (P15 step 3). H2 in
+# PostgreSQL-compatibility mode, same fallback backend/application's
+# application-test.yml already uses for ApplicationSmokeTest — see
+# domain/pom.xml for why Testcontainers-backed Postgres is not used here.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  datasource:
+    url: jdbc:h2:mem:domaintestdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver

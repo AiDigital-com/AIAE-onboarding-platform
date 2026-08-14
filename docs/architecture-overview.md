@@ -7,8 +7,8 @@ Platform** and must not be copied into the rule tree.
 ## Document status
 
 - Owner: engineering (AIAE convergence migration)
-- Lifecycle phase: MVP
-- Last verified against: `migration` @ P6 (2026-08-11)
+- Lifecycle phase: Engineering
+- Last verified against: `migration` @ P15 (2026-08-14)
 - Verification evidence: `bash scripts/local-verify.sh`
 - Cache status: enabled
 - MVP usage telemetry: enabled during MVP
@@ -72,10 +72,12 @@ contract that keeps deep links working.
   (optionally AI-generating lesson/quiz content from uploaded materials),
   assigns it to a team/group, and Users complete lessons while their progress
   is tracked.
-- Evidence path: `backend/service/src/main/java/com/aidigital/aionboarding/service/roadmap`
-- Evidence path: `frontend/src/features/library`
+- Evidence path: `backend/service/src/main/java/com/aidigital/aionboarding/service/roadmap/services/impl/RoadmapServiceImpl.java`
+- Evidence path: `frontend/src/features/library/ui/CreateLessonDialog.tsx`
 
 ## Runtime and deployment
+
+- Evidence: `backend/application/src/main/java/com/aidigital/aionboarding/web/SpaFallbackController.java`
 
 | Environment | Frontend | Backend | Data |
 |---|---|---|---|
@@ -106,6 +108,8 @@ one without the other silently breaks either the API or the upload, not both,
 which is why this has bitten before.
 
 ## Repository and module boundaries
+
+- Evidence: `backend/pom.xml`
 
 `backend/pom.xml` declares eight top-level Maven modules, in this order:
 `domain`, `migrations`, `event-logging-to-db-feature`, `service`,
@@ -157,6 +161,8 @@ Repositories are accessed only through their paired entity services.
   `@Qualifier("bigqueryUsageEventSink")` bean and falls back to PostgreSQL.
 
 ## Primary runtime flows
+
+- Evidence: `backend/application/src/main/java/com/aidigital/aionboarding/jobs/MaterialYoutubeBackfillJob.java`
 
 ### Authenticated API request
 
@@ -215,6 +221,7 @@ read.
 
 ## API and security boundaries
 
+- Evidence: `backend/application/src/main/java/com/aidigital/aionboarding/security/SecurityConfig.java`
 - OpenAPI YAML (`backend/application/src/main/resources/api/v1/specs/openapi.yaml`)
   is the API source of truth; backend interfaces and frontend types are
   generated from it.
@@ -235,6 +242,7 @@ read.
 
 ## Data ownership and migrations
 
+- Evidence: `backend/migrations/src/main/resources/db/changelog/db.changelog-master.xml`
 - PostgreSQL is the system of record.
 - `backend/migrations` owns the Liquibase changelogs at
   `backend/migrations/src/main/resources/db/changelog/`. The Spring property
@@ -253,6 +261,8 @@ read.
 - JPA identifiers use `Long`; schema identifiers use `BIGINT`.
 
 ## Caching and consistency
+
+- Evidence: `backend/application/src/main/resources/ehcache.xml`
 
 Hibernate L2/query caching is enabled through JCache/Ehcache
 (`hibernate.javax.cache.uri: ehcache.xml`). `ehcache.xml`
@@ -301,6 +311,8 @@ round trip because those repository methods were already `@QueryHints
 
 ## External integrations
 
+- Evidence: `backend/external-services/src/main/java/com/aidigital/aionboarding/external/openai/impl/OpenAiClientImpl.java`
+
 | Integration | Purpose | Protocol/authentication | Failure and retry policy |
 |---|---|---|---|
 | OpenAI (Responses API) | AI-generated lessons/quizzes; multi-turn lesson assistant | HTTPS + API key (`OpenAiClientImpl`) | Pooled client with `ExternalClientMetricsInterceptor` + Logbook; bounded timeouts |
@@ -313,6 +325,7 @@ round trip because those repository methods were already `@QueryHints
 
 ## Observability and operations
 
+- Evidence: `backend/observability/src/main/java/com/aidigital/aionboarding/observability/external/ExternalClientMetricsInterceptor.java`
 - Actuator exposes health and Prometheus metrics
   (`http.server.requests`, `http.client.requests`, `external.client.requests`
   with configured percentiles).

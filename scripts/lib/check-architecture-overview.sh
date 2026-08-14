@@ -204,6 +204,10 @@ for section in required:
     print(f"{section}\t{matches[0]}")
 PY
 )" || fail "engineering overview has incomplete section-specific evidence"
+  # See the matching tr -d '\r' comment above: Windows-native python3 stdout
+  # is CRLF-terminated even when piped, which corrupts the trailing path field
+  # of every tab-separated record below. No-op on LF-only output.
+  section_evidence="$(printf '%s' "${section_evidence}" | tr -d '\r')"
 
   section_evidence_paths=()
   while IFS=$'\t' read -r evidence_section evidence_path; do
@@ -246,6 +250,12 @@ if len(names) != len(set(names)):
 print("\n".join(names))
 PY
 )" || fail "cannot parse active top-level modules from backend/pom.xml"
+    # Windows-native python3 writes CRLF to stdout even when piped (text-mode
+    # newline translation to os.linesep); left unstripped, every module name
+    # below carries a trailing \r that breaks both the exact-match `continue`
+    # and the grep lookup, so every module reports "missing" regardless of
+    # doc content. Stripping is a no-op on LF-only output (Linux CI, WSL).
+    active_modules="$(printf '%s' "${active_modules}" | tr -d '\r')"
     while IFS= read -r module; do
       [ -n "${module}" ] || continue
       [ "${module}" = "event-logging-to-db-feature" ] && continue

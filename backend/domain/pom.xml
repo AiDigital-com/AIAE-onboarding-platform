@@ -13,20 +13,18 @@
 	<artifactId>domain</artifactId>
 	<name>AIAE Onboarding Platform — domain</name>
 
-	<!-- Coverage floor override — P9, 2026-08-11, docs/aiae-migration-plan.md §6.1 D-C.
-		 The strict 0.80 LINE / 0.70 BRANCH default (backend/pom.xml properties) is
-		 held everywhere it already passes. This module is the one exception,
-		 measured 2026-08-11 with the seven hand-written jacoco excludes gone: 0.0232
-		 LINE / 0.0714 BRANCH (entities and repositories, effectively untested).
-		 Pinned just under that measured value so the module cannot regress further
-		 while its tests are written — see docs/aiae-migration-plan.md §6.1 D-C
-		 "Still open" and the P9 log row for the sizing. Remove this override only
-		 once real tests (entity equals/hashCode contracts, Testcontainers
-		 repository tests) close the gap to 0.80/0.70. -->
-	<properties>
-		<jacoco.line.coverage>0.0231</jacoco.line.coverage>
-		<jacoco.branch.coverage>0.0714</jacoco.branch.coverage>
-	</properties>
+	<!-- Coverage floor override REMOVED — P15 step 3, 2026-08-14,
+		 docs/aiae-migration-plan.md §6.1 D-C "Still open". The P9 override
+		 (0.0231 LINE / 0.0714 BRANCH) pinned this module just above its
+		 then-measured value while its equals/hashCode contract tests and
+		 repository tests were still unwritten. Closed the gap: the ~10
+		 composite-key *Id classes are covered via EqualsVerifier
+		 (CompositeKeyEqualsContractTest) and the 4 *RepositoryImpl classes via
+		 @DataJpaTest repository tests (H2/PostgreSQL mode — see the dependency
+		 comment below for why not Testcontainers here). Measured 2026-08-14:
+		 216/259 lines (83.4%), 108/112 branches (96.4%). This module now
+		 inherits the strict 0.80/0.70 default from the parent POM like every
+		 other module. -->
 
 	<!-- Leaf module. Depends on JPA only. NO other internal modules.
 
@@ -35,10 +33,23 @@
 		 reports it "unused declared" once the JPA/Hibernate types this module
 		 references directly (below) are declared explicitly. It stays declared
 		 anyway — see backend/DEPENDENCY-ANALYSIS.md — because it supplies the
-		 JPA/DataSource autoconfiguration this module's own Testcontainers
-		 repository tests need (P15 step 3), which no directly-referenced class
-		 can represent to the analyzer. spring-boot-starter-validation was
-		 removed: zero jakarta.validation usage anywhere under domain/src. -->
+		 JPA/DataSource autoconfiguration this module's own repository tests
+		 need (P15 step 3), which no directly-referenced class can represent to
+		 the analyzer. spring-boot-starter-validation was removed: zero
+		 jakarta.validation usage anywhere under domain/src.
+
+		 P15 step 3's repository tests use @DataJpaTest against H2 in
+		 PostgreSQL-compatibility mode (src/test/resources/application.yml),
+		 not Testcontainers: this sandbox's Docker Desktop exposes a
+		 non-standard named-pipe proxy that testcontainers-java's Npipe client
+		 cannot negotiate with (`BadRequestException (Status 400: ...
+		 "com.docker.desktop.address=npipe://\\.\pipe\docker_cli"`), regardless
+		 of context/DOCKER_HOST override — verified against the already-present
+		 CompletedRoadmapRepositoryIntegrationTest et al. in `application`,
+		 which are silently *skipped* here for the identical reason
+		 (`@Testcontainers(disabledWithoutDocker = true)`), not run. H2/PG-mode
+		 is the same fallback `application-test.yml` already uses for
+		 ApplicationSmokeTest. -->
 	<dependencies>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
@@ -85,6 +96,54 @@
 		<dependency>
 			<groupId>org.assertj</groupId>
 			<artifactId>assertj-core</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- @DataJpaTest / @AutoConfigureTestDatabase for the repository tests. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-test-autoconfigure</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- @SpringBootConfiguration / @EnableAutoConfiguration (DomainTestConfig)
+			 and @Autowired (the repository tests) — test-only, since domain's own
+			 main code has no Spring context to bootstrap. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-autoconfigure</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-beans</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- In-memory database for the repository tests (H2, PostgreSQL mode). -->
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- Runtime FormatMapper for @JdbcTypeCode(SqlTypes.JSON) columns
+			 (Lesson.generationMetadata, Lesson.tags, ...): Hibernate needs
+			 Jackson on the classpath to (de)serialize JSON columns even though
+			 domain's own main code never calls Jackson directly. Test-only —
+			 main code has no compile-time dependency on it. -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- Contract-based equals()/hashCode() verification for the ~10 composite
+			 *Id key classes (P15 step 3). -->
+		<dependency>
+			<groupId>nl.jqno.equalsverifier</groupId>
+			<artifactId>equalsverifier</artifactId>
+			<version>3.17.3</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
