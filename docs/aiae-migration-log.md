@@ -3061,52 +3061,196 @@ recorded here is a defect.
 
 ---
 
-## P11 — Thin controllers and service shape · **IN PROGRESS**
+## P11 — Thin controllers and service shape · **COMPLETE**
 
-Interrupted three times by API budget limits, most recently the weekly one
-(resets 2026-08-14). Recorded here so the state survives independently of any
-agent transcript or conversation.
+Completed 2026-08-14 on branch `mig/p11-controllers-services` (from `migration` @
+`e15d1c3`), across four session interruptions from API/budget limits. Committing after
+every aggregate — written into the plan for rollback granularity — turned out to matter far
+more as protection against losing work: all sixteen service-split aggregates plus the
+controllers/mappers/factories aggregate survived every interruption with zero rework.
 
-**Branch:** `mig/p11-controllers-services`, 14 commits ahead of `migration` @ `e15d1c3`.
+### Environment
 
-**Committed and safe:**
+Same shims as P0–P10: `python3` resolved to a real interpreter via a copy on `PATH` ahead
+of the Windows Store stub; `JAVA_HOME=/c/Users/Admin/.jdks/corretto-21.0.12` and
+`/c/Users/Admin/tools/apache-maven-3.9.16/bin` prepended for Maven. Every `mvn` invocation
+ran to completion in the foreground.
+
+**Gate-script bug found and fixed en route (`scripts/lib/check-service-contract-quality.py`).**
+`METHOD_START`'s regex matched any line ending in `;` and containing `(` — including
+`throw new X(...);` and `return foo(...);` statements — as if it were a method declaration,
+because the negative lookahead excluded only `class|interface|enum|record`, not statement
+keywords. Fixed by adding `throw|return|if|for|while|switch|new|super|this` to the
+exclusion list. Verified the fix removed exactly the 3 known false positives without
+changing any of the 23 genuine violations it also reported that day.
+
+### Commits (17 aggregates, one per commit)
 
 | Commit | Aggregate |
 |---|---|
-| `40ce39e` | thin controllers, MapStruct-constructed mappers, static factories |
+| `40ce39e` | Thin controllers; 11 application mappers switched from hand-built `new *V1(...)` to MapStruct construction; 8 static factories converted to resolvers/constructors |
 | `125809b` | `LearningServiceImpl` split into `LearningService` + `RoadmapAssignmentService` |
 | `fba7b1a` | `GroupServiceImpl` to 8 injected fields |
-| `615d0c7` | `LessonAssistantServiceImpl` to 5 |
-| `94e80f9` | `LessonInitialGenerationServiceImpl` to 5 |
-| `16be349` | `LessonRevisionServiceImpl` to 8 |
-| `899a644` | `LessonActivityManagementServiceImpl` to 8 |
-| `fe0593b` | `RoadmapGroupAssignmentServiceImpl` to 7 |
-| `769b074` | `TeacherVideoServiceImpl` to 7 |
+| `615d0c7` | `LessonAssistantServiceImpl` to 5 injected fields |
+| `94e80f9` | `LessonInitialGenerationServiceImpl` to 5 injected fields |
+| `16be349` | `LessonRevisionServiceImpl` to 8 injected fields |
+| `899a644` | `LessonActivityManagementServiceImpl` to 8 injected fields |
+| `fe0593b` | `RoadmapGroupAssignmentServiceImpl` to 7 injected fields |
+| `769b074` | `TeacherVideoServiceImpl` to 7 injected fields |
 | `808b618` | `LessonServiceImpl` to 199 lines / 8 fields (was 332 / 11) |
-| `d3df96f` | `RoadmapServiceImpl` to 197 lines / 8 fields |
-| `08aa16b` | `LessonActivityProgressServiceImpl` to 230 lines |
-| `c1aa7cc` | `PermissionServiceImpl` to 10 public methods |
-| `96977dd` | `UserServiceImpl` to 10 public methods / 8 fields |
+| `d3df96f` | `RoadmapServiceImpl` to 197 lines / 8 fields (was 279 / 9); fixed a pre-existing nested-record hard-rule violation (`EnrollmentKey` → top-level `RoadmapLessonEnrollmentKey`) found while relocating the code that held it |
+| `08aa16b` | `LessonActivityProgressServiceImpl` to 230 lines (was 287; a pure line-count violation, fields already at 8) |
+| `c1aa7cc` | `PermissionServiceImpl` to 10 public methods (was 11); new top-level `TeamLeadershipService`/`Impl` |
+| `96977dd` | `UserServiceImpl` to 10 public methods / 8 fields (was 11 / 10); removed a dead single-arg `listAssignableUsers(AppUser)` overload (zero callers) |
+| `ca54964` | `TeamServiceImpl` to 243 lines / 6 fields / 9 public methods (was 330 / 8 / 12); removed a dead `getUserByEmail(String)` (zero external callers); new `TeamLeadPromotionService`/`Impl` and `TeamMembershipSupport` |
+| `ecfe1dd` | `LearningEnrollmentServiceImpl` to 203 lines / 5 fields / 10 public methods (was 324 / 7 / 14); new `RoadmapEnrollmentService`/`Impl`; fixed a second pre-existing nested-record violation (`EnrollmentKey` → top-level `UserLessonEnrollmentKey`) |
+| *(this entry)* | `docs/aiae-migration-log.md` — this row |
 
-**Uncommitted, mid-aggregate** — the `TeamServiceImpl` split: modified
-`AdminController`, `TeamService`, `TeamServiceImpl`; new `TeamLeadPromotionService`,
-`TeamLeadPromotionServiceImpl`, and a `team/support/` directory.
+**16 `ServiceImpl` classes touched** against the plan's 5 oversized / 9 over-injected
+estimate (measured 6 oversized-by-lines, 11 over-injected, 6 over-public-methods — several
+classes tripped more than one limit at once, which is why the touched-class count exceeds
+the sum of any single category). **One violation declined, documented, and carried:**
+`MaterialFileServiceImpl` (11 public methods; max 10) is the literal entity-service for
+`MaterialFile` — it injects `materialFileRepository` directly, so splitting its public
+interface to shed one method would create a second service touching the same entity,
+violating the separate "1 entity = 1 repository = 1 service" hard rule. Declining the split
+is the correct outcome of that conflict, not an oversight.
 
-**Still outstanding after that:**
-- structure-lint item 14, `Service interfaces must not expose Map<String,Object>` — named
-  in no source document and owned by no phase.
-- **C9, the Logbook sink decision.** `verify-gates` items 6 and 7 want literal expressions;
-  this project has configurable `resolveFormatter()` / `resolveStrategy()` with tests, which
-  the plan assesses as stricter than the scaffold's. Either match the literals or carry the
-  two assertions as a documented exception — CR-5 exists upstream for exactly this. The
-  choice must be stated, not made silently.
-- Full `mvn -f backend/pom.xml clean verify` with no profile flag, and the gate before/after.
+Two collaborator-extraction patterns recur across the sixteen splits and are documented
+inline in the affected classes rather than repeated here: (1) where extracting a method into
+a *new* collaborator would only trade one field for another (net-zero), multiple
+extractable methods were combined into *one* new collaborator instead, to guarantee a net
+field reduction (`LessonMutationSupport` on `LessonServiceImpl` is the most explicit
+example, with its own Javadoc calling this out as a deliberate exception to
+one-collaborator-per-concern); (2) where the method to extract was the *only* caller of an
+already-injected collaborator field, the method's body was folded into that collaborator
+instead of creating a new one (`GroupRecordAssembler`, `LessonRevisionMetadataMapper`,
+`LessonActivityRecordAssembler`, `RoadmapGroupAssignmentRecordAssembler` all gained methods
+this way).
 
-**Targets:** `verify-gates` 10 → 8 (or 6 with the Logbook literals); `structure-lint`
-14 → 1, with item 1 (`usage-events migration`, carried CR-8) still failing.
+### C9 — the Logbook sink decision
 
-**What this phase already proves about the process.** Committing per aggregate was written
-into the plan for rollback granularity. Across three interruptions it turned out to matter
-far more as protection against losing work: fourteen aggregates survived budget exhaustion
-that would otherwise have cost the entire phase. Earlier phases that batched their work lost
-an hour each to the same failure.
+Read `docs/aiae-template-change-requests.md` CR-5 first, as instructed. CR-5 argues (upstream,
+against the template's own gate) that `verify-gates.sh` items 6–7 test for a literal
+expression rather than the property they protect, and that this project's actual
+implementation — `.strategy(resolveStrategy(props))` / `.sink(new
+DefaultSink(resolveFormatter(props), new DefaultHttpLogWriter()))` in `LogbookConfig`
+(:57–58), with `resolveFormatter` defaulting to `MetadataOnlyHttpLogFormatter` (stricter
+than the scaffold's `JsonHttpLogFormatter`) and `resolveStrategy` defaulting to
+`WithoutBodyStrategy` unless `logBodies` is explicitly enabled (`LogbookConfig:126,138`) —
+is **more** redacting than the literal the gate wants, not less, and is covered by its own
+tests (`LogbookConfigTest`).
+
+**Decision: keep the configurable design, decline flattening it to the literal, and carry
+`verify-gates` items 6–7 as a documented exception.** Reasoning: flattening a tested,
+stricter, configurable implementation into a hardcoded literal to satisfy a `grep` would be
+a straight regression in actual behavior (losing the `logBodies` escape hatch and the
+stricter default) purely to make a gate pass syntactically — exactly the failure mode CR-5
+is warning about. This is not a silent pick: CR-5 already exists upstream making this exact
+argument, so keeping the stricter design and citing CR-5 is picking the side this project
+already went on record for, not inventing a new position mid-phase.
+
+### Structure-lint item 14 — `Map<String,Object>` in service interfaces
+
+**Decision: declined as out of scope for this phase, not fixed.** The only `*Service.java`
+match is `LessonEntityService.markGenerating/markReady/markFailed/saveRevised` and its
+`generationMeta(...)` builder, which read/write `Lesson.generationMetadata` — a JSONB column
+holding heterogeneous, provider-varying AI-generation-pipeline metadata (`step`, `mode`,
+`desiredFormat`, `depth`, `tone`, plus caller-supplied `extra` entries that differ per
+generation step and per provider). Tracing every consumer (`LessonDetailRecord`,
+`LessonActivityRecord`, `LessonRecordAssembler`, `LessonRevisionMetadataMapper`,
+`TeacherVideoPromptBuilder`, `TeacherVideoMetadataSupport`, `LessonGenServiceImpl`'s
+`GenerationMetadataAssembler`) shows the same untyped map threaded through at least three
+feature areas — lesson content generation, lesson activity generation, and teacher-video
+generation — and out to the OpenAPI-facing `LessonDetailRecord`/`LessonActivityRecord`
+fields. Replacing it with typed records would mean designing one contract for a blob that is
+*intentionally* extensible per caller, changing the DB column, the OpenAPI schema, and every
+one of those call sites — a schema/contract redesign with real behavior-change risk, not a
+mechanical service-shape extraction. No existing CR (unlike CR-5 for C9, or CR-8 for the
+carried usage-events item) covers this; it genuinely has no owning phase. Recommend a
+dedicated follow-up phase or CR rather than a P11-scoped fix.
+
+### Verification
+
+| Gate | Before (P10 end, re-measured at `e15d1c3` via a scratch worktree) | After |
+|---|---|---|
+| `bash scripts/verify-gates.sh` | **10** | **9** — `check-production-static-methods.sh reported violations` (item 9) is gone, cleared by the 8 static-factory-to-resolver/constructor conversions in `40ce39e`; the other 9 are byte-identical: 4 pre-existing frontend items (vitest pin, lint script, eslint config, sidebar), `check-maven-dependency-analysis.py` (pre-existing `backend/pom.xml`/`DEPENDENCY-ANALYSIS.md` config, untouched by this or any phase since P9), Logbook items 6–7 (carried, C9), `check-frontend-ui-rules.sh` (frontend, untouched), and `check-service-contract-quality.sh` (still fails — the single declined `MaterialFileServiceImpl` violation) |
+| `bash scripts/structure-lint.sh` | **14** | **2** — item 2 (`check-thin-controllers.py`) and items 3–13 (11 application mappers' manual `new *V1(...)`) are gone, both cleared by `40ce39e`; item 1 (`usage-events migration`, carried CR-8) and item 14 (`Map<String,Object>`, declined above) remain, byte-identical in wording |
+| `python3 scripts/lib/check-service-contract-quality.py backend/service/src/main/java` | 6 oversized-by-lines, 11 over-injected-fields, 6 over-public-methods classes (16 distinct classes, several tripping more than one limit) | **1 violation** — `MaterialFileServiceImpl`, 11 public methods, declined and documented above |
+| `mvn -f backend/pom.xml clean verify` (no profile flag) | BUILD SUCCESS (P10 baseline) | **BUILD SUCCESS**, reproduced; every module's `jacoco-check` still "All coverage checks have been met." |
+| Fixture manifest (`.claude/.aiae-fixtures-manifest`) | 80/80 | **80/80** — re-hashed with `sha256sum -c` after the full diff; nothing under `.claude/**` touched |
+
+**Movement beyond the two predicted items: none.** `verify-gates.sh` moved by exactly the
+static-methods assertion (10 → 9); `structure-lint.sh` moved by exactly the thin-controllers
+assertion plus the 11 manual-mapping assertions it lists individually (14 → 2, both
+predicted-remaining items — usage-events and Map<String,Object> — present and
+byte-identical in wording). Confirmed by running both scripts against a throwaway
+`git worktree` checked out at the P11 base commit (`e15d1c3`) and diffing the failure lists
+line-for-line, rather than trusting a remembered baseline number.
+
+**Test counts, per module** (`mvn -f backend/pom.xml clean verify`, strict 0.80/0.70 floors,
+no `-Pmvp`):
+
+| Module | Tests | Failures/Errors | Coverage |
+|---|---|---|---|
+| `domain` | 2 | 0/0 | met |
+| `migrations` | 0 | 0/0 | met |
+| `event-logging-to-db-feature` | 48 | 0/0 | met |
+| `observability` | 11 | 0/0 | met |
+| `external-services` | 177 | 0/0 | met |
+| `cache-management` | 19 | 0/0 | met |
+| `service` | 1234 | 0/0 | met |
+| `application` | 713 (45 skipped — `@Disabled`/profile-gated integration tests, pre-existing) | 0/0 | met |
+| **Total** | **2204** | **0/0** | **all 8 modules "All coverage checks have been met."** |
+
+Total rose from the ~2,030 pre-phase baseline to 2,204 — a net increase, driven by one new
+test file per new collaborator/interface across the sixteen splits (each split's original
+test class was trimmed to delegation-style tests against the new collaborator mock, and the
+moved test bodies were ported verbatim into the new collaborator's own test class, so no
+test coverage was dropped in the split — it moved and, in several classes, grew with new
+edge cases the extraction made easier to isolate).
+
+**Rollback** `git revert` on any of the 17 commits restores that aggregate's pre-split
+shape; each commit is independently revertable since every aggregate's collaborators, tests,
+and callers were committed together. No out-of-repo action — nothing was deployed, and no
+data-carrying migration was touched.
+
+### What the plan got wrong, what changed under measurement, and what was declined
+
+- **The plan's "5 oversized / 9 over-injected" undercounted the actual violation surface.**
+  Measured at phase start: 6 oversized-by-lines, 11 over-injected-fields, and 6
+  over-public-methods classes — 16 distinct `ServiceImpl` classes touched in total (several
+  tripped more than one limit simultaneously, e.g. `LessonServiceImpl` was both
+  over-lines and over-fields, `TeamServiceImpl` was both over-lines and over-methods),
+  which is why 16 classes needed splitting against a plan that named 14.
+- **`LearningEnrollmentServiceImpl` was not named in the plan's list but was the last
+  violation standing after the other 15** (324 lines / 12 public methods, measured 14) —
+  found by re-running the gate after aggregate 15, not predicted in advance. Split the same
+  way as the plan's own precedent (`LearningServiceImpl` → `LearningService` +
+  `RoadmapAssignmentService`): by caller-boundary, lesson-enrollment methods staying on the
+  original interface, roadmap-enrollment methods and their lesson fan-out moving to a new
+  `RoadmapEnrollmentService`.
+- **Two pre-existing nested-record hard-rule violations were found and fixed opportunistically**
+  while relocating the code that held them: `RoadmapServiceImpl`'s package-private
+  `EnrollmentKey` (aggregate 11) and `LearningEnrollmentServiceImpl`'s package-private
+  `EnrollmentKey` — an unrelated, differently-scoped record with the same name in a different
+  class (aggregate 16) — were both promoted to top-level records
+  (`RoadmapLessonEnrollmentKey`, `UserLessonEnrollmentKey`) in their module's `models`
+  package. Neither was part of the plan; both were "No nested data types in production code"
+  hard-rule violations that predated this phase and were only visible once their hosting
+  method was being moved anyway.
+- **Two method-count violations were resolved by dead-code removal, not architecture
+  change.** `UserService.listAssignableUsers(AppUser)` (single-arg overload) and
+  `TeamService.getUserByEmail(String)` both had zero callers anywhere in `service`,
+  `application`, or any test directory, confirmed by exhaustive grep before deletion.
+  Removing them mechanically resolved both classes' method-count violations with no
+  functional risk and no behavior change.
+- **One violation declined outright:** `MaterialFileServiceImpl`, documented above — the
+  entity-service integrity rule and the max-public-methods gate are in direct conflict for
+  this one class, and the entity-service rule wins.
+- **Structure-lint item 14 (`Map<String,Object>`) declined as out of scope,** documented
+  above — a schema/contract redesign, not a service-shape extraction, and owned by no
+  existing CR or phase.
+- **C9 resolved by keeping the stricter, configurable Logbook design** and carrying
+  `verify-gates` items 6–7 as a documented exception per CR-5, rather than flattening to the
+  literal the gate wants.
