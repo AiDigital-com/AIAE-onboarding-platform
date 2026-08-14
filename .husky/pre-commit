@@ -1,0 +1,19 @@
+#!/usr/bin/env sh
+# Frontend lint, run before every commit.
+#
+# REPORT-ONLY for now, exit 0 regardless — mirrors the pattern P2 established
+# for scripts/local-verify.sh. ESLint was installed by P12 onto a codebase
+# with no prior linting; the first run found 339 pre-existing violations
+# (see docs/aiae-migration-log.md, P12), and fixing all of them is explicitly
+# not this phase's job. Blocking commits on day one would stop every phase
+# after this one from landing. Flip this to blocking once the backlog is
+# cleared — same lever P15 uses for local-verify.sh.
+#
+# Husky's shim runs this script with `sh -e`, so a bare failing command
+# would abort the script before reaching any cleanup below it — the `if`
+# here is load-bearing, not stylistic: `set -e` does not trigger for a
+# command whose exit status is itself being tested.
+if ! npm --prefix frontend run lint; then
+  echo "pre-commit: eslint reported violations (report-only, not blocking — see docs/aiae-migration-log.md P12)"
+fi
+exit 0
