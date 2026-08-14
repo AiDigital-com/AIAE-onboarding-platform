@@ -3575,3 +3575,30 @@ fewer. No movement beyond what was predicted in either direction.
 **Rollback** `git revert <this-commit>`; `cd frontend && rm -rf node_modules
 package-lock.json && npm ci` (against the reverted lockfile) restores the pre-P12 toolchain.
 No out-of-repo action.
+
+---
+
+## Correction: the "9x slower test suite" finding was wrong
+
+Recorded during P0's R5 spike and repeated in a commit message: that pinning
+`vite ^5.4` / `vitest ^3.2.6` cost roughly nine times slower test runs — 5.6s on
+vite 8 against 52.1s on the pinned toolchain, same 78 tests.
+
+**Measured again on the committed P12 tree: 4.52s.** Reproduced by the phase agent
+three times at 4.7–5.6s before I checked it myself.
+
+The 52.1s was a cold-start artifact. The spike ran in a freshly created scratch
+copy where Vite had to perform its dependency-optimisation pass from nothing on
+the very first invocation. That cost is paid once per cache, not per run, and it
+is not a property of the pinned toolchain.
+
+**Consequences.** The downgrade costs nothing measurable in test time. The
+suggestion to repurpose CR-6 as a report of the mandated pin's performance cost
+is withdrawn — there is no such cost to report, and CR-6 stays withdrawn on its
+original grounds: the compatibility deadlock it was written for never
+materialised.
+
+Recorded rather than quietly edited, because the wrong number was used to argue
+for an upstream change request. A measurement taken once, on a cold cache, in a
+directory that existed for the duration of one command, was not a measurement of
+the thing it claimed to measure.
