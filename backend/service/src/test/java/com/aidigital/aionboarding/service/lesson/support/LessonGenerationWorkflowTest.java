@@ -8,6 +8,7 @@ import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.lesson.enums.LessonCreationModeV1;
 import com.aidigital.aionboarding.service.lesson.models.CreateLessonInput;
+import com.aidigital.aionboarding.service.lesson.models.LessonGenerationMetadata;
 import com.aidigital.aionboarding.service.lesson.services.entity.LessonEntityService;
 import com.aidigital.aionboarding.service.lesson.util.LessonContentUtil;
 import com.aidigital.aionboarding.service.lessongen.model.GeneratedContentResult;
@@ -170,9 +171,9 @@ class LessonGenerationWorkflowTest {
 				.hasMessageContaining("Lesson generation failed")
 				.satisfies(ex -> assertThat(((AppException) ex).getCode()).isEqualTo(ErrorReason.C003.name()));
 
-		ArgumentCaptor<Map<String, Object>> metaCaptor = ArgumentCaptor.forClass(Map.class);
+		ArgumentCaptor<LessonGenerationMetadata> metaCaptor = ArgumentCaptor.forClass(LessonGenerationMetadata.class);
 		verify(lessonEntityService).markFailed(eq(generating), eq("OpenAI rate limit"), metaCaptor.capture());
-		assertThat(metaCaptor.getValue()).containsKey("failedAt");
+		assertThat(metaCaptor.getValue().asMap()).containsKey("failedAt");
 	}
 
 	@Nested
@@ -238,9 +239,9 @@ class LessonGenerationWorkflowTest {
 			workflow.run(draft, prepared, input, ids, "Draft");
 
 			// Verification
-			ArgumentCaptor<Map<String, Object>> metaCaptor = ArgumentCaptor.forClass(Map.class);
+			ArgumentCaptor<LessonGenerationMetadata> metaCaptor = ArgumentCaptor.forClass(LessonGenerationMetadata.class);
 			verify(lessonEntityService).markGenerating(eq(draft), metaCaptor.capture());
-			Map<String, Object> generatingMeta = metaCaptor.getValue();
+			Map<String, Object> generatingMeta = metaCaptor.getValue().asMap();
 			@SuppressWarnings("unchecked")
 			List<Map<String, Object>> attachedFiles = (List<Map<String, Object>>) generatingMeta.get("attachedFiles");
 			assertThat(attachedFiles).hasSize(1);
@@ -255,12 +256,12 @@ class LessonGenerationWorkflowTest {
 					"file_id", "file-abc"
 			));
 
-			ArgumentCaptor<Map<String, Object>> readyMetaCaptor = ArgumentCaptor.forClass(Map.class);
+			ArgumentCaptor<LessonGenerationMetadata> readyMetaCaptor = ArgumentCaptor.forClass(LessonGenerationMetadata.class);
 			verify(lessonEntityService).markReady(
 					eq(generating), eq("Title"), anyString(), eq("# Title\nbody"), readyMetaCaptor.capture());
 			@SuppressWarnings("unchecked")
 			List<Map<String, Object>> readyAttachedFiles =
-					(List<Map<String, Object>>) readyMetaCaptor.getValue().get("attachedFiles");
+					(List<Map<String, Object>>) readyMetaCaptor.getValue().asMap().get("attachedFiles");
 			assertThat(readyAttachedFiles).containsExactly(Map.of(
 					"type", "input_file",
 					"file_id", "file-abc"
@@ -290,12 +291,12 @@ class LessonGenerationWorkflowTest {
 					.isInstanceOf(AppException.class)
 					.hasMessageContaining("Lesson generation failed");
 
-			ArgumentCaptor<Map<String, Object>> failedMetaCaptor = ArgumentCaptor.forClass(Map.class);
+			ArgumentCaptor<LessonGenerationMetadata> failedMetaCaptor = ArgumentCaptor.forClass(LessonGenerationMetadata.class);
 			verify(lessonEntityService).markFailed(eq(generating), eq("OpenAI rate limit"),
 					failedMetaCaptor.capture());
 			@SuppressWarnings("unchecked")
 			List<Map<String, Object>> failedAttachedFiles =
-					(List<Map<String, Object>>) failedMetaCaptor.getValue().get("attachedFiles");
+					(List<Map<String, Object>>) failedMetaCaptor.getValue().asMap().get("attachedFiles");
 			assertThat(failedAttachedFiles).containsExactly(Map.of(
 					"type", "input_file",
 					"file_id", "file-failure"

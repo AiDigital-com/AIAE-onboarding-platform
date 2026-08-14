@@ -68,15 +68,14 @@
 			<artifactId>observability</artifactId>
 		</dependency>
 
-		<!-- application never imports a class from external-services directly
-			 in earlier layers, but SpaFallbackController / lesson & material
-			 upload flows do — declared explicitly per
-			 maven-dependency-plugin:analyze-only (previously reached only
-			 transitively via `service`). -->
-		<dependency>
-			<groupId>${project.groupId}</groupId>
-			<artifactId>external-services</artifactId>
-		</dependency>
+		<!-- external-services is NOT declared directly here on purpose:
+			 structure-lint forbids an application -> external-services pom.xml
+			 edge ("route through service/"). YoutubeController/YoutubeApiMapper
+			 use external-services' YoutubeClient/model types directly in Java,
+			 reached transitively through the existing service -> external-services
+			 edge, so maven-dependency-plugin:analyze-only flags it "used
+			 undeclared" — ignored, not declared; see
+			 backend/DEPENDENCY-ANALYSIS.md. -->
 
 		<!-- Web + security + AOP + actuator -->
 		<dependency>

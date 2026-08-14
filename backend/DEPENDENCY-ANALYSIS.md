@@ -103,6 +103,18 @@ bytecode-reference analyzer sees zero direct main-source reference and misclassi
 compile-scope dependency as test-only. Do not "fix" any of these five by re-scoping to
 `test` — verify against a real build first.
 
+## One used-undeclared exception
+
+`ignoredUsedUndeclaredDependencies` contains exactly one entry:
+`${project.groupId}:external-services` for `application`. `YoutubeController`/
+`YoutubeApiMapper` reference `external-services`' `YoutubeClient` and its model types
+directly, which is genuinely "used undeclared" by this analyzer's definition — but
+declaring the dependency directly in `application/pom.xml` is forbidden by
+`structure-lint.sh`'s own architecture assertion ("application/pom.xml must not depend on
+external-services — route through service/"). The edge already exists transitively via
+`service -> external-services`, so the two gates are reconciled by ignoring the analyzer
+finding rather than declaring the dependency.
+
 Keep the dependency graph small going forward: when the gate identifies a genuinely unused
 compile dependency, remove it (as `commons-csv` was removed here) rather than adding a new
 ignore. Add an ignore only for the same two shapes documented above — a POM-only aggregator

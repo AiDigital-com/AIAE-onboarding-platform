@@ -6,6 +6,7 @@ import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.lesson.models.LessonDetailRecord;
+import com.aidigital.aionboarding.service.lesson.models.LessonGenerationMetadata;
 import com.aidigital.aionboarding.service.lesson.models.ReviseLessonInput;
 import com.aidigital.aionboarding.service.lesson.models.RevisionBriefRecord;
 import com.aidigital.aionboarding.service.lesson.models.RevisionHistoryEntryRecord;
@@ -157,6 +158,6 @@ public class LessonRevisionServiceImpl implements LessonRevisionService {
     Lesson applyRevisionAndSave(Lesson lesson, String revisedContent, RevisionHistoryEntryRecord revisionEntry) {
         lessonRevisionMetadataMapper.applyRevisedContent(lesson, revisedContent);
         Map<String, Object> updatedMetadata = lessonRevisionMetadataMapper.mergeRevisionEntry(lesson, revisionEntry);
-        return lessonEntityService.saveRevised(lesson, updatedMetadata);
+        return lessonEntityService.saveRevised(lesson, new LessonGenerationMetadata(updatedMetadata));
     }
 }

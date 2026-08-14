@@ -6,6 +6,7 @@ import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.lesson.models.CreateLessonInput;
+import com.aidigital.aionboarding.service.lesson.models.LessonGenerationMetadata;
 import com.aidigital.aionboarding.service.lesson.services.entity.LessonEntityService;
 import com.aidigital.aionboarding.service.lesson.util.LessonContentUtil;
 import com.aidigital.aionboarding.service.lessongen.model.GeneratedContentResult;
@@ -89,7 +90,7 @@ public class LessonGenerationWorkflow {
         generatingMeta.put(META_PROMPT_VERSION, LessonPromptConstants.LESSON_PROMPT_VERSION);
         generatingMeta.put(META_PREPARED_MATERIALS, serializedPreparedMaterials);
         generatingMeta.put(META_ATTACHED_FILES, attachedFiles);
-        lesson = lessonEntityService.markGenerating(lesson, generatingMeta);
+        lesson = lessonEntityService.markGenerating(lesson, new LessonGenerationMetadata(generatingMeta));
 
         try {
             GeneratedContentResult result = lessonGenService.generateLessonContent(prompt);
@@ -114,7 +115,7 @@ public class LessonGenerationWorkflow {
                 extractedTitle,
                 contentHtml,
                 isHtml ? "" : rawContent,
-                readyMeta
+                new LessonGenerationMetadata(readyMeta)
             );
         } catch (Exception ex) {
             String errorMessage = ex.getMessage() == null ? "Lesson generation failed" : ex.getMessage();
@@ -124,7 +125,7 @@ public class LessonGenerationWorkflow {
             failedMeta.put(META_PREPARED_MATERIALS, serializedPreparedMaterials);
             failedMeta.put(META_ATTACHED_FILES, attachedFiles);
             failedMeta.put(META_FAILED_AT, currentTime.utcDateTime().toString());
-            lessonEntityService.markFailed(lesson, errorMessage, failedMeta);
+            lessonEntityService.markFailed(lesson, errorMessage, new LessonGenerationMetadata(failedMeta));
             throw new AppException(ErrorReason.C003, "Lesson generation failed", ex);
         }
     }

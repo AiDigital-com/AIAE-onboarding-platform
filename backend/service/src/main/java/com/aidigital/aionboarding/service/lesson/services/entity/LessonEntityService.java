@@ -21,8 +21,10 @@ import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.lesson.enums.LessonCreationModeV1;
 import com.aidigital.aionboarding.service.lesson.models.CreateLessonInput;
+import com.aidigital.aionboarding.service.lesson.models.LessonGenerationMetadata;
 import com.aidigital.aionboarding.service.lesson.models.LessonListQuery;
 import com.aidigital.aionboarding.service.lesson.models.LessonVisibilityFilter;
+import com.aidigital.aionboarding.service.lesson.support.LessonGenerationMetadataFactory;
 import com.aidigital.aionboarding.service.lesson.support.LessonHtmlSanitizer;
 import com.aidigital.aionboarding.service.lesson.support.LessonSpecificationBuilder;
 import com.aidigital.aionboarding.service.material.services.entity.MaterialEntityService;
@@ -39,9 +41,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 
@@ -64,16 +64,6 @@ public class LessonEntityService {
 
 	private static final String ANONYMOUS_DISPLAY_NAME = "anonymous";
 
-	private static final String META_STEP = "step";
-
-	private static final String META_MODE = "mode";
-
-	private static final String META_DESIRED_FORMAT = "desiredFormat";
-
-	private static final String META_DEPTH = "depth";
-
-	private static final String META_TONE = "tone";
-
 	private final LessonRepository lessonRepository;
 
 	private final LessonMaterialEntityService lessonMaterialEntityService;
@@ -89,6 +79,8 @@ public class LessonEntityService {
 	private final LessonContentFormatEntityService lessonContentFormatEntityService;
 
 	private final LessonSpecificationBuilder lessonSpecificationBuilder;
+
+	private final LessonGenerationMetadataFactory lessonGenerationMetadataFactory;
 
 	private final LessonHtmlSanitizer lessonHtmlSanitizer;
 
@@ -211,7 +203,9 @@ public class LessonEntityService {
 		lesson.setContentMarkdown("");
 		lesson.setErrorMessage("");
 		lesson.setRevisionHistory(Collections.emptyList());
-		lesson.setGenerationMetadata(generationMeta(input, DRAFT_STEP, Map.of()));
+		String draftMode = input.mode() == null ? LessonCreationModeV1.GENERATE.name() : input.mode().name();
+		lesson.setGenerationMetadata(lessonGenerationMetadataFactory
+				.forCreation(input, DRAFT_STEP, draftMode, LessonGenerationMetadata.EMPTY).asMap());
 		lesson = lessonRepository.save(lesson);
 		linkMaterials(lesson, materialIds);
 		return lesson;
@@ -236,7 +230,9 @@ public class LessonEntityService {
 		lesson.setContentMarkdown("");
 		lesson.setErrorMessage("");
 		lesson.setRevisionHistory(Collections.emptyList());
-		lesson.setGenerationMetadata(generationMeta(input, MANUAL_STEP, Map.of()));
+		String manualMode = input.mode() == null ? LessonCreationModeV1.GENERATE.name() : input.mode().name();
+		lesson.setGenerationMetadata(lessonGenerationMetadataFactory
+				.forCreation(input, MANUAL_STEP, manualMode, LessonGenerationMetadata.EMPTY).asMap());
 		lesson = lessonRepository.save(lesson);
 		linkMaterials(lesson, materialIds);
 		return lesson;
@@ -250,11 +246,11 @@ public class LessonEntityService {
 	 * @return the saved {@link Lesson}
 	 */
 	@Transactional
-	public Lesson markGenerating(Lesson lesson, Map<String, Object> generationMetadata) {
+	public Lesson markGenerating(Lesson lesson, LessonGenerationMetadata generationMetadata) {
 		lesson.setStatus(requireStatus(LessonStatusCode.GENERATING));
 		lesson.setErrorMessage("");
 		if (generationMetadata != null) {
-			lesson.setGenerationMetadata(generationMetadata);
+			lesson.setGenerationMetadata(generationMetadata.asMap());
 		}
 		lesson.setUpdatedAt(currentTime.utcDateTime());
 		return lessonRepository.save(lesson);
@@ -276,7 +272,7 @@ public class LessonEntityService {
 			String extractedTitle,
 			String contentHtml,
 			String contentMarkdown,
-			Map<String, Object> readyMetadata
+			LessonGenerationMetadata readyMetadata
 	) {
 		lesson.setStatus(requireStatus(LessonStatusCode.READY));
 		if (extractedTitle != null && !extractedTitle.isBlank()) {
@@ -287,7 +283,7 @@ public class LessonEntityService {
 		lesson.setContentMarkdown(contentMarkdown == null ? "" : contentMarkdown);
 		lesson.setErrorMessage("");
 		if (readyMetadata != null) {
-			lesson.setGenerationMetadata(readyMetadata);
+			lesson.setGenerationMetadata(readyMetadata.asMap());
 		}
 		lesson.setUpdatedAt(currentTime.utcDateTime());
 		return lessonRepository.save(lesson);
@@ -302,11 +298,11 @@ public class LessonEntityService {
 	 * @return the saved {@link Lesson}
 	 */
 	@Transactional
-	public Lesson markFailed(Lesson lesson, String errorMessage, Map<String, Object> failedMetadata) {
+	public Lesson markFailed(Lesson lesson, String errorMessage, LessonGenerationMetadata failedMetadata) {
 		lesson.setStatus(requireStatus(LessonStatusCode.FAILED));
 		lesson.setErrorMessage(errorMessage == null ? "" : errorMessage);
 		if (failedMetadata != null) {
-			lesson.setGenerationMetadata(failedMetadata);
+			lesson.setGenerationMetadata(failedMetadata.asMap());
 		}
 		lesson.setUpdatedAt(currentTime.utcDateTime());
 		return lessonRepository.save(lesson);
@@ -337,8 +333,8 @@ public class LessonEntityService {
 	 * @return the saved {@link Lesson}
 	 */
 	@Transactional
-	public Lesson saveRevised(Lesson lesson, Map<String, Object> generationMetadata) {
-		lesson.setGenerationMetadata(generationMetadata);
+	public Lesson saveRevised(Lesson lesson, LessonGenerationMetadata generationMetadata) {
+		lesson.setGenerationMetadata(generationMetadata.asMap());
 		lesson.setErrorMessage("");
 		lesson.setUpdatedAt(currentTime.utcDateTime());
 		return lessonRepository.save(lesson);
@@ -618,30 +614,5 @@ public class LessonEntityService {
 	 */
 	LessonContentFormat requireContentFormat(String code) {
 		return lessonContentFormatEntityService.getReferenceByCode(code);
-	}
-
-	/**
-	 * Builds the initial generation metadata map for a new lesson.
-	 *
-	 * @param input the lesson creation input
-	 * @param step  the creation step label (e.g., {@code "draft"} or {@code "manual"})
-	 * @param extra additional entries to merge into the metadata
-	 * @return a mutable metadata map
-	 */
-	Map<String, Object> generationMeta(
-			CreateLessonInput input,
-			String step,
-			Map<String, Object> extra
-	) {
-		Map<String, Object> meta = new HashMap<>();
-		meta.put(META_STEP, step);
-		meta.put(META_MODE, input.mode() == null ? LessonCreationModeV1.GENERATE.name() : input.mode().name());
-		meta.put(META_DESIRED_FORMAT, input.desiredFormat());
-		meta.put(META_DEPTH, input.depth());
-		meta.put(META_TONE, input.tone());
-		if (extra != null) {
-			meta.putAll(extra);
-		}
-		return meta;
 	}
 }

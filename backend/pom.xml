@@ -413,6 +413,17 @@
 									<ignoredNonTestScopedDependency>jakarta.persistence:jakarta.persistence-api</ignoredNonTestScopedDependency>
 									<ignoredNonTestScopedDependency>org.springframework.data:spring-data-jpa</ignoredNonTestScopedDependency>
 								</ignoredNonTestScopedDependencies>
+								<!-- application: external-services is used directly in Java
+									 (YoutubeController/YoutubeApiMapper) but must NOT become a
+									 direct pom.xml dependency — structure-lint asserts
+									 "application/pom.xml must not depend on external-services —
+									 route through service/". The edge already exists
+									 transitively via service -> external-services, so this is
+									 ignored rather than declared. See
+									 backend/DEPENDENCY-ANALYSIS.md. -->
+								<ignoredUsedUndeclaredDependencies>
+									<ignoredUsedUndeclaredDependency>${project.groupId}:external-services</ignoredUsedUndeclaredDependency>
+								</ignoredUsedUndeclaredDependencies>
 							</configuration>
 						</execution>
 					</executions>
