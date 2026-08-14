@@ -1248,77 +1248,181 @@ settled it: the downgrade works.** Install, build and the full test suite are gr
 **Build** `cd frontend && npm run build`
 **Test** `npm test`, `npm run typecheck`, `npm run lint`
 **Review** `frontend-style-review`
-**Verification** `npm run lint` green and firing on pre-commit; `verify-gates.sh` vitest-pin
+**Verification** `npm run lint` runs and fires on pre-commit; `verify-gates.sh` vitest-pin
 assertion passes; bundle size recorded via `report-bundle-size.sh` before → after.
+
+*Corrected 2026-08-14.* This line read "`npm run lint` **green** and firing on pre-commit",
+and the Exit condition below said "lint is green and hooked". **Both were unreachable and
+the phase was merged without meeting them.** Installing the template's ESLint config on a
+codebase that has never had linting yields **339 errors**, not zero. Neither this plan nor
+the audit budgeted a phase to clear them, and P13/P14 — where frontend work would have
+lived — were removed from scope.
+
+Clearing them is also now forbidden. 184 of the 339 are `no-restricted-syntax` demanding
+that constants and interfaces move out of components — restructuring 145 UI source files —
+against the standing product decision that the UI is carried over unchanged. Decided
+2026-08-14: the backlog stays, `.husky/pre-commit` stays report-only, and `eslint --fix` is
+not the answer either (it repairs **0** of 339; the `import-section-order` rule declares
+`fixable: "code"` in its meta and ships no fixer — CR-12). See `migration-guardrails.md`.
+
 **Rollback** `git revert`; `npm ci` restores the lockfile.
 
-> **Exit** — lint is green and hooked, the chosen toolchain builds and tests, `sass` is gone,
-> and the three libraries have a recorded decision.
+> **Exit** — lint is installed, runs, and is hooked into pre-commit in report-only mode with
+> its 339-error backlog recorded; the chosen toolchain builds and tests, `sass` is gone, and
+> the three libraries have a recorded decision.
 
 ---
 
 ### P15 — Make it stick · *lock-in*
 
-**Preconditions.** Both chains complete.
+**Preconditions.** Both chains complete. Working tree clean on `migration`.
+
+**Amended 2026-08-14.** Three changes, all agreed in session: the three unresolved backend
+gate failures were never in this step list and its Exit condition cannot be met without
+them; steps 1 and 5 both read "make `local-verify.sh` blocking" and are now one step; and
+the carried set is written out below so the Exit comparison is mechanical.
+
+**Standing rule for this phase.** The carried set is **closed**. It contains only what was
+decided by name (below). Anything else that surfaces — a gate nobody tracked, a refactor
+that ripples further than expected — is **carried through to completion, not added to the
+carried set**. This is a convergence migration; a phase that defers every hard item is not
+convergence. Where an item outgrows one agent pass, commit what is done and continue in the
+next pass. Do not descope.
 
 **Steps.**
 
-1. **Make `local-verify.sh` blocking, and treat `ci.yml` as documentation.** Flip
-   `static-checks` in `ci.yml` (remove `continue-on-error`) for convergence, but nothing
-   executes that file — the enforcement that bites is step 5.
+1. **Close the three unresolved backend gate failures.** None of these is a decision; all
+   three are work that fell between phases.
 
-   **There is no allow-list mechanism.** An earlier revision of this step said the four
-   carried assertions would be "explicitly allow-listed and annotated". `verify-gates.sh`
-   has no such feature — no allow-list, no annotations, no exemptions. What exists after
-   the P2 follow-up is that it now *reports every* failure instead of aborting on the
-   first, so the carried ones are visible alongside everything else and can be compared
-   against the log's expected set. Blocking therefore means: the failure list must equal
-   the carried set exactly — no additions, no disappearances. That comparison is manual
-   until CR-4 lands upstream. Each annotation names the rule the gate conflicts with and the CR tracking
-   it. The `== 1` form from P2 stays for CR-1. **This file still executes nowhere** — it is
-   converged for a future remote; the enforcement that actually bites is step 5.
-2. Confirm the AIAE `local-verify.sh` installed in P2 still runs gates, `mvn clean verify`,
-   the frontend suite and the compose syntax check, end to end with no skipped step.
-3. **Raise coverage to 0.80 LINE / 0.70 BRANCH and flip `.template-phase` to `engineering`.**
-   This is a hard exit condition (§6.1 D-C): P15 does not close below it, and the temporary
-   `mvp` floor ends here. Run `finalize-coverage`; the gap was measured in P9 step 2, so
-   the size of this job is already known rather than discovered now. **Close out the P9
-   step 2 note in the log.**
+   a. **`maven-dependency-plugin` is absent from the entire backend.** `grep -rn
+      "dependency-plugin" backend/` returns zero. P0 flagged the checker "resolve in P2";
+      the plan and audit both stated the only violation was the missing
+      `backend/DEPENDENCY-ANALYSIS.md` policy file, and **P2 disproved that by running it** —
+      creating the file moves the failure to `maven-dependency-plugin is required`. The
+      checker wants the plugin in root `build/plugins` *and* an `analyze-only` execution
+      bound to `verify` under `pluginManagement` with `failOnWarning=true` and
+      `ignoreNonCompile=true`. **Size is unknown until run**: `failOnWarning=true` fails the
+      build on every undeclared-but-used and declared-but-unused dependency across seven
+      modules. Work it to completion per the standing rule above.
 
-   Flipping the phase is what enforces 0.80/0.70 — the `-Pmvp` relaxation is passed only
-   while `.template-phase` reads `mvp`. It is *not* the same thing as running the handoff
-   script; see step 3a.
-3a. **Do not run `prepare-engineering-handoff.sh`.** It is not a checker — it is a
-   destructive migration. Verified in the standard: at line 174 it executes
-   `remove-usage-logging.sh --apply`, and at line 282 it hard-fails if
-   `backend/event-logging-to-db-feature` still exists. Running it would delete the usage
-   telemetry this project is keeping (§6.1 D-D). Record in the log that the script is
-   deliberately not run and why, so the next person does not read its absence as an
-   oversight.
-4. Document the `sync-llm-aux.sh --update-lock` upgrade path in `AGENTS.md`, so the next
+   b + c. **The two Logbook assertions: keep our implementation, file the CR.** *Decided
+      2026-08-14 (option B).* `verify-gates.sh:401,403` are literal `grep -F` for
+      `new DefaultSink(new JsonHttpLogFormatter(), new DefaultHttpLogWriter())` and
+      `.strategy(new WithoutBodyStrategy())`. We build the same objects through
+      `resolveFormatter(props)` / `resolveStrategy(props)`, and our default is **stricter
+      than the gate demands**: with `logBodies=false` we use `MetadataOnlyHttpLogFormatter`,
+      where the gate settles for the JSON formatter. The gate asserts a *form*; our form
+      yields a better *property*, and it is already covered by tests. Inlining the literals
+      would weaken working production logging to satisfy a text match — the same trade we
+      refused for `Sidebar` → `NavRail`. File the template exception alongside CR-1; these
+      two join the carried set.
+
+2. **Type the `Map<String,Object>` leak out of the service interface.**
+   `structure-lint.sh:303` scopes this to `*Service.java` under `backend/service`; exactly
+   one file trips it — `service/lesson/services/entity/LessonEntityService.java`, **7 sites**,
+   all carrying the `Lesson.generationMetadata` JSON column raw through `markGenerating`,
+   `markFailed`, `saveRevised` and the `generationMeta` builder. Introduce the typed record
+   and convert at the boundary. This touches live lesson-generation logic; work it to
+   completion.
+
+3. **Raise `domain` coverage to 0.80 LINE / 0.70 BRANCH, then flip `.template-phase` to
+   `engineering`.** Hard exit condition (§6.1 D-C). **Order matters: steps 1 and 2 land
+   first** — the flip drops `-Pmvp` and turns the strict floor on for *every* module at
+   once, so flipping early makes the open gates block the remaining work.
+
+   The job is far smaller than the 105-class module suggests. `lombok.config` already sets
+   `lombok.addLombokGeneratedAnnotation = true` (verified in bytecode), so JaCoCo counts
+   **259 lines and 112 branches** in total, currently 6 and 8 covered:
+
+   - **~17 composite-key `*Id` classes — ~136 lines, 100 of the 112 branches.** Their
+     `equals`/`hashCode` is the whole branch budget. `EqualsVerifier` covers each in one
+     line; the dependency is not yet in the POM. This alone clears the 0.70 BRANCH floor
+     with room to spare.
+   - **4 hand-written `*RepositoryImpl` — 123 lines, zero branches.** Straight-line query
+     assembly. They are already exercised from `application`'s tests, but JaCoCo checks
+     **per-module bundles**, so that execution credits the wrong module. Add tests in
+     `domain`'s own tree (it has one test file today) following the existing pattern in
+     `application` — `CompletedRoadmapRepositoryIntegrationTest` and siblings.
+
+   Do **not** re-add JaCoCo excludes for `entities/` or `repositories/`: P9 removed every
+   hand-written exclude precisely because they hid hand-written code (§6.1 D-C). Do **not**
+   merge exec data across modules to make the number pass — that is gate-gaming, not
+   coverage. **Close out the P9 step 2 note in the log.**
+
+3a. **Do not run `prepare-engineering-handoff.sh`.** It is a destructive migration wearing a
+   checker's name, and it offers no way out: **line 174** calls
+   `remove-usage-logging.sh --apply` unconditionally when the module is present, and **line
+   282** hard-fails if the module survives. It deletes the module directory, the
+   `usage_events` migration and the BigQuery sink directories, and rewrites the master
+   changelog. Removing an **already-applied** changelog entry desynchronises
+   `DATABASECHANGELOG` — the same hazard class as renaming the changelog directory.
+
+   The module is **live, not dormant** (verified 2026-08-14). `UsageLoggingAspect` binds
+   `execution(public * *..service..services.impl.*ServiceImpl.*(..))` — **42 `*ServiceImpl`
+   classes**, every public method — and `app.usage-logging.enabled` defaults to `true`,
+   binding `PostgresUsageLogger`. `@LogUsage` is an **optional override** for the action name
+   and event type, never the trigger; zero annotation sites means nobody overrode a name, not
+   that nothing emits. Kept by explicit decision (D-D). Record in the log that the script is
+   deliberately not run, so its absence is not read later as an oversight.
+
+4. **Make `local-verify.sh` blocking, and converge `ci.yml` as documentation.** *Merged from
+   the former steps 1 and 5, which duplicated each other.* Remove the report-only mode
+   installed in P2 step 5 so it exits non-zero on gate failure, and remove
+   `continue-on-error` from `static-checks` in `ci.yml`. **`ci.yml` executes nowhere** — it is
+   converged for a future remote; `local-verify.sh` is the only enforcement that exists.
+
+   **There is no allow-list mechanism.** An earlier revision claimed the carried assertions
+   would be "explicitly allow-listed and annotated". `verify-gates.sh` has no such feature —
+   no allow-list, no annotations, no exemptions. What the P2 follow-up bought is that it now
+   reports *every* failure instead of aborting on the first, so the carried ones are visible
+   alongside anything new. Blocking therefore means: **the failure list must equal the
+   carried set below, exactly** — no additions, no disappearances. The comparison is manual
+   until CR-4 lands upstream. The `== 1` tripwire form from P2 stays for CR-1.
+
+5. Confirm the AIAE `local-verify.sh` runs gates, `mvn clean verify`, the frontend suite and
+   the compose syntax check end to end with no skipped step.
+
+6. Document the `sync-llm-aux.sh --update-lock` upgrade path in `AGENTS.md`, so the next
    template revision arrives as a reviewed diff rather than as drift. The standard stays
    frozen at `cc64e49` until this point.
-5. **Make `local-verify.sh` blocking** — remove the report-only mode installed in P2 step
-   5, so it exits non-zero on any gate failure except the three allow-listed ones. With no
-   CI, this is the only enforcement that exists; until now it has only reported.
-6. **Write the handover note for whoever deploys.** Nothing in this migration was deployed
-   or run in CI, so the release is somebody else's first contact with it. Record: the three
-   carried assertions and why; that `ci.yml` has never executed; that the Replit deploy
-   path is unverified (P3); and that P5 needs a `DATABASECHANGELOG` backup before it
-   reaches a live database.
+
+7. **Write the handover note for whoever deploys.** Nothing here was deployed or run in CI,
+   so the release is somebody else's first contact with it. Record: the carried set and why;
+   that `ci.yml` has never executed; that the Replit deploy path is unverified (P3); that P5
+   needs a `DATABASECHANGELOG` backup before it reaches a live database; and that
+   `prepare-engineering-handoff.sh` must never be run while the telemetry module is kept.
+
+**The carried set — five assertions, the complete list.** P15 closes when the gate output
+matches this and nothing else.
+
+| # | Script | Assertion | Why it is carried |
+|---|---|---|---|
+| 1 | `verify-gates` | Frontend must not use a left side menu/sidebar | Product decision: the UI is carried over unchanged. Renaming to pass would change nothing real and destroy the signal. CR-2. |
+| 2 | `verify-gates` | `check-frontend-ui-rules.sh` (~2222: raw `px`, form a11y) | Same decision. Fixing means rewriting the visual layer, which is out of scope by explicit product call. |
+| 3 | `verify-gates` | Logbook `DefaultSink` must be built with formatter + writer | Step 1b: our configurable form is stricter than the literal the gate greps for. |
+| 4 | `verify-gates` | Production/Replit Logbook must use metadata-only `WithoutBodyStrategy` | Step 1b, same reason. |
+| 5 | `structure-lint` | present event-logging module requires the usage-events migration | False negative: the checker looks for `changes/0001-usage-events.xml`; ours is `1.0.0/db.version-master.xml` + `sql/usage_events.sql`. The migration exists. |
+
+**CR-1 is not in this set.** P2 converted it from a red assertion into a green tripwire that
+asserts exactly one `await fetch(` per presigned file, so the exemption cannot vanish
+silently. It passes. Earlier revisions of this plan and of the log counted it as carried;
+they were wrong.
+
+**Frontend lint is not in this set either** — 339 ESLint errors are real and stay, but
+`.husky/pre-commit` is report-only, so they fail no gate. See the P12 correction above.
 
 **Build** `mvn -f backend/pom.xml clean verify` (no flags, strict)
 **Test** `bash scripts/local-verify.sh` end to end with no skipped step
 **Review** `aiae-rule-compliance-audit` over the whole repository as the closing check
-**Verification** Every gate zero except the four carried assertions, each annotated;
-`.template-phase` = `engineering`; `llm-aux.lock` and `.template-version` current; the
-handover note exists.
+**Verification** Gate output equals the five-row carried set exactly; `.template-phase` =
+`engineering`; `llm-aux.lock` and `.template-version` current; the handover note exists.
 **Rollback** Revert `local-verify.sh` to report-only and `static-checks` to advisory;
 `.template-phase` back to `mvp`.
 
-> **Exit** — `local-verify.sh` passes end to end and blocks on failure, a fresh
-> `aiae-rule-compliance-audit` reproduces it, and the handover note lists everything this
-> migration could not verify locally.
+> **Exit** — `local-verify.sh` passes end to end and blocks on failure, its failure list
+> equals the five carried assertions and nothing else, a fresh `aiae-rule-compliance-audit`
+> reproduces it, and the handover note lists everything this migration could not verify
+> locally.
 
 ---
 

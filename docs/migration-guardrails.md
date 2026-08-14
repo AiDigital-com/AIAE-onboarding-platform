@@ -40,6 +40,12 @@ Each rule below is a trap that has already been hit or verified in this reposito
   fail a gate on purpose; the failure is tracked as CR-1.
 - **Turn a gate green by renaming.** `Sidebar` → `NavRail` and the like change nothing real and
   destroy the signal for everyone after. Four assertions are red by decision — see the log.
+- **Fix the frontend lint backlog.** `npm run lint` reports **339 errors** and that is the
+  accepted state. `.husky/pre-commit` is report-only on purpose. 184 of them demand moving
+  constants and interfaces out of components — restructuring 145 UI source files — and the
+  product decision is that UI is carried over unchanged. Do not "clean up" lint, do not flip
+  the hook to blocking, do not run `eslint --fix` (it repairs 0 of 339 anyway; the rule
+  declares `fixable` and ships no fixer — CR-12).
 - **Remove `backend/event-logging-to-db-feature`,** and never run
   `prepare-engineering-handoff.sh`: it deletes that module at line 174 and then fails at line
   282 if it survives. Usage telemetry is kept by explicit decision (D-D).

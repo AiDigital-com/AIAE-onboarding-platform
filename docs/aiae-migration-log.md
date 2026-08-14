@@ -3602,3 +3602,105 @@ Recorded rather than quietly edited, because the wrong number was used to argue
 for an upstream change request. A measurement taken once, on a cold cache, in a
 directory that existed for the duration of one command, was not a measurement of
 the thing it claimed to measure.
+
+---
+
+## Pre-P15 decisions and two corrections to this log (2026-08-14)
+
+### Decision: the frontend lint backlog stays, permanently
+
+`npm run lint` reports **339 errors** and `.husky/pre-commit` stays report-only.
+
+| rule | count | what clearing it would require |
+|---|---|---|
+| `no-restricted-syntax` | 184 | move constants and interfaces out of components — restructuring 145 UI source files |
+| `project-rules/import-section-order` | 128 | reorder import statements |
+| `@typescript-eslint/no-explicit-any` | 20 | typing |
+| `react-hooks/exhaustive-deps` | 7 | the only ones that can be real bugs |
+
+The product decision is that the UI is carried over unchanged, and the 184 structural
+findings are exactly that change. `eslint --fix` is not a shortcut either: measured with
+`--fix-dry-run`, it repairs **0 of 339**. The `import-section-order` rule declares
+`fixable: "code"` in its meta and supplies no `fix` function in any of its three
+`context.report` calls, so the metadata promises an autofix the code does not implement.
+That is upstream's defect, not ours — CR-12.
+
+**The cost is honest and worth naming**: a hook that prints 339 errors and blocks nothing
+trains people to scroll past it, and the 7 `exhaustive-deps` findings are the ones that
+could be real. Recorded here rather than left implicit.
+
+P12's Exit condition in the plan read *"lint is green and hooked"*. It was merged without
+meeting that, because installing the template's ESLint config on a codebase that never had
+linting yields 339 errors rather than zero, and no phase was ever budgeted to clear them —
+P13/P14, where frontend work would have lived, were removed from scope. The plan has been
+corrected to describe what the phase actually delivers.
+
+### Correction: CR-1 is not a carried red assertion
+
+Earlier entries, and my running summaries, counted CR-1 among the assertions carried red by
+decision. **It is green.** P2 replaced the raw-`fetch` assertion with a tripwire —
+`verify-gates.sh:206` requires exactly one `await fetch(` per presigned file, so the
+exemption cannot disappear unnoticed. It passes. CR-1 remains a live change request to the
+template; it is not a gate failure.
+
+### Correction: the carried set is five, and `structure-lint` was never counted
+
+The set was tracked as "four", assembled by memory rather than from a gate run. Measured on
+`047f71f`:
+
+```
+==> verify-gates: 5 assertion(s) failed
+  1. Frontend must not use a left side menu/sidebar
+  2. check-maven-dependency-analysis.py reported violations
+  3. Logbook DefaultSink must be built with formatter + writer
+  4. Production/Replit Logbook must use metadata-only WithoutBodyStrategy
+  5. check-frontend-ui-rules.sh reported violations
+
+==> structure-lint: 2 assertion(s) failed
+  1. present event-logging module requires the usage-events migration
+  2. Service interfaces must not expose Map<String,Object>
+```
+
+Two of those seven are decisions (sidebar, frontend-ui-rules); one is a false negative
+(usage-events path); **four were unresolved work nobody was tracking** — the
+`maven-dependency-plugin`, the two Logbook assertions, and the `Map<String,Object>` leak in
+`LessonEntityService`. All four are now steps 1 and 2 of P15, and the canonical carried set
+is written into the plan as a table so the Exit comparison stops depending on recall.
+
+`structure-lint.sh` is a separate script with its own failure list. Every earlier count of
+"the carried set" read only `verify-gates` and silently omitted it.
+
+### Decision: the two Logbook assertions are carried, not satisfied (option B)
+
+`verify-gates.sh:401,403` are literal `grep -F` for
+`new DefaultSink(new JsonHttpLogFormatter(), new DefaultHttpLogWriter())` and
+`.strategy(new WithoutBodyStrategy())`. `LogbookConfig` builds the same objects via
+`resolveFormatter(props)` / `resolveStrategy(props)`, and its default is **stricter** than
+the gate asks for — at `logBodies=false` it uses `MetadataOnlyHttpLogFormatter`, where the
+gate is satisfied by the JSON formatter. Inlining the literals would weaken working,
+tested production logging to satisfy a text match. Same trade refused for `Sidebar` →
+`NavRail`. Filed as a template exception alongside CR-1.
+
+### Correction: the usage-telemetry module is live, not dormant
+
+A first pass concluded the module was dead because `@LogUsage` appears **zero** times outside
+it. That inference was wrong, and the annotation's own header says so: *"`@LogUsage` —
+OPTIONAL override for the auto usage-logging aspect. Add `@LogUsage` only to override the
+derived action name or the event type."*
+
+The aspect is automatic. `UsageLoggingAspect` binds
+`execution(public * *..service..services.impl.*ServiceImpl.*(..))`, which matches **42
+`*ServiceImpl` classes** — every public method of each. `app.usage-logging.enabled` defaults
+to `true`, binding `PostgresUsageLogger`; `enabled=false` binds `NoOpUsageLogger`. Zero
+annotation sites means nobody overrode an action name, not that nothing emits.
+
+So D-D preserves live instrumentation across the whole service layer, and
+`prepare-engineering-handoff.sh` would strip it from 42 services while deleting an applied
+Liquibase changelog. Both facts are now in P15 step 3a.
+
+### Standing rule agreed for P15
+
+The carried set is **closed**. Anything that surfaces beyond the five listed items is worked
+to completion, not appended to it — this is a convergence migration, and a phase that defers
+every hard item is not convergence. Where an item outgrows one agent pass, commit what is
+done and continue; do not descope.
