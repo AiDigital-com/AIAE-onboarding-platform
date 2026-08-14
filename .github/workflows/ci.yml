@@ -28,13 +28,15 @@ jobs:
   static-checks:
     name: Static checks
     runs-on: ubuntu-latest
-    # AIAE convergence (P2): report-only for this migration. No CI service runs
-    # in this repo, so this flag has no observable effect yet; it converges the
-    # file with the standard, which requires static-checks non-blocking until
-    # the gates it runs are proven quiet. P15 removes this if the gates are
-    # clean by then, or leaves it if they still carry the four documented
-    # carried-red assertions.
-    continue-on-error: true
+    # AIAE convergence (P15 step 4): `continue-on-error: true` removed to match
+    # the standard's ci.yml exactly, which carries no such flag. This file
+    # still executes nowhere — no CI service runs in this migration
+    # (docs/aiae-migration-plan.md §1) — so the flag's removal is pure
+    # documentation of the converged, blocking shape for a future remote, not
+    # an observed behavior change. local-verify.sh is the only enforcement
+    # that actually runs, and it still carries the five known red assertions
+    # (docs/aiae-migration-plan.md P15) every time — that does not change
+    # here.
     outputs:
       has_backend: ${{ steps.detect.outputs.has_backend }}
       has_frontend: ${{ steps.detect.outputs.has_frontend }}

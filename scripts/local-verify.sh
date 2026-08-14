@@ -3,46 +3,73 @@
 # local-verify.sh — the one command engineering runs before any push.
 #
 # ============================================================================
-# AIAE CONVERGENCE (P2 step 5) — DELIBERATE, TEMPORARY, REPORT-ONLY OVERRIDE
+# AIAE CONVERGENCE (P15 step 4) — now blocking. History below.
 # ============================================================================
-# This is the standard's local-verify.sh (scaffold/scripts/local-verify.sh at
-# `cc64e49`), installed here with ONE intentional change: every step reports
-# its outcome instead of aborting the script, and the script always exits 0.
+# P2 step 5 installed this file in a deliberate, temporary REPORT-ONLY form
+# (every step recorded but the script always exited 0), because there was no
+# CI service to fall back on and no shared baseline yet for any of the 28
+# checkers. That phase is over. This step restores a real exit code.
 #
-# Why: there is no CI service in this migration (docs/aiae-migration-plan.md
-# §1) and no remote, so this script is the ONLY thing that ever runs the
-# gates end to end. Installing it in its normal blocking form on day one of
-# a 15-phase migration — before any of the 28 checkers' numbers have even
-# been converted into a shared baseline — would mean either every phase
-# after this one fails the moment it runs this script, or nobody runs it at
-# all. Report-only makes the numbers visible without blocking anything;
-# docs/aiae-migration-plan.md P2 step 5 and docs/migration-guardrails.md both
-# call this out explicitly.
+# Two things this file still does NOT do, both deliberate and both explained
+# in docs/aiae-migration-plan.md's P15 step 4:
 #
-# THIS IS TEMPORARY. docs/aiae-migration-plan.md's P15 step for local-verify.sh
-# is to make it blocking again: restore `set -euo pipefail` at the top, remove
-# the run_step()/report-only wrapper below, and delete this header block (or
-# fold its history into the log). Search for "REPORT-ONLY" to find every
-# place this file's behavior differs from the upstream template's.
-# ============================================================================
+# 1. It does not abort on the first failing step. structure-lint.sh and
+#    verify-gates.sh are *expected* to report a fixed, known set of failures
+#    forever — the five-row carried table in docs/aiae-migration-plan.md
+#    (sidebar navigation, check-frontend-ui-rules.sh, and the two Logbook
+#    literal-string assertions from verify-gates.sh; the usage-events
+#    changelog-path false negative from structure-lint.sh). Aborting there
+#    under `set -e` (the upstream scaffold's literal shape) would mean the
+#    backend build, the frontend build, and the compose check never run
+#    again — the opposite of "end to end, no skipped step" (P15 step 5).
+#    So every step still runs and is recorded, exactly as under report-only.
+# 2. It does not special-case the carried five. There is no allow-list
+#    mechanism in verify-gates.sh/structure-lint.sh (no annotations, no
+#    exemptions) — confirming the reported failure list equals the carried
+#    set exactly is a manual comparison against docs/aiae-migration-plan.md,
+#    done by whoever reads this script's output, until CR-4 lands upstream.
 #
-# Upstream steps (all preserved, all made non-fatal below):
+# What changed from report-only: the final exit code is now REAL — it is
+# non-zero whenever any recorded step failed, computed from the same
+# STEP_RESULTS this file already collected under report-only. A run with
+# only the five carried failures below still exits non-zero; that is
+# correct and expected, and it is why the comparison above is manual rather
+# than automated.
+#
+# One step is excluded from that pass/fail rollup on purpose: frontend lint.
+# `.husky/pre-commit` made lint report-only, not blocking, back in P12 (339
+# ESLint errors, 184 of them demanding a UI restructuring this migration
+# explicitly does not do — see docs/migration-guardrails.md and the P12
+# correction in docs/aiae-migration-log.md). That was never a blocking gate
+# in this project, so promoting it to one here — silently, as a side effect
+# of this step alone — would be a new decision dressed up as mechanical
+# convergence. Lint still runs and is reported every time; it just does not
+# turn the exit code non-zero on its own. `npm test` and `npm run build`,
+# which used to be chained after it with `&&` (so a lint failure silently
+# skipped them under report-only, unnoticed because nothing enforced the
+# exit code anyway), now run as their own step regardless of the lint result.
+#
+# Upstream steps (all preserved):
 #   1. structure-lint.sh + verify-gates.sh (28 checkers under scripts/lib/,
 #      itemized separately below since both scripts fail-fast on their first
 #      violation and would otherwise hide every count after the first one)
 #   2. Backend: `mvn -f backend/pom.xml clean verify`
-#   3. Frontend: `npm test && npm run build`
+#   3. Frontend: lint (report-only) + `npm test && npm run build` (blocking)
 #   4. docker-compose syntax check (does NOT run containers)
 
 set -uo pipefail
-# NOTE: no `-e`. REPORT-ONLY (see header): a failing step must not abort the
-# rest of the report. Restoring `-e` is part of undoing this override.
+# NOTE: still no `-e` — see point 1 above. Every step must run regardless of
+# an earlier one's result; the real exit code is computed at the end instead.
 
 cd "$(dirname "$0")/.."
 REPO_ROOT="$(pwd)"
 
 STEP_NAMES=()
 STEP_RESULTS=()
+# Step names present in this array are excluded from the final pass/fail
+# rollup (still recorded and printed, never counted) — currently only
+# frontend lint. See the header comment.
+NON_BLOCKING_STEPS=("Frontend: lint (report-only)")
 
 record_step() {
   STEP_NAMES+=("$1")
@@ -50,8 +77,9 @@ record_step() {
 }
 
 run_step() {
-  # Runs "$2..." (a command), never lets its exit status propagate, and
-  # records a PASS/FAIL line for the final summary. REPORT-ONLY wrapper.
+  # Runs "$2..." (a command), records a PASS/FAIL line for the final summary,
+  # and lets the caller inspect $? itself if it needs to (e.g. to chain a
+  # dependent step). Never lets the command's exit status abort this script.
   local label="$1"
   shift
   echo "==> ${label}"
@@ -64,7 +92,7 @@ run_step() {
 }
 
 echo "############################################################"
-echo "# local-verify.sh — REPORT-ONLY MODE (P2 step 5, temporary) #"
+echo "# local-verify.sh — every step runs; exit code is real       #"
 echo "############################################################"
 echo
 
@@ -87,21 +115,24 @@ run_step "verify-gates.sh" bash scripts/verify-gates.sh
 
 echo
 echo "==> scripts/lib/ — itemized count per file (28 files)"
-echo "    structure-lint.sh/verify-gates.sh above stop at the FIRST failing"
-echo "    assertion (fail-fast). This section runs every checker file"
+echo "    structure-lint.sh/verify-gates.sh above report every failing"
+echo "    assertion, but a checker file run standalone still fail-fasts on"
+echo "    its own first violation. This section runs every checker file"
 echo "    independently, with the same source-root arguments the two"
 echo "    orchestrators above use, so every count is visible even when one"
 echo "    of them is red."
 echo
 
 python3 - "${REPO_ROOT}" <<'PY'
-"""AIAE convergence (P2 step 5): itemized, non-fatal report over every file in
-scripts/lib/. This is new orchestration written for this migration; it exists
-because neither structure-lint.sh nor verify-gates.sh prints a running count
-per checker on its own (both call fail() -> exit 1 on the first violation).
-It intentionally does not replace either script -- it is a report layer next
+"""AIAE convergence (P2 step 5, kept in P15): itemized, non-fatal report over
+every file in scripts/lib/. This is new orchestration written for this
+migration; it exists because neither structure-lint.sh nor verify-gates.sh
+prints a running count per checker on its own when a checker is run alone
+(each calls fail() -> exit 1 on its first violation in that mode). It
+intentionally does not replace either script -- it is a report layer next
 to them, invoking each checker file exactly the way structure-lint.sh /
-verify-gates.sh already do (same explicit source roots), so the numbers match.
+verify-gates.sh already do (same explicit source roots), so the numbers
+match. Diagnostic only: nothing here affects this script's exit code.
 """
 from __future__ import annotations
 
@@ -235,7 +266,7 @@ for name, argv, kind in CHECKS:
         combined = (proc.stdout or "") + (proc.stderr or "")
         count = extract_count(kind, combined, proc.returncode)
         results.append({"name": name, "count": count, "returncode": proc.returncode})
-    except Exception as exc:  # noqa: BLE001 - report-only, must never abort the run
+    except Exception as exc:  # noqa: BLE001 - diagnostic only, must never abort the run
         results.append({"name": name, "count": f"ERROR ({exc})", "returncode": -1})
 
 for name in NOT_INDEPENDENT_GATES:
@@ -281,7 +312,7 @@ else
 fi
 
 if [ -f frontend/package.json ]; then
-  echo "==> Frontend: lint + test + build"
+  echo "==> Frontend: install"
   NPM_BIN="$(pwd)/backend/application/target/frontend-toolchain/node/npm"
   if [ -x "${NPM_BIN}" ]; then
     export PATH="$(dirname "${NPM_BIN}"):${PATH}"
@@ -289,15 +320,31 @@ if [ -f frontend/package.json ]; then
     NPM_BIN="npm"
   fi
   if ( cd frontend && \
-      { [ -f package-lock.json ] && "${NPM_BIN}" ci --no-audit --no-fund || "${NPM_BIN}" install --no-audit --no-fund; } && \
-      "${NPM_BIN}" run lint && \
-      "${NPM_BIN}" test && "${NPM_BIN}" run build ); then
-    record_step "Frontend: lint + test + build" "PASS"
+      { [ -f package-lock.json ] && "${NPM_BIN}" ci --no-audit --no-fund || "${NPM_BIN}" install --no-audit --no-fund; } ); then
+    record_step "Frontend: install" "PASS"
+
+    echo "==> Frontend: lint (report-only — see header comment)"
+    if ( cd frontend && "${NPM_BIN}" run lint ); then
+      record_step "Frontend: lint (report-only)" "PASS"
+    else
+      record_step "Frontend: lint (report-only)" "FAIL (exit $? — known backlog, does not block; see docs/aiae-migration-log.md P12)"
+    fi
+
+    echo "==> Frontend: test + build"
+    if ( cd frontend && "${NPM_BIN}" test && "${NPM_BIN}" run build ); then
+      record_step "Frontend: test + build" "PASS"
+    else
+      record_step "Frontend: test + build" "FAIL (exit $?)"
+    fi
   else
-    record_step "Frontend: lint + test + build" "FAIL (exit $?)"
+    record_step "Frontend: install" "FAIL (exit $?)"
+    record_step "Frontend: lint (report-only)" "SKIP (install failed)"
+    record_step "Frontend: test + build" "SKIP (install failed)"
   fi
 else
-  record_step "Frontend: lint + test + build" "SKIP (no frontend/package.json)"
+  record_step "Frontend: install" "SKIP (no frontend/package.json)"
+  record_step "Frontend: lint (report-only)" "SKIP (no frontend/package.json)"
+  record_step "Frontend: test + build" "SKIP (no frontend/package.json)"
 fi
 
 if [ -f docker-compose.yml ]; then
@@ -315,13 +362,36 @@ fi
 
 echo
 echo "############################################################"
-echo "# local-verify.sh — summary (REPORT-ONLY, exit 0 regardless) #"
+echo "# local-verify.sh — summary                                  #"
 echo "############################################################"
 for i in "${!STEP_NAMES[@]}"; do
   printf '  %-42s %s\n' "${STEP_NAMES[$i]}" "${STEP_RESULTS[$i]}"
 done
 echo
 echo "See scripts/lib/ report above for all 28 checker files."
-echo "REPORT-ONLY MODE: this script always exits 0. See the header comment"
-echo "and docs/aiae-migration-plan.md P15 for when that changes."
-exit 0
+
+# Real exit code: non-zero if any step outside NON_BLOCKING_STEPS recorded a
+# FAIL. structure-lint.sh/verify-gates.sh are expected to report the
+# five-row carried set every time (docs/aiae-migration-plan.md P15) — that
+# is not compared against here (no allow-list mechanism exists to do it
+# mechanically); confirm it by reading the "verify-gates.sh"/
+# "structure-lint.sh" lines' printed failure lists against the plan.
+OVERALL_RC=0
+for i in "${!STEP_NAMES[@]}"; do
+  name="${STEP_NAMES[$i]}"
+  result="${STEP_RESULTS[$i]}"
+  is_non_blocking=0
+  for nb in "${NON_BLOCKING_STEPS[@]}"; do
+    [ "${name}" = "${nb}" ] && is_non_blocking=1 && break
+  done
+  if [ "${is_non_blocking}" -eq 0 ] && [[ "${result}" == FAIL* ]]; then
+    OVERALL_RC=1
+  fi
+done
+
+if [ "${OVERALL_RC}" -eq 0 ]; then
+  echo "==> local-verify.sh: all blocking checks passed"
+else
+  echo "==> local-verify.sh: at least one blocking check failed — see summary above"
+fi
+exit "${OVERALL_RC}"
