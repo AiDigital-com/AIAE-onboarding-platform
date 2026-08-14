@@ -9,7 +9,7 @@ import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.learning.models.RoadmapAssignmentEnrollmentRecord;
-import com.aidigital.aionboarding.service.learning.services.LearningEnrollmentService;
+import com.aidigital.aionboarding.service.learning.services.RoadmapEnrollmentService;
 import com.aidigital.aionboarding.service.roadmap.services.entity.RoadmapTeamAssignmentEntityService;
 import com.aidigital.aionboarding.service.team.services.entity.TeamEntityService;
 import com.aidigital.aionboarding.service.user.services.entity.UserEntityService;
@@ -39,7 +39,7 @@ class RoadmapTeamAssignmentWorkflowTest {
 	@Mock
 	private RoadmapTeamAssignmentEntityService roadmapTeamAssignmentEntityService;
 	@Mock
-	private LearningEnrollmentService learningEnrollmentService;
+	private RoadmapEnrollmentService roadmapEnrollmentService;
 	@Mock
 	private LearningEnrollmentSupport learningEnrollmentSupport;
 	@Spy
@@ -108,7 +108,7 @@ class RoadmapTeamAssignmentWorkflowTest {
 			RoadmapAssignmentEnrollmentRecord memberEnrollmentRecord = Instancio.create(RoadmapAssignmentEnrollmentRecord.class);
 
 			when(teamEntityService.findByLeadUserIdWithMember(leadUserId)).thenReturn(List.of(member));
-			when(learningEnrollmentService.enrollUsersInRoadmap(List.of(20L, 30L), roadmapId))
+			when(roadmapEnrollmentService.enrollUsersInRoadmap(List.of(20L, 30L), roadmapId))
 					.thenReturn(List.of(leadEnrollmentRow, memberEnrollmentRow));
 			when(learningEnrollmentSupport.toRoadmapAssignmentEnrollment(leadEnrollmentRow, 20L))
 					.thenReturn(leadEnrollmentRecord);
@@ -131,7 +131,7 @@ class RoadmapTeamAssignmentWorkflowTest {
 			RoadmapAssignmentEnrollmentRecord leadEnrollmentRecord = Instancio.create(RoadmapAssignmentEnrollmentRecord.class);
 
 			when(teamEntityService.findByLeadUserIdWithMember(leadUserId)).thenReturn(List.of());
-			when(learningEnrollmentService.enrollUsersInRoadmap(List.of(leadUserId), roadmapId))
+			when(roadmapEnrollmentService.enrollUsersInRoadmap(List.of(leadUserId), roadmapId))
 					.thenReturn(List.of(leadEnrollmentRow));
 			when(learningEnrollmentSupport.toRoadmapAssignmentEnrollment(leadEnrollmentRow, leadUserId))
 					.thenReturn(leadEnrollmentRecord);

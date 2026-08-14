@@ -1,7 +1,6 @@
 package com.aidigital.aionboarding.service.learning.services;
 
 import com.aidigital.aionboarding.domain.learning.entities.UserLesson;
-import com.aidigital.aionboarding.domain.learning.entities.UserRoadmap;
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.learning.models.LessonEnrollmentRecord;
@@ -15,7 +14,8 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Creates and updates lesson and roadmap enrollment rows for learners.
+ * Creates and updates lesson enrollment rows for learners. Roadmap enrollment and its
+ * per-lesson fan-out live in {@link RoadmapEnrollmentService}.
  */
 public interface LearningEnrollmentService {
 
@@ -97,26 +97,6 @@ public interface LearningEnrollmentService {
     );
 
     /**
-     * Enrolls a user in a roadmap and fans out roadmap lesson enrollments.
-     *
-     * @param userId learner identifier
-     * @param roadmapId roadmap identifier
-     * @return persisted roadmap enrollment row
-     * @throws com.aidigital.aionboarding.service.common.error.AppException when the roadmap is missing
-     */
-    UserRoadmap enrollUserInRoadmap(Long userId, Long roadmapId);
-
-    /**
-     * Enrolls several users in one roadmap and fans out its lessons using batch enrollment
-     * lookups and saves.
-     *
-     * @param userIds learners to enroll
-     * @param roadmapId roadmap identifier
-     * @return roadmap enrollment rows ordered like {@code userIds}
-     */
-    List<UserRoadmap> enrollUsersInRoadmap(Collection<Long> userIds, Long roadmapId);
-
-    /**
      * Removes a user's lesson enrollment when present.
      *
      * @param userId learner identifier
@@ -132,23 +112,6 @@ public interface LearningEnrollmentService {
      * @param lessonId lesson identifier
      */
     void unenrollUsersFromLesson(Collection<Long> userIds, Long lessonId);
-
-    /**
-     * Removes a user's roadmap enrollment when present.
-     *
-     * @param userId learner identifier
-     * @param roadmapId roadmap identifier
-     */
-    void unenrollUserFromRoadmap(Long userId, Long roadmapId);
-
-    /**
-     * Removes several users' roadmap enrollments and their roadmap-derived lesson enrollments
-     * using set-based bulk deletes, regardless of user or roadmap-lesson count.
-     *
-     * @param userIds learners to revoke
-     * @param roadmapId roadmap identifier
-     */
-    void unenrollUsersFromRoadmap(Collection<Long> userIds, Long roadmapId);
 
     /**
      * Returns the set of lesson IDs, among the given lesson IDs, that the user is enrolled in.

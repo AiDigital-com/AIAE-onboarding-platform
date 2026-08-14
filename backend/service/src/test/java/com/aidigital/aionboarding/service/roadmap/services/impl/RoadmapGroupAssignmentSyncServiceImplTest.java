@@ -9,7 +9,7 @@ import com.aidigital.aionboarding.domain.roadmap.entities.RoadmapGroupAssignment
 import com.aidigital.aionboarding.domain.user.entities.User;
 import com.aidigital.aionboarding.service.group.services.entity.GroupMemberEntityService;
 import com.aidigital.aionboarding.service.learning.models.RoadmapAssignmentEnrollmentRecord;
-import com.aidigital.aionboarding.service.learning.services.LearningEnrollmentService;
+import com.aidigital.aionboarding.service.learning.services.RoadmapEnrollmentService;
 import com.aidigital.aionboarding.service.learning.support.LearningEnrollmentSupport;
 import com.aidigital.aionboarding.service.roadmap.services.entity.RoadmapGroupAssignmentEntityService;
 import com.aidigital.aionboarding.service.user.services.entity.UserEntityService;
@@ -42,7 +42,7 @@ class RoadmapGroupAssignmentSyncServiceImplTest {
 	@Mock
 	private UserEntityService userEntityService;
 	@Mock
-	private LearningEnrollmentService learningEnrollmentService;
+	private RoadmapEnrollmentService roadmapEnrollmentService;
 	@Mock
 	private LearningEnrollmentSupport learningEnrollmentSupport;
 
@@ -95,7 +95,7 @@ class RoadmapGroupAssignmentSyncServiceImplTest {
 			when(groupMemberEntityService.findByGroupId(1L)).thenReturn(List.of(member(1L, 10L), member(1L, 11L)));
 			UserRoadmap row1 = new UserRoadmap();
 			UserRoadmap row2 = new UserRoadmap();
-			when(learningEnrollmentService.enrollUsersInRoadmap(List.of(10L, 11L), 100L)).thenReturn(List.of(row1,
+			when(roadmapEnrollmentService.enrollUsersInRoadmap(List.of(10L, 11L), 100L)).thenReturn(List.of(row1,
 					row2));
 			when(learningEnrollmentSupport.toRoadmapAssignmentEnrollment(row1, 10L))
 					.thenReturn(new RoadmapAssignmentEnrollmentRecord(10L, 100L, LocalDateTime.now()));
@@ -116,7 +116,7 @@ class RoadmapGroupAssignmentSyncServiceImplTest {
 			when(groupMemberEntityService.findByGroupIdAndMemberGradeIdIn(1L, Set.of(5L)))
 					.thenReturn(List.of(member(1L, 10L)));
 			UserRoadmap row = new UserRoadmap();
-			when(learningEnrollmentService.enrollUsersInRoadmap(List.of(10L), 100L)).thenReturn(List.of(row));
+			when(roadmapEnrollmentService.enrollUsersInRoadmap(List.of(10L), 100L)).thenReturn(List.of(row));
 			when(learningEnrollmentSupport.toRoadmapAssignmentEnrollment(row, 10L))
 					.thenReturn(new RoadmapAssignmentEnrollmentRecord(10L, 100L, LocalDateTime.now()));
 
@@ -140,7 +140,7 @@ class RoadmapGroupAssignmentSyncServiceImplTest {
 			when(roadmapGroupAssignmentEntityService.findGradesByAssignmentId(1L)).thenReturn(List.of());
 			when(userEntityService.findById(10L)).thenReturn(Optional.of(userWithGrade(10L, null)));
 			UserRoadmap row = new UserRoadmap();
-			when(learningEnrollmentService.enrollUsersInRoadmap(List.of(10L), 100L)).thenReturn(List.of(row));
+			when(roadmapEnrollmentService.enrollUsersInRoadmap(List.of(10L), 100L)).thenReturn(List.of(row));
 			when(learningEnrollmentSupport.toRoadmapAssignmentEnrollment(row, 10L))
 					.thenReturn(new RoadmapAssignmentEnrollmentRecord(10L, 100L, LocalDateTime.now()));
 
@@ -148,7 +148,7 @@ class RoadmapGroupAssignmentSyncServiceImplTest {
 			service.syncNewGroupMember(1L, 10L);
 
 			// Then:
-			verify(learningEnrollmentService).enrollUsersInRoadmap(List.of(10L), 100L);
+			verify(roadmapEnrollmentService).enrollUsersInRoadmap(List.of(10L), 100L);
 		}
 
 		@Test
@@ -159,7 +159,7 @@ class RoadmapGroupAssignmentSyncServiceImplTest {
 			when(roadmapGroupAssignmentEntityService.findGradesByAssignmentId(1L)).thenReturn(List.of(gradeFilterRow(5L)));
 			when(userEntityService.findById(10L)).thenReturn(Optional.of(userWithGrade(10L, 5L)));
 			UserRoadmap row = new UserRoadmap();
-			when(learningEnrollmentService.enrollUsersInRoadmap(List.of(10L), 100L)).thenReturn(List.of(row));
+			when(roadmapEnrollmentService.enrollUsersInRoadmap(List.of(10L), 100L)).thenReturn(List.of(row));
 			when(learningEnrollmentSupport.toRoadmapAssignmentEnrollment(row, 10L))
 					.thenReturn(new RoadmapAssignmentEnrollmentRecord(10L, 100L, LocalDateTime.now()));
 
@@ -167,7 +167,7 @@ class RoadmapGroupAssignmentSyncServiceImplTest {
 			service.syncNewGroupMember(1L, 10L);
 
 			// Then:
-			verify(learningEnrollmentService).enrollUsersInRoadmap(List.of(10L), 100L);
+			verify(roadmapEnrollmentService).enrollUsersInRoadmap(List.of(10L), 100L);
 		}
 
 		@Test
@@ -182,7 +182,7 @@ class RoadmapGroupAssignmentSyncServiceImplTest {
 			service.syncNewGroupMember(1L, 10L);
 
 			// Then:
-			verify(learningEnrollmentService, never()).enrollUsersInRoadmap(List.of(10L), 100L);
+			verify(roadmapEnrollmentService, never()).enrollUsersInRoadmap(List.of(10L), 100L);
 		}
 
 		@Test
@@ -197,7 +197,7 @@ class RoadmapGroupAssignmentSyncServiceImplTest {
 			service.syncNewGroupMember(1L, 10L);
 
 			// Then:
-			verify(learningEnrollmentService, never()).enrollUsersInRoadmap(List.of(10L), 100L);
+			verify(roadmapEnrollmentService, never()).enrollUsersInRoadmap(List.of(10L), 100L);
 		}
 
 		@Test
@@ -224,7 +224,7 @@ class RoadmapGroupAssignmentSyncServiceImplTest {
 			when(roadmapGroupAssignmentEntityService.findByGroupIdIn(Set.of(1L))).thenReturn(List.of(assignment));
 			when(roadmapGroupAssignmentEntityService.findGradesByAssignmentId(1L)).thenReturn(List.of(gradeFilterRow(5L)));
 			UserRoadmap row = new UserRoadmap();
-			when(learningEnrollmentService.enrollUsersInRoadmap(List.of(10L), 100L)).thenReturn(List.of(row));
+			when(roadmapEnrollmentService.enrollUsersInRoadmap(List.of(10L), 100L)).thenReturn(List.of(row));
 			when(learningEnrollmentSupport.toRoadmapAssignmentEnrollment(row, 10L))
 					.thenReturn(new RoadmapAssignmentEnrollmentRecord(10L, 100L, LocalDateTime.now()));
 
@@ -232,7 +232,7 @@ class RoadmapGroupAssignmentSyncServiceImplTest {
 			service.syncUserGradeChange(10L, 5L);
 
 			// Then:
-			verify(learningEnrollmentService).enrollUsersInRoadmap(List.of(10L), 100L);
+			verify(roadmapEnrollmentService).enrollUsersInRoadmap(List.of(10L), 100L);
 		}
 
 		@Test
@@ -243,7 +243,7 @@ class RoadmapGroupAssignmentSyncServiceImplTest {
 			when(roadmapGroupAssignmentEntityService.findByGroupIdIn(Set.of(1L))).thenReturn(List.of(assignment));
 			when(roadmapGroupAssignmentEntityService.findGradesByAssignmentId(1L)).thenReturn(List.of());
 			UserRoadmap row = new UserRoadmap();
-			when(learningEnrollmentService.enrollUsersInRoadmap(List.of(10L), 100L)).thenReturn(List.of(row));
+			when(roadmapEnrollmentService.enrollUsersInRoadmap(List.of(10L), 100L)).thenReturn(List.of(row));
 			when(learningEnrollmentSupport.toRoadmapAssignmentEnrollment(row, 10L))
 					.thenReturn(new RoadmapAssignmentEnrollmentRecord(10L, 100L, LocalDateTime.now()));
 
@@ -251,7 +251,7 @@ class RoadmapGroupAssignmentSyncServiceImplTest {
 			service.syncUserGradeChange(10L, null);
 
 			// Then:
-			verify(learningEnrollmentService).enrollUsersInRoadmap(List.of(10L), 100L);
+			verify(roadmapEnrollmentService).enrollUsersInRoadmap(List.of(10L), 100L);
 		}
 
 		@Test
@@ -266,7 +266,7 @@ class RoadmapGroupAssignmentSyncServiceImplTest {
 			service.syncUserGradeChange(10L, 6L);
 
 			// Then:
-			verify(learningEnrollmentService, never()).enrollUsersInRoadmap(List.of(10L), 100L);
+			verify(roadmapEnrollmentService, never()).enrollUsersInRoadmap(List.of(10L), 100L);
 		}
 
 		@Test

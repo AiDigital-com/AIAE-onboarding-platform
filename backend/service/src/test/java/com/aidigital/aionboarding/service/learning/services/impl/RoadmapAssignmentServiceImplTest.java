@@ -13,7 +13,7 @@ import com.aidigital.aionboarding.service.learning.models.RoadmapEnrollmentRecor
 import com.aidigital.aionboarding.service.learning.models.RoadmapEnrollmentResultRecord;
 import com.aidigital.aionboarding.service.learning.models.RoadmapTeamAssignmentRecord;
 import com.aidigital.aionboarding.service.learning.models.RoadmapTeamAssignmentResultRecord;
-import com.aidigital.aionboarding.service.learning.services.LearningEnrollmentService;
+import com.aidigital.aionboarding.service.learning.services.RoadmapEnrollmentService;
 import com.aidigital.aionboarding.service.learning.services.entity.LearningEnrollmentEntityService;
 import com.aidigital.aionboarding.service.learning.support.LearningAssignmentAccessPolicy;
 import com.aidigital.aionboarding.service.learning.support.LearningEnrollmentSupport;
@@ -51,7 +51,7 @@ class RoadmapAssignmentServiceImplTest {
 	@Mock
 	private LearningEnrollmentEntityService learningEnrollmentEntityService;
 	@Mock
-	private LearningEnrollmentService learningEnrollmentService;
+	private RoadmapEnrollmentService roadmapEnrollmentService;
 	@Mock
 	private LearningEnrollmentSupport learningEnrollmentSupport;
 	@Mock
@@ -96,7 +96,7 @@ class RoadmapAssignmentServiceImplTest {
 			RoadmapAssignmentEnrollmentRecord secondRecord = Instancio.create(RoadmapAssignmentEnrollmentRecord.class);
 
 			when(learningEnrollmentSupport.normalizeUserIds(userIds)).thenReturn(userIds);
-			when(learningEnrollmentService.enrollUsersInRoadmap(userIds, roadmapId)).thenReturn(List.of(firstRow, secondRow));
+			when(roadmapEnrollmentService.enrollUsersInRoadmap(userIds, roadmapId)).thenReturn(List.of(firstRow, secondRow));
 			when(learningEnrollmentSupport.toRoadmapAssignmentEnrollment(firstRow, 20L)).thenReturn(firstRecord);
 			when(learningEnrollmentSupport.toRoadmapAssignmentEnrollment(secondRow, 21L)).thenReturn(secondRecord);
 
@@ -166,7 +166,7 @@ class RoadmapAssignmentServiceImplTest {
 			// Then:
 			verify(permissionService).requirePermission(actor, PermissionKeys.LEARNING_ASSIGN);
 			verify(roadmapEntityService).getReference(roadmapId);
-			verify(learningEnrollmentService).unenrollUsersFromRoadmap(userIds, roadmapId);
+			verify(roadmapEnrollmentService).unenrollUsersFromRoadmap(userIds, roadmapId);
 		}
 
 		@Test
@@ -183,7 +183,7 @@ class RoadmapAssignmentServiceImplTest {
 			// When-Then:
 			assertThatThrownBy(() -> service.revokeRoadmapAssignments(actor, roadmapId, userIds))
 					.isInstanceOf(AppException.class);
-			verify(learningEnrollmentService, never()).unenrollUsersFromRoadmap(any(), any());
+			verify(roadmapEnrollmentService, never()).unenrollUsersFromRoadmap(any(), any());
 		}
 	}
 
@@ -197,7 +197,7 @@ class RoadmapAssignmentServiceImplTest {
 			Long roadmapId = 10L;
 			UserRoadmap enrollment = Instancio.create(UserRoadmap.class);
 			RoadmapEnrollmentRecord enrollmentRecord = Instancio.create(RoadmapEnrollmentRecord.class);
-			when(learningEnrollmentService.enrollUserInRoadmap(user.internalId(), roadmapId)).thenReturn(enrollment);
+			when(roadmapEnrollmentService.enrollUserInRoadmap(user.internalId(), roadmapId)).thenReturn(enrollment);
 			when(learningEnrollmentSupport.toRoadmapEnrollment(enrollment)).thenReturn(enrollmentRecord);
 
 			// When:
@@ -224,7 +224,7 @@ class RoadmapAssignmentServiceImplTest {
 
 			// Then:
 			verify(permissionService).requirePermission(user, PermissionKeys.LEARNING_ENROLL);
-			verify(learningEnrollmentService).unenrollUserFromRoadmap(user.internalId(), roadmapId);
+			verify(roadmapEnrollmentService).unenrollUserFromRoadmap(user.internalId(), roadmapId);
 		}
 	}
 
@@ -401,8 +401,8 @@ class RoadmapAssignmentServiceImplTest {
 			service.syncNewTeamMemberEnrollments(leadUserId, memberUserId);
 
 			// Then:
-			verify(learningEnrollmentService).enrollUsersInRoadmap(List.of(memberUserId), firstRoadmap.getId());
-			verify(learningEnrollmentService).enrollUsersInRoadmap(List.of(memberUserId), secondRoadmap.getId());
+			verify(roadmapEnrollmentService).enrollUsersInRoadmap(List.of(memberUserId), firstRoadmap.getId());
+			verify(roadmapEnrollmentService).enrollUsersInRoadmap(List.of(memberUserId), secondRoadmap.getId());
 		}
 
 		@Test
@@ -416,7 +416,7 @@ class RoadmapAssignmentServiceImplTest {
 			service.syncNewTeamMemberEnrollments(leadUserId, memberUserId);
 
 			// Then:
-			verifyNoInteractions(learningEnrollmentService);
+			verifyNoInteractions(roadmapEnrollmentService);
 		}
 	}
 }

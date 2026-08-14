@@ -12,8 +12,8 @@ import com.aidigital.aionboarding.service.learning.models.RoadmapAssignmentResul
 import com.aidigital.aionboarding.service.learning.models.RoadmapEnrollmentResultRecord;
 import com.aidigital.aionboarding.service.learning.models.RoadmapTeamAssignmentRecord;
 import com.aidigital.aionboarding.service.learning.models.RoadmapTeamAssignmentResultRecord;
-import com.aidigital.aionboarding.service.learning.services.LearningEnrollmentService;
 import com.aidigital.aionboarding.service.learning.services.RoadmapAssignmentService;
+import com.aidigital.aionboarding.service.learning.services.RoadmapEnrollmentService;
 import com.aidigital.aionboarding.service.learning.services.entity.LearningEnrollmentEntityService;
 import com.aidigital.aionboarding.service.learning.support.LearningAssignmentAccessPolicy;
 import com.aidigital.aionboarding.service.learning.support.LearningEnrollmentSupport;
@@ -34,7 +34,7 @@ public class RoadmapAssignmentServiceImpl implements RoadmapAssignmentService {
 
     private final PermissionService permissionService;
     private final LearningEnrollmentEntityService learningEnrollmentEntityService;
-    private final LearningEnrollmentService learningEnrollmentService;
+    private final RoadmapEnrollmentService roadmapEnrollmentService;
     private final LearningEnrollmentSupport learningEnrollmentSupport;
     private final RoadmapEntityService roadmapEntityService;
     private final RoadmapTeamAssignmentEntityService roadmapTeamAssignmentEntityService;
@@ -52,7 +52,7 @@ public class RoadmapAssignmentServiceImpl implements RoadmapAssignmentService {
         learningAssignmentAccessPolicy.requireAssignableTargets(
             actor, targetUserIds, "You can assign roadmaps only to manageable users.");
 
-        List<UserRoadmap> enrollmentRows = learningEnrollmentService.enrollUsersInRoadmap(targetUserIds, roadmapId);
+        List<UserRoadmap> enrollmentRows = roadmapEnrollmentService.enrollUsersInRoadmap(targetUserIds, roadmapId);
         List<RoadmapAssignmentEnrollmentRecord> enrollments = new ArrayList<>();
         for (int i = 0; i < targetUserIds.size(); i++) {
             enrollments.add(learningEnrollmentSupport.toRoadmapAssignmentEnrollment(enrollmentRows.get(i), targetUserIds.get(i)));
@@ -88,14 +88,14 @@ public class RoadmapAssignmentServiceImpl implements RoadmapAssignmentService {
         learningAssignmentAccessPolicy.requireAssignableTargets(
             actor, targetUserIds, "You can revoke roadmap assignments only for manageable users.");
         roadmapEntityService.getReference(roadmapId);
-        learningEnrollmentService.unenrollUsersFromRoadmap(targetUserIds, roadmapId);
+        roadmapEnrollmentService.unenrollUsersFromRoadmap(targetUserIds, roadmapId);
     }
 
     @Override
     @Transactional
     public RoadmapEnrollmentResultRecord enrollRoadmap(AppUser user, Long roadmapId) {
         permissionService.requirePermission(user, PermissionKeys.LEARNING_ENROLL);
-        UserRoadmap enrollment = learningEnrollmentService.enrollUserInRoadmap(user.internalId(), roadmapId);
+        UserRoadmap enrollment = roadmapEnrollmentService.enrollUserInRoadmap(user.internalId(), roadmapId);
 
         return new RoadmapEnrollmentResultRecord(true, learningEnrollmentSupport.toRoadmapEnrollment(enrollment));
     }
@@ -104,7 +104,7 @@ public class RoadmapAssignmentServiceImpl implements RoadmapAssignmentService {
     @Transactional
     public void unenrollRoadmap(AppUser user, Long roadmapId) {
         permissionService.requirePermission(user, PermissionKeys.LEARNING_ENROLL);
-        learningEnrollmentService.unenrollUserFromRoadmap(user.internalId(), roadmapId);
+        roadmapEnrollmentService.unenrollUserFromRoadmap(user.internalId(), roadmapId);
     }
 
     @Override
@@ -155,7 +155,7 @@ public class RoadmapAssignmentServiceImpl implements RoadmapAssignmentService {
             .map(assignment -> assignment.getRoadmap().getId())
             .toList();
         for (Long roadmapId : roadmapIds) {
-            learningEnrollmentService.enrollUsersInRoadmap(List.of(memberUserId), roadmapId);
+            roadmapEnrollmentService.enrollUsersInRoadmap(List.of(memberUserId), roadmapId);
         }
     }
 }

@@ -6,7 +6,7 @@ import com.aidigital.aionboarding.domain.roadmap.entities.RoadmapTeamAssignment;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.learning.models.RoadmapAssignmentEnrollmentRecord;
-import com.aidigital.aionboarding.service.learning.services.LearningEnrollmentService;
+import com.aidigital.aionboarding.service.learning.services.RoadmapEnrollmentService;
 import com.aidigital.aionboarding.service.roadmap.services.entity.RoadmapTeamAssignmentEntityService;
 import com.aidigital.aionboarding.service.team.services.entity.TeamEntityService;
 import com.aidigital.aionboarding.service.user.services.entity.UserEntityService;
@@ -27,7 +27,7 @@ public class RoadmapTeamAssignmentWorkflow {
     private final UserEntityService userEntityService;
     private final TeamEntityService teamEntityService;
     private final RoadmapTeamAssignmentEntityService roadmapTeamAssignmentEntityService;
-    private final LearningEnrollmentService learningEnrollmentService;
+    private final RoadmapEnrollmentService roadmapEnrollmentService;
     private final LearningEnrollmentSupport learningEnrollmentSupport;
     private final CurrentTime currentTime;
 
@@ -68,7 +68,7 @@ public class RoadmapTeamAssignmentWorkflow {
         if (targetUserIds.isEmpty()) {
             return List.of();
         }
-        List<UserRoadmap> enrollmentRows = learningEnrollmentService.enrollUsersInRoadmap(targetUserIds, roadmapId);
+        List<UserRoadmap> enrollmentRows = roadmapEnrollmentService.enrollUsersInRoadmap(targetUserIds, roadmapId);
         List<RoadmapAssignmentEnrollmentRecord> enrollments = new ArrayList<>();
         for (int i = 0; i < targetUserIds.size(); i++) {
             enrollments.add(learningEnrollmentSupport.toRoadmapAssignmentEnrollment(enrollmentRows.get(i), targetUserIds.get(i)));
