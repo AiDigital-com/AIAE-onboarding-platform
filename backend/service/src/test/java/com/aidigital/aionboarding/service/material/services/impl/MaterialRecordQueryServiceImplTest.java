@@ -137,7 +137,7 @@ class MaterialRecordQueryServiceImplTest {
 		MaterialRecord expected = Instancio.create(MaterialRecord.class);
 		when(materialYoutubeService.findByMaterialIdOrderBySortOrderAsc(10L)).thenReturn(youtubeUrls);
 		when(materialLinkService.findByMaterialIdOrderBySortOrderAsc(10L)).thenReturn(links);
-		when(materialFileService.findByMaterialIdOrderByCreatedAtAsc(10L)).thenReturn(files);
+		when(materialFileService.findByMaterialIdsOrderByCreatedAtAsc(List.of(10L))).thenReturn(files);
 		when(materialMapper.toRecord(material, youtubeUrls, links, files, 7L)).thenReturn(expected);
 
 		// When:

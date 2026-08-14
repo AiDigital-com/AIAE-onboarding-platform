@@ -7,7 +7,6 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 
 public interface MaterialFileRepository extends JpaRepository<MaterialFile, Long> {
 
@@ -22,8 +21,7 @@ public interface MaterialFileRepository extends JpaRepository<MaterialFile, Long
 
     void deleteByMaterial_Id(Long materialId);
 
-    @Query("SELECT f FROM MaterialFile f WHERE f.storageKey = :storageKey")
-    Optional<MaterialFile> findByStorageKey(@Param("storageKey") String storageKey);
+    boolean existsByStorageKey(String storageKey);
 
     /**
      * Returns bounded attachment summary projections for the given materials, omitting the

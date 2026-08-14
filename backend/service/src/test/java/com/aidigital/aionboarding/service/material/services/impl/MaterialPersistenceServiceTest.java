@@ -106,7 +106,7 @@ class MaterialPersistenceServiceTest {
 			);
 
 			syncCaptor.getValue().afterCommit();
-			verify(materialFileService).deleteStorageKeysQuietly(removedKeys);
+			verify(storageService).deleteObjectsQuietly(removedKeys);
 		}
 	}
 

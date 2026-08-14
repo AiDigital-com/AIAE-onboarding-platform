@@ -266,7 +266,7 @@ class MaterialServiceImplTest {
 
 				// Invoke the afterCommit callback manually
 				syncCaptor.getValue().afterCommit();
-				verify(materialFileService).deleteStorageKeysQuietly(storageKeys);
+				verify(materialPersistenceService).deleteStorageKeysQuietly(storageKeys);
 			}
 		}
 
@@ -281,7 +281,7 @@ class MaterialServiceImplTest {
 			when(materialFileService.collectStorageKeys(20L)).thenReturn(storageKeys);
 			doNothing().when(materialRecordQueryService).requireDeletable(20L);
 			doThrow(new RuntimeException("S3 unavailable"))
-					.when(materialFileService).deleteStorageKeysQuietly(anyList());
+					.when(materialPersistenceService).deleteStorageKeysQuietly(anyList());
 
 			try (MockedStatic<TransactionSynchronizationManager> txMgr =
 						 mockStatic(TransactionSynchronizationManager.class)) {

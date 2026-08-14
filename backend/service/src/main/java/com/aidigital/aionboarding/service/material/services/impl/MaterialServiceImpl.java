@@ -153,7 +153,7 @@ public class MaterialServiceImpl implements MaterialService {
 			@Override
 			public void afterCommit() {
 				try {
-					materialFileService.deleteStorageKeysQuietly(keysToDelete);
+					materialPersistenceService.deleteStorageKeysQuietly(keysToDelete);
 				} catch (RuntimeException e) {
 					log.warn("Storage cleanup failed after material delete (non-fatal): {}", e.getMessage());
 				}

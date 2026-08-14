@@ -35,6 +35,7 @@ import java.util.Optional;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -551,6 +552,60 @@ class StorageServiceTest {
 				syncCaptor.getValue().afterCommit();
 				verify(storageClient).deleteObjects(List.of("key-7"));
 			}
+		}
+	}
+
+	@Nested
+	class DeleteObjectsQuietlyTests {
+
+		@Test
+		void shouldDoNothingForNullInputTest() {
+			// When:
+			service.deleteObjectsQuietly(null);
+
+			// Then:
+			verifyNoInteractions(storageClient);
+		}
+
+		@Test
+		void shouldDoNothingForEmptyInputTest() {
+			// When:
+			service.deleteObjectsQuietly(List.of());
+
+			// Then:
+			verifyNoInteractions(storageClient);
+		}
+
+		@Test
+		void shouldDoNothingWhenOnlyBlankAndNullKeysGivenTest() {
+			// When:
+			service.deleteObjectsQuietly(java.util.Arrays.asList(null, "  ", ""));
+
+			// Then:
+			verifyNoInteractions(storageClient);
+		}
+
+		@Test
+		void shouldFilterBlankAndDuplicateKeysBeforeDeletingTest() {
+			// Given:
+			List<String> keys = java.util.Arrays.asList("key-1", null, "key-1", "  ", "key-2");
+
+			// When:
+			service.deleteObjectsQuietly(keys);
+
+			// Then:
+			verify(storageClient).deleteObjects(List.of("key-1", "key-2"));
+		}
+
+		@Test
+		void shouldSwallowRuntimeExceptionFromStorageClientTest() {
+			// Given:
+			List<String> keys = List.of("key-3");
+			org.mockito.Mockito.doThrow(new RuntimeException("S3 unavailable"))
+					.when(storageClient).deleteObjects(keys);
+
+			// When-Then:
+			assertThatCode(() -> service.deleteObjectsQuietly(keys)).doesNotThrowAnyException();
 		}
 	}
 }

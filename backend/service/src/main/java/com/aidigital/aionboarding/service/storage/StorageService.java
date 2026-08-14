@@ -339,6 +339,32 @@ public class StorageService {
 	}
 
 	/**
+	 * Deletes one or more objects for a best-effort caller: blank and duplicate keys are
+	 * dropped first, and any storage failure is logged and swallowed rather than propagated,
+	 * so cleanup after a database commit never fails the surrounding workflow (e.g. a material
+	 * update/delete's after-commit storage cleanup).
+	 *
+	 * @param storageKeys object storage keys to remove; may be null or contain blanks/duplicates
+	 */
+	public void deleteObjectsQuietly(List<String> storageKeys) {
+		if (storageKeys == null || storageKeys.isEmpty()) {
+			return;
+		}
+		List<String> uniqueKeys = storageKeys.stream()
+				.filter(key -> key != null && !key.isBlank())
+				.distinct()
+				.toList();
+		if (uniqueKeys.isEmpty()) {
+			return;
+		}
+		try {
+			deleteObjects(uniqueKeys);
+		} catch (RuntimeException e) {
+			LOG.warn("Storage cleanup failed (non-fatal): {}", e.getMessage());
+		}
+	}
+
+	/**
 	 * Rejects an upload/reference attempt for the given reason, recording the security counter
 	 * and returning the exception to throw.
 	 *
