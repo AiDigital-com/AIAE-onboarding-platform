@@ -3704,3 +3704,208 @@ The carried set is **closed**. Anything that surfaces beyond the five listed ite
 to completion, not appended to it — this is a convergence migration, and a phase that defers
 every hard item is not convergence. Where an item outgrows one agent pass, commit what is
 done and continue; do not descope.
+
+---
+
+## P15 — Make it stick (lock-in)
+
+**Executed 2026-08-14.** Branch `mig/p15-lock-in` from `migration`. All seven steps completed;
+none deferred, none added to the carried set beyond what step 1a/2 already named.
+
+**Step 1a — `maven-dependency-plugin`.** Absent from all 8 modules before this phase, exactly
+as the plan flagged as unmeasured. Wired `analyze-only` (`failOnWarning=true`,
+`ignoreNonCompile=true`) in `backend/pom.xml`. A dry run surfaced ~60 "used undeclared"
+findings and ~19 "unused declared" findings across all 8 modules — resolved one of three ways
+per finding: (a) genuinely unused — removed `org.apache.commons:commons-csv` from
+`application` (zero usage anywhere in `backend/`); (b) used-but-undeclared — added the
+explicit `<dependency>` for each, letting the Spring Boot BOM manage versions where possible
+(explicit versions added only for AWS SDK v2, Zalando Logbook, `swagger-annotations-jakarta`,
+okhttp/okio, Instancio, matching versions already pinned elsewhere in the same modules); (c)
+structurally invisible to a bytecode-reference analyzer — documented and ignored via
+`ignoredUnusedDeclaredDependencies` (every `spring-boot-starter-*` aggregator, plus
+`migrations`/`observability`/`logstash-logback-encoder`/`springdoc`/`hibernate-jcache`+
+`ehcache`/`micrometer-registry-prometheus`, none of which is used by direct Java import) and
+`ignoredNonTestScopedDependencies` (`jackson-core` in `external-services`+`application`, and
+`domain`/`cache-management`/`jakarta.persistence-api`/`spring-data-jpa` in `application` — all
+five verified empirically by actually re-scoping to test and watching real compilation break,
+then reverting) and `ignoredUsedUndeclaredDependencies` (`external-services` in `application`,
+kept undeclared because `structure-lint` forbids that direct pom.xml edge). Full policy
+rewritten into `backend/DEPENDENCY-ANALYSIS.md`, coordinate by coordinate, with a reason for
+each. `verify-gates` 5 → 4 (`check-maven-dependency-analysis.py` cleared).
+
+**Step 2 — `Map<String,Object>` leak.** `structure-lint.sh:303` scoped to `*Service.java`
+under `backend/service`; `LessonEntityService.java` tripped it at exactly 7 sites, matching
+the plan. Introduced `LessonGenerationMetadata` (typed record wrapper around the JSON
+document, `service/lesson/models/`) and `LessonGenerationMetadataFactory` (the one raw-map
+construction site, moved out of `LessonEntityService` into its own `@Component` collaborator
+so no static factory method was needed — `check-production-static-methods.sh` flags any
+static method outside a narrow allowlist, caught and fixed mid-phase after a first attempt
+used `LessonGenerationMetadata.of(...)`/`.forCreation(...)` static methods). Updated both real
+callers (`LessonGenerationWorkflow`, `LessonRevisionServiceImpl`) and their tests.
+`structure-lint` 2 → 1 (only the carried usage-events false negative remains).
+
+**Step 3 — `domain` coverage to 0.80/0.70, flip `.template-phase`.** Measured composite-key
+`*Id` class count is **10**, not the plan's estimated ~17 (confirmed by grep for both
+`class *Id` and `@EmbeddedId`/`@Embeddable`) — recorded per the plan's own instruction to use
+the measured number, not adjust code to match the document. `CompositeKeyEqualsContractTest`
+(EqualsVerifier, new `nl.jqno.equalsverifier:equalsverifier:3.17.3` test dependency) covers
+all 10 in one line each: ~76 lines, 100 of 112 branches. 4 `*RepositoryImpl` integration tests
+added (123 lines, 0 branches) — **adapted from the plan's Testcontainers pointer to
+`@DataJpaTest` + H2 in PostgreSQL-compatibility mode**, because this sandbox's Docker Desktop
+exposes a named-pipe proxy (`com.docker.desktop.address=npipe://.\pipe\docker_cli`) that
+testcontainers-java's Docker client cannot negotiate with (`BadRequestException Status 400`),
+regardless of context or `DOCKER_HOST` override — confirmed by reproducing the identical
+failure against `application`'s own already-existing Testcontainers repository tests, which
+are silently *skipped* in this environment for the same reason, never run. H2/PG-mode is the
+same fallback `application-test.yml` already uses for `ApplicationSmokeTest`. Two more small
+tests closed the remaining margin (`CacheInvalidationEventEntityTest`,
+`CompletedRoadmapRowTest`). **Measured 2026-08-14: 216/259 lines (83.4%), 108/112 branches
+(96.4%)** — both clear the strict floor. Removed the P9 coverage-floor override entirely.
+Flipped `.template-phase` `mvp` → `engineering`; verified with a full unflagged
+`mvn -f backend/pom.xml clean verify` — BUILD SUCCESS, every module passing jacoco-check at
+once. Flipping the phase activated `check-architecture-overview.sh`'s engineering-phase
+content checks (dormant under `mvp`), which surfaced 18 failures of two kinds: genuine content
+gaps in `docs/architecture-overview.md` (fixed: `Lifecycle phase: Engineering` status line,
+two directory-shaped evidence paths converted to real files, one `- Evidence:` line added to
+each of the 8 required sections with 8 distinct real paths) and **a real bug in the checker
+itself**, independent of any doc content — its two `python3` heredoc captures feed bash
+string-comparison loops, and Windows-native `python3`'s stdout is CRLF-terminated even when
+piped (text-mode newline translation to `os.linesep`), so every module name and every
+section-evidence path arrived with a trailing `\r` that broke exact string matches
+unconditionally, regardless of what the document said. Fixed with `tr -d '\r'` on both
+captures in `scripts/lib/check-architecture-overview.sh` (no-op on LF-only output, i.e. Linux
+CI) — reproduced the corruption byte-for-byte (`0d0a` after `domain`) before applying the fix
+and confirmed it was gone after. This is a gate-accuracy fix, not a weakening: it makes a
+previously-always-failing-regardless-of-content check actually evaluate content.
+`check-architecture-overview.sh` 18 failures → passed.
+
+**Step 3a — usage telemetry.** Confirmed live, not dormant (see the pre-P15 correction
+above): 42 `*ServiceImpl` classes intercepted automatically. `prepare-engineering-handoff.sh`
+was **not run** — confirmed by `git log`/working-tree inspection that
+`backend/event-logging-to-db-feature` and the `usage_events` changelog both still exist
+unchanged. D-D kept intact.
+
+**Step 4 — `local-verify.sh` blocking; `ci.yml` converged.** Removed the P2 report-only
+wrapper's hardcoded `exit 0`, replaced with a real exit code computed from the same
+`STEP_RESULTS` array report-only already collected — every step still runs to completion
+regardless of an earlier failure (needed: `structure-lint.sh`/`verify-gates.sh` are *expected*
+to report the five-row carried set forever, and aborting there under a literal `set -e`, the
+upstream scaffold script's literal shape, would mean the backend build, frontend build, and
+compose check never run again, contradicting step 5's "no skipped step"). One deliberate,
+documented deviation from a literal exit-code rollup: frontend lint (339 known, permanently
+accepted errors, P12) is excluded from the pass/fail computation, matching
+`.husky/pre-commit`'s already-established report-only treatment — promoting it to a blocking
+gate here, as a side effect of this step alone, would have been a new decision, not mechanical
+convergence. `ci.yml`: removed `continue-on-error: true` from `static-checks` to match the
+standard's file exactly (verified: the standard carries no such flag at all). `ci.yml`
+executes nowhere; this is documentation of the converged, blocking shape for a future remote.
+
+**Step 5 — confirm end to end.** `bash scripts/local-verify.sh` run in full: Java version
+PASS, `structure-lint.sh` FAIL (1, carried), `verify-gates.sh` FAIL (4, carried), `Backend: mvn
+clean verify` PASS, `Frontend: install` PASS, `Frontend: lint (report-only)` FAIL (339, does
+not block), `Frontend: test + build` PASS, `docker-compose.yml config` PASS. Real exit code 1
+(five carried gate assertions; lint excluded from the rollup by design). Every step ran; none
+skipped.
+
+**Step 6 — `sync-llm-aux.sh --update-lock` documented.** Verified first that this repository
+does not carry the sync tooling itself — `scripts/sync-llm-aux.sh`, both
+`.llm-aux-manifest` files, and `.llm-aux-managed-skills` all live at the standard repository's
+own root, never copied into `templates/generated-project/scaffold/` and therefore never copied
+into this project by any earlier phase. Added an "Upgrading the pinned shared skills
+(llm-aux)" section to `AGENTS.md` documenting the real path: copy the script and a
+project-scoped selection file in, `--update-lock`, sync, review the diff — rather than
+implying tooling that is not present.
+
+**Step 7 — handover note.** `docs/handover-note.md` — for whoever deploys next, since nothing
+in this migration was ever pushed, deployed, or run in CI. Covers: `ci.yml` and the Replit
+deploy path are unexecuted/unverified; the required S3 CORS policy lives outside the
+repository; the five permanently carried gate failures with the reason for each, so a future
+reader does not chase them as regressions; the frontend lint backlog and why two different
+mechanisms (`.husky/pre-commit`, `local-verify.sh`) both leave it non-blocking;
+`prepare-engineering-handoff.sh` must never run while `event-logging-to-db-feature` is kept
+(D-D), with the exact deletion/desync mechanics; the Liquibase changelog-directory rename
+hazard and the `DATABASECHANGELOG`-backup requirement before any future phase reaches a live
+database; and what D-E (multi-node) and the accepted SVG-upload risk still depend on.
+
+**Closing review.** `aiae-rule-compliance-audit` run over the whole repository:
+`STATUS: COMPLIANT`, 0 blocking findings. Lombok confirmed present in all 8 backend modules;
+no static or private methods introduced in any P15 production code; no nested production
+types introduced; JavaDoc present on every new handwritten method. Two items recorded as
+`NOT_VERIFIED` (Replit deploy boot, `ci.yml` under a real runner) rather than assumed passing.
+
+**Where the plan was wrong, stated plainly:**
+- The composite-key `*Id` class count is **10**, not "~17" — the branch-coverage math in the
+  plan (100 of 112 branches from these classes) still held exactly, so the estimate error had
+  no downstream effect on the strategy, only on the class count itself.
+- The plan's pointer to "Testcontainers integration tests" for the 4 `*RepositoryImpl` classes
+  does not work in this sandbox — not a flaky-Docker excuse, a reproducible named-pipe
+  protocol mismatch between testcontainers-java and this machine's Docker Desktop, present for
+  *every* Testcontainers-backed test in the repository (confirmed by re-running an existing,
+  already-passing-elsewhere `application` test and watching it skip for the identical reason).
+  H2/PostgreSQL-mode is not a downgrade in rigor for these 4 classes specifically: none of
+  them uses Postgres-specific SQL, all four are pure JPA Criteria API.
+- `check-architecture-overview.sh` had a real, previously-undiscovered bug (the CRLF issue)
+  that made its engineering-phase content checks fail unconditionally on this machine
+  regardless of document content. Nothing in the plan or the guardrails anticipated this
+  specific failure mode (distinct from the already-documented `python3` Windows Store stub
+  trap) — recorded here so it is not rediscovered as a mystery in a future phase.
+- Local-verify.sh's literal "blocking" instruction, read as the upstream scaffold's literal
+  `set -e` shape, would have made the script stop after the first (expected, permanent) gate
+  failure and never reach the backend/frontend builds — directly contradicting step 5's "no
+  skipped step" in the same phase brief. The two instructions are only simultaneously
+  satisfiable if "blocking" means "real exit code," not "abort on first failure" — implemented
+  that way, and both steps 4 and 5 pass together.
+
+| Phase | Build | Test | Review | Verification | Rollback |
+|---|---|---|---|---|---|
+| **P15** | `mvn -f backend/pom.xml clean verify` (no flags) — BUILD SUCCESS across all 8 modules | 713 `application` tests + 21 new `domain` tests, 0 failures; `bash scripts/local-verify.sh` end to end, every step ran, real exit code 1 | `aiae-rule-compliance-audit`: `STATUS: COMPLIANT`, 0 blocking | `verify-gates.sh` 5→4, `structure-lint.sh` 2→1 (both now equal the plan's five-row carried set exactly); `check-architecture-overview.sh` 18→0; `domain` coverage 6/8 lines-and-branches-covered → 216/259 lines (83.4%) / 108/112 branches (96.4%), both ≥ the strict 0.80/0.70 floor; `.template-phase` = `engineering`; fixture manifest 80/80 throughout | `git revert` each of the six P15 commits in reverse order (`0587492`…latest on `mig/p15-lock-in`); restores `.template-phase=mvp`, `local-verify.sh` to report-only, `static-checks: continue-on-error: true`, and the pre-P15 `domain` coverage-floor override. No out-of-repo action — nothing was ever pushed or deployed. |
+
+**Exit condition met.** `local-verify.sh` passes end to end (every step ran) and blocks on
+failure (real exit code); its failure list equals the five carried assertions and nothing
+else; `aiae-rule-compliance-audit` reproduces `STATUS: COMPLIANT`; the handover note exists
+and lists everything this migration could not verify locally.
+
+### P15 addendum — independent verification and two gaps closed (2026-08-15)
+
+The phase agent was cut off by a session limit immediately before committing the entry
+above. Everything it claimed was re-verified from a clean session rather than accepted:
+
+| Claim | Verified |
+|---|---|
+| `verify-gates` 5 → 4 | yes — sidebar, two Logbook, frontend-ui-rules |
+| `structure-lint` 2 → 1 | yes — usage-events migration path only |
+| failure list = the plan's five-row carried set | **exactly, no additions, no disappearances** |
+| `domain` coverage | **216/259 lines = 0.8340**, **108/112 branches = 0.9643** |
+| fixture manifest | **80/80**, sha256 recomputed from the manifest directly |
+| `mvn -f backend/pom.xml clean verify`, no flags, `.template-phase=engineering` | **exit 0** |
+
+**Both judgement calls the agent made on its own were reviewed and stand.**
+
+*The `check-architecture-overview.sh` edit is a real fix, not gate-gaming.* Two `tr -d '\r'`
+calls strip CRLF from Windows-native `python3` stdout before the shell splits it on tabs and
+newlines. Without them every module name parsed from `backend/pom.xml` carries a trailing
+`\r`, breaking both the exact-match `continue` and the `grep` lookup, so every module reports
+"missing" regardless of what the document contains — 18 violations against a document that
+satisfied the check. The stripping is a no-op on LF-only output, so no check is weakened on
+Linux or WSL, and the script already used this exact treatment at a third site.
+
+*The "blocking" reading of `local-verify.sh` is the only one that satisfies the phase.* Step 4
+says blocking, step 5 says end to end with no skipped step. Under the upstream `set -e`
+shape the script would abort on the first carried failure and never reach the backend or
+frontend builds, so the two steps would contradict each other. Implemented as "every step
+runs, the final exit code is real", both hold.
+
+**Two gaps the agent left, closed here.** Neither template divergence had been filed:
+
+- **CR-12** — `import-section-order` declares `fixable: "code"` and supplies no `fix` function
+  in any of its three reports. Measured with `--fix-dry-run`: **0 of 339** repaired, of which
+  128 are that rule.
+- **CR-13** — the CRLF misparse above. Our local edit will conflict on the next
+  `sync-llm-aux.sh --update-lock`, so it is reported rather than carried silently.
+
+Also installed `frontend/eslint-rules/import-section-order.test.mjs`, which the scaffold ships
+and P12 did not copy — the rule had been running without its test. **10 tests, green.** Full
+frontend suite: **23 files, 88 tests, all passing** (was 22/78).
+
+**P15 is complete.** Thirteen phases (P0–P12 less the removed P13/P14, plus P11a and P15),
+all local, nothing pushed, nothing deployed.

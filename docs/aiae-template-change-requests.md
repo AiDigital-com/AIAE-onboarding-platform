@@ -519,6 +519,92 @@ generated project copies.
 
 ---
 
+## CR-12 — `import-section-order` declares `fixable` and ships no fixer
+
+**Severity: low. Every generated project inherits a rule whose metadata lies.**
+
+`frontend/eslint-rules/import-section-order.mjs:27` declares:
+
+```js
+meta: {
+    type: "problem",
+    ...
+    fixable: "code",
+```
+
+None of the rule's three `context.report({...})` calls (lines 81, 95, 108) supplies a `fix`
+function. In ESLint, `meta.fixable` only *permits* fixes; the fix itself must come from the
+report. So `eslint --fix` silently repairs nothing for this rule while the metadata
+advertises that it will.
+
+**Measured on this project**: `npx eslint . --fix-dry-run` repairs **0 of 339** findings, of
+which **128** are `import-section-order`. A maintainer reading the rule source reasonably
+concludes those 128 are one command away; they are not.
+
+### Proposed change
+
+Either implement the fixer — all three violations are mechanically fixable (move the import
+to its section, insert a blank line, remove a blank line) and a fixer would make the rule
+adoptable on brownfield projects at near-zero cost — or drop `fixable: "code"` from the meta
+so the tooling and the docs agree.
+
+We would strongly prefer the fixer. See CR-13 for why this matters more than it looks: a
+project adopting the rule set on an existing codebase gets a large, unfixable backlog on day
+one, and the honest response is to make the hook report-only, which is a worse outcome for
+everyone than an autofix would have been.
+
+---
+
+## CR-13 — three checkers misparse Windows-native `python3` output (CRLF)
+
+**Severity: medium. On a Windows checkout the affected checks fail unconditionally,
+regardless of repository content.**
+
+`scripts/lib/check-architecture-overview.sh` embeds `python3` heredocs and reads their stdout
+into shell variables, then splits the result on tabs and newlines. Windows-native CPython
+performs newline translation to `os.linesep` on stdout **even when the stream is piped**, so
+every record arrives `\r`-terminated.
+
+The consequences are silent and total:
+
+- the tab-separated `section<TAB>path` records lose the trailing path field to a `\r`, so
+  every evidence path fails to resolve;
+- each module name parsed from `backend/pom.xml` carries a trailing `\r`, which breaks both
+  the exact-match `continue` and the subsequent `grep` lookup, so **every module reports
+  "missing" no matter what the document says**.
+
+On this project the engineering-phase check reported **18 violations against a document that
+satisfied it**. Nothing in the output hints at line endings; it reads as a genuine content
+failure, and the natural response is to start editing a correct document.
+
+**The script already knows about this.** It carries an existing `tr -d '\r'` with an
+explanatory comment elsewhere in the same file — the treatment was applied at one site and
+not at the two others that need it.
+
+### What we did
+
+Added `tr -d '\r'` at the two remaining sites, matching the existing precedent:
+
+```sh
+section_evidence="$(printf '%s' "${section_evidence}" | tr -d '\r')"
+active_modules="$(printf '%s' "${active_modules}" | tr -d '\r')"
+```
+
+This is a no-op on LF-only output, so Linux and WSL behaviour is unchanged and no check is
+weakened. It took the engineering-phase check from 18 violations to 0.
+
+**This is a local edit to a script you own**, so it will conflict on the next
+`sync-llm-aux.sh --update-lock`. We are reporting it rather than carrying it silently.
+
+### Proposed change
+
+Apply the same treatment upstream, and audit the other checkers that read `python3` stdout
+into shell variables for the same pattern. A more durable fix is to have the embedded Python
+write with explicit `\n` — e.g. reconfigure `sys.stdout` with `newline="\n"` — so the shell
+side does not need to defend against it at every call site.
+
+---
+
 ## Summary
 
 | ID | Gate | Severity | Blocking us? | We need |
@@ -534,6 +620,8 @@ generated project copies.
 | CR-9 | `CLAUDE.md` managed *and* meant to be adapted | **High** | **Yes** | Seed-once, or a sanctioned unhashed region |
 | CR-10 | link checker vs path rewriter file sets | Low | No | The two to cover the same files |
 | CR-11 | scaffold services break the entity-service rule | Medium | No — diverged | A paired entity service in the scaffold, or an explicit exemption |
+| CR-12 | `import-section-order` declares `fixable`, ships no fixer | Low | No | Implement the fixer, or drop the meta claim |
+| CR-13 | checkers misparse Windows `python3` CRLF stdout | Medium | No — diverged | `tr -d '\r'` upstream, or `newline="\n"` in the embedded Python |
 
 Everything else in our audit is our own work and is in progress. We are happy to supply the
 full audit, reproduction commands, or a patch for any of the above.
