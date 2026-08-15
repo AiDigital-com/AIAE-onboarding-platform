@@ -605,6 +605,113 @@ side does not need to defend against it at every call site.
 
 ---
 
+## CR-14 — the cache-invalidation cursor can skip an event permanently
+
+**Severity: high. Silent, permanent staleness on a subset of nodes; the failure mode the
+module exists to prevent.**
+
+**Status: reasoned from the code, not yet reproduced by a test.** We are reporting it at this
+confidence rather than sitting on it, and we say so plainly below. If you want the
+reproduction before acting, we will write it.
+
+### The mechanism
+
+`distributed_cache.md` specifies the polling protocol as:
+
+> - Event identity and ordering use the database-generated monotonic `id`, never application
+>   clocks or timestamps.
+> - Consumers query `id > lastProcessedId ORDER BY id` in bounded pages.
+
+`CacheInvalidationEventEntity` inherits `@GeneratedValue(strategy = GenerationType.IDENTITY)`
+from `IdAwareEntity`. On PostgreSQL that id is allocated **when the INSERT executes**, inside
+the still-open transaction. The row becomes **visible to other sessions only at COMMIT**.
+
+Those are two different moments, and nothing orders them with respect to each other. The id
+is monotonic in *allocation* order, not in *visibility* order.
+
+### The interleaving
+
+| | |
+|---|---|
+| `t1` | Transaction A publishes an event, is allocated id **100**, and keeps working — it is a business transaction, so it may still be mutating other rows. |
+| `t2` | Transaction B publishes an event, is allocated id **101**, and commits. |
+| `t3` | A poller on some node queries `id > 99`. Row 100 is not visible — A has not committed. It sees only **101**, evicts, and advances its cursor to **101**. |
+| `t4` | Transaction A commits. Row 100 becomes visible. |
+| `t5` | The next poll queries `id > 101`. **Row 100 is never returned to that node, ever.** |
+
+That node has permanently missed an invalidation. Its heap-local cache serves stale data for
+the affected class until either another event for the same class arrives, or the node
+restarts (which clears the heap and replays from zero).
+
+### Why this matters more than the frequency suggests
+
+- **It is silent.** No error, no backlog warning, no gap in the cursor sequence — the cursor
+  advanced legally past an id that had not yet appeared. `ScheduledCacheUpdater`'s
+  strictly-increasing assertion cannot see it, because the sequence it observed *was*
+  increasing.
+- **The self-healing case is the wrong way round.** Frequently-mutated data recovers on the
+  next event. Rarely-mutated data does not — and the caching guidance points squarely at
+  read-mostly dictionaries as the intended cached population. The data least likely to
+  recover is the data most likely to be cached.
+- **Only some nodes are affected.** The publishing node evicted correctly in-process, and any
+  node whose poll happened to fall outside the window is fine. So the symptom is
+  "one instance shows old data, the others are correct" — the hardest shape to diagnose and
+  the easiest to dismiss as a browser cache or a load-balancer quirk.
+- **Concurrency is the trigger, not bad luck.** Any two overlapping publishing transactions
+  where the earlier-inserting one commits later will do it. That is ordinary behaviour under
+  load, not a rare interleaving.
+
+### The document already contains the argument against itself
+
+`distributed_cache.md` warns:
+
+> Do not replace this with `updatedAt > lastPollTime`: an event timestamped before a poll but
+> committed after its query can be skipped permanently.
+
+That reasoning is correct, and **it applies verbatim to the id**. Substitute "allocated an
+id" for "timestamped" and the sentence describes the shipped design. The doc rules out
+timestamps for a hazard the id shares; calling the id "monotonic" is what hides the
+equivalence, because it is monotonic in the sense that does not help here.
+
+### Proposed change
+
+The cheapest fix exploits a property the protocol already guarantees. `distributed_cache.md`
+states:
+
+> - Clearing is idempotent. Duplicate delivery and replay are safe.
+
+If replay is free, the cursor does not need to be exact — it needs to be *conservative*.
+Re-read a bounded overlap window on every poll instead of a strict `id > cursor`:
+
+```
+id > (lastProcessedId - overlapWindow)   -- or: created_at > (now - overlapInterval)
+```
+
+sized to exceed the longest publishing transaction. The cost is a handful of redundant
+evictions per poll, which the protocol already declares harmless; the benefit is that an
+event committing out of order is still picked up on a subsequent pass.
+
+Two stricter alternatives if you would rather close it exactly:
+
+1. **Bound the cursor by the oldest in-flight transaction.** Advance only past ids that no
+   open transaction could still be holding — on PostgreSQL,
+   `pg_snapshot_xmin(pg_current_snapshot())` gives the watermark. Exact, and
+   PostgreSQL-specific, which the design already is (`SKIP LOCKED` elsewhere).
+2. **Make visibility the ordering key.** Stamp a commit-time sequence rather than an
+   insert-time one, or track per-consumer acknowledgement instead of a high-water mark.
+
+We would take option (1) in the "Proposed change" — the overlap window — because it is a
+few lines, needs no new column, and rests on a guarantee the protocol already publishes.
+
+### What we are asking for
+
+Either the fix, or an explicit statement in `distributed_cache.md` that the skip is a known
+and accepted limitation with the operational mitigation named (periodic node restart, or a
+full-cache-clear policy). Right now the document reads as though the id-based cursor closes
+the hazard that the timestamp-based one leaves open, and that is the part we think is wrong.
+
+---
+
 ## Summary
 
 | ID | Gate | Severity | Blocking us? | We need |
@@ -622,6 +729,7 @@ side does not need to defend against it at every call site.
 | CR-11 | scaffold services break the entity-service rule | Medium | No — diverged | A paired entity service in the scaffold, or an explicit exemption |
 | CR-12 | `import-section-order` declares `fixable`, ships no fixer | Low | No | Implement the fixer, or drop the meta claim |
 | CR-13 | checkers misparse Windows `python3` CRLF stdout | Medium | No — diverged | `tr -d '\r'` upstream, or `newline="\n"` in the embedded Python |
+| CR-14 | cache-invalidation cursor can skip an event permanently | **High** | No — unverified | An overlap window on the poll, or an explicit accepted-limitation note |
 
 Everything else in our audit is our own work and is in progress. We are happy to supply the
 full audit, reproduction commands, or a patch for any of the above.
