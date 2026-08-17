@@ -297,8 +297,31 @@ jobs:
             echo "VITE_API_BASE_URL must not be /api/v1; leave it empty for same-origin Replit/Vite proxy"
             exit 1
           }
+          # Exclusions kept in sync with scripts/verify-gates.sh:208, which owns
+          # this rule. Two divergences, both already decided:
+          #
+          #   *.test.ts / *.test.tsx  — test doubles. frontend/src/shared/testing/
+          #     fetchSpy.test.ts calls fetch() 7 times precisely to test the spy
+          #     over it; the rule is about production call sites.
+          #   useLessonMutations.ts / useMaterialMutations.ts — the two CR-1
+          #     presigned-upload PUTs. There is no OpenAPI operation for an
+          #     S3-hosted PUT, and routing it through the backend would violate
+          #     14-performance.md by heap-buffering large files. Carried, decided,
+          #     permanent (audit 6.2); see docs/migration-guardrails.md.
+          #
+          # verify-gates.sh additionally asserts each exempt file holds EXACTLY
+          # ONE `await fetch(` site, so the exemption cannot silently widen or
+          # vanish. That guard is not duplicated here: verify-gates.sh runs in
+          # this same job, earlier, via check-carried-assertions.sh.
+          #
+          # Without these excludes the step failed on legitimate code every run.
+          # The unbracketed regex also matches `fetch()` inside a comment
+          # (useLessonMutations.ts:316), which verify-gates.sh's `await fetch(`
+          # count does not — see CR-16.
           ! grep -RInE 'fetch[[:space:]]*\(|from[[:space:]]+["'\'']axios["'\'']|axios\.|new[[:space:]]+XMLHttpRequest' \
-              --include='*.ts' --include='*.tsx' frontend/src >/dev/null 2>&1 || {
+              --include='*.ts' --include='*.tsx' frontend/src \
+              --exclude='*.test.ts' --exclude='*.test.tsx' \
+              --exclude=useLessonMutations.ts --exclude=useMaterialMutations.ts >/dev/null 2>&1 || {
             echo "Frontend must use shared/api/client.ts (typed openapi-fetch), not raw fetch/axios/XMLHttpRequest"
             exit 1
           }
