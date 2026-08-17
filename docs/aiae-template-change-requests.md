@@ -839,11 +839,13 @@ divergences we would rather not carry.
 
 ---
 
-## CR-17 — `find … | grep -q .` under `set -o pipefail` fails on large modules
+## CR-17 — `find … | grep -q .` under `set -o pipefail` reports populated trees as empty
 
-**Severity: medium. A latent, size-dependent flake that reports a healthy module as empty.**
+**Severity: high. Not a flake and not size-dependent — it fires on `ubuntu-latest` and blocks
+the job. Ten sites in `ci.yml`.**
 
-**Status: reproduced, 8 runs out of 8, on macOS. Not yet observed on a Linux runner.**
+**Status: reproduced on CI.** `Maven module must not be empty/POM-only: domain`, with GNU find
+printing `find: 'standard output': Broken pipe` / `find: write error` immediately above it.
 
 ### The mechanism
 
@@ -859,17 +861,20 @@ divergences we would rather not carry.
 takes `SIGPIPE`, and exits 141. Under `set -o pipefail` the pipeline inherits 141, so a module
 with hundreds of files is reported as **empty**.
 
-Whether it trips is a race between how much `find` still has to write and the pipe buffer:
+The trigger is not output size. `grep -q` exits at the **first** matching line, and any tree
+with at least one file matches on line one — so the reader is gone almost immediately while
+`find` is still walking the directory tree. Everything `find` writes after that hits a closed
+pipe.
 
-| | pipe buffer | `find` output for `backend/service` | result |
-|---|---|---|---|
-| our macOS dev machine | 8 KB | 53 KB | fails, 8/8 |
-| `ubuntu-latest` | 64 KB | 53 KB | passes today |
+We first assumed this was a pipe-buffer race (macOS 8 KB vs Linux 64 KB) and predicted CI would
+survive it. **That was wrong.** CI failed on `backend/domain`, whose `find` output is 12.8 KB —
+comfortably inside the Linux buffer. Buffer size only affects whether `find` happens to finish
+before the reader leaves; on a real checkout it does not. GNU find is also louder about it than
+BSD find, printing `find: 'standard output': Broken pipe` and `find: write error` before
+exiting non-zero.
 
-So the check currently passes on CI and fails locally — the worst arrangement, since it makes
-local reproduction of the CI job untrustworthy in both directions. And it is on a trajectory:
-once `backend/service` outgrows the Linux pipe buffer, CI starts failing too, with a message
-that points at the wrong thing entirely.
+The practical consequence is that the failure message names the wrong thing entirely: a module
+with 467 files is reported as "empty/POM-only".
 
 ### Proposed change
 
@@ -884,8 +889,19 @@ is strictly faster. The same shape appears elsewhere in `ci.yml` and is worth a 
 
 ### What we are asking for
 
-The `-print -quit` form upstream. We have not applied it locally: the check passes on CI today,
-and we would rather not add a fourth divergence to carry.
+The `-print -quit` form upstream, at all ten sites.
+
+We have applied it locally — the job could not pass otherwise. The affected sites in `ci.yml`
+were: the Python-app-file detector, four `pom.xml` plugin/dependency scans, the module
+non-emptiness loop, and four MVP-test-existence checks (three of which run inside a per-class
+loop, so they would have fired repeatedly). Note the last four sit in the step that verifies
+tests exist, which we had just made pass by writing the missing tests — they would have failed
+anyway, for a reason unrelated to test coverage.
+
+The gate scripts are not affected and we changed nothing there: `structure-lint.sh:170,176`
+already use `-print -quit`, and `:219,221` only run the pipeline when the match set is expected
+to be empty, where no early reader exit occurs. Worth fixing upstream for uniformity, but not
+currently broken.
 
 ---
 
@@ -909,7 +925,7 @@ and we would rather not add a fourth divergence to carry.
 | CR-14 | cache-invalidation cursor can skip an event permanently | **High** | No — unverified | An overlap window on the poll, or an explicit accepted-limitation note |
 | CR-15 | service-account-key scan matches its own source, always fails | **High** (CI defect) | **Yes** — diverged | The bracketed pattern upstream, so we can drop the local edit |
 | CR-16 | `ci.yml` duplicates gate rules, bypassing carried-assertions; copies have drifted | **High** | **Yes** — diverged | The duplicates deleted upstream, gate scripts as single owner |
-| CR-17 | `find \| grep -q .` under `pipefail` reports large modules as empty | Medium | No — latent | `find … -print -quit` instead of the pipeline |
+| CR-17 | `find \| grep -q .` under `pipefail` reports populated trees as empty, 10 sites | **High** | **Yes** — diverged | `find … -print -quit` instead of the pipeline |
 
 Everything else in our audit is our own work and is in progress. We are happy to supply the
 full audit, reproduction commands, or a patch for any of the above.
