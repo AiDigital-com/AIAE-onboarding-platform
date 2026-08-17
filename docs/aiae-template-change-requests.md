@@ -905,6 +905,62 @@ currently broken.
 
 ---
 
+## CR-18 — the AuthProperties accessor rule contradicts the template's own Lombok rule
+
+**Severity: medium. Two rules from the same template cannot both be satisfied; we complied with
+the gate, at a cost the gate does not account for.**
+
+**Status: complied.** We rewrote the class rather than carry a fourth red.
+
+### The contradiction
+
+`ci.yml:457` rejects Lombok accessor annotations in `security/AuthProperties.java`.
+
+`.claude/rules/00-backend-hard-rules.md`, shipped by the same template, says:
+
+> Lombok is mandatory in every backend Maven submodule … Use Lombok for constructor injection
+> and appropriate boilerplate **instead of handwritten equivalents**.
+
+There is no stated exception for this class, and nothing in the code explains one. Lombok
+accessors on a mutable `@ConfigurationProperties` bean are ordinary JavaBean binding and work
+correctly — the class was in production this way.
+
+### What complying cost
+
+The class went from 55 lines to 181. Beyond the 14 accessors themselves:
+
+- **JavaDoc.** The same rules file requires JavaDoc on *every* handwritten production method and
+  explicitly exempts Lombok-generated members. Generating the accessors by hand therefore also
+  generates 14 JavaDoc blocks.
+- **Coverage.** `backend/lombok.config` sets `lombok.addLombokGeneratedAnnotation = true`, so
+  JaCoCo skipped these accessors while they were generated. `backend/pom.xml:287` records that
+  every hand-written JaCoCo exclude — `config/`, `entities/`, `models/` — was removed in P9,
+  leaving only generated OpenAPI code. So the 14 new methods land in the denominator of the
+  0.80/0.70 gate. Two of them (`setSso`, `setAudience`) have no source call site at all: Spring
+  invokes them reflectively during binding, which JaCoCo does not observe.
+
+  We wrote `AuthPropertiesTest` to cover them. It is not a box-ticking accessor test: hand-written
+  accessors can silently swap two same-typed fields (`issuerUri` / `jwkSetUri` would still
+  compile and would misconfigure JWT validation), and the defaults it pins are load-bearing —
+  `AuthStartupValidator` depends on `authorizedParties` starting blank, and callers dereference
+  `getSso()` with no null check. That risk did not exist while Lombok generated the accessors.
+
+### A second defect in the same check
+
+The pattern is `grep -RInE '@(Getter|Setter|Data|Value|RequiredArgsConstructor)'` over the file's
+raw text, so it matches those names **inside comments**. Our first rewrite removed every
+annotation but explained the exception in the class JavaDoc — and still failed, on the prose.
+The file now carries a warning not to name those annotations even in a comment. Same root cause
+as CR-15 and the `fetch()`-in-a-comment case in CR-16: a text grep standing in for a code check.
+
+### What we are asking for
+
+Either drop the rule and let Lombok generate these accessors like everywhere else, or state the
+reason for the exception in the rules file so it stops reading as a contradiction. If the rule
+stays, please also make it ignore comments.
+
+---
+
 ## Summary
 
 | ID | Gate | Severity | Blocking us? | We need |
@@ -926,6 +982,7 @@ currently broken.
 | CR-15 | service-account-key scan matches its own source, always fails | **High** (CI defect) | **Yes** — diverged | The bracketed pattern upstream, so we can drop the local edit |
 | CR-16 | `ci.yml` duplicates gate rules, bypassing carried-assertions; copies have drifted | **High** | **Yes** — diverged | The duplicates deleted upstream, gate scripts as single owner |
 | CR-17 | `find \| grep -q .` under `pipefail` reports populated trees as empty, 10 sites | **High** | **Yes** — diverged | `find … -print -quit` instead of the pipeline |
+| CR-18 | AuthProperties accessor rule contradicts the mandatory-Lombok rule; also matches comments | Medium | No — complied | The exception dropped, or its reason stated in the rules file |
 
 Everything else in our audit is our own work and is in progress. We are happy to supply the
 full audit, reproduction commands, or a patch for any of the above.
