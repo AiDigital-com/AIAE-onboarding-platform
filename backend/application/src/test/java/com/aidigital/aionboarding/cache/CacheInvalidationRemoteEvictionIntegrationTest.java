@@ -32,7 +32,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * place. Full {@code @SpringBootTest} (not {@code @DataJpaTest}) because
  * {@code CacheUpdaterService} is a regular {@code @Service} bean the JPA test slice excludes.
  */
-@SpringBootTest
+// Supplies the one property the default profile leaves empty. application.yml has
+// `authorized-parties: ${AUTH_AUTHORIZED_PARTIES:}`, and AuthStartupValidator refuses
+// to start on a blank value, so without this the context fails to load. The obvious
+// alternative — @ActiveProfiles("test") — would gut the test: application-test.yml
+// sets liquibase.enabled=false and an H2 datasource, and this test exists precisely to
+// run the real migrations against real Postgres (see the class Javadoc above).
+@SpringBootTest(properties = "app.auth.authorized-parties=http://localhost:5173")
 @Testcontainers(disabledWithoutDocker = true)
 class CacheInvalidationRemoteEvictionIntegrationTest {
 
