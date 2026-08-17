@@ -183,7 +183,11 @@ jobs:
           for v in "${required_usage_vars[@]}"; do
             grep -Eq "^${v}=" .env.example || { echo "Missing ${v}= in .env.example"; exit 1; }
           done
-          if grep -R --exclude-dir=.git -n '"private_key_id"\|"private_key"\|"type": "service_account"' .; then
+          # The bracketed characters keep this line from matching itself. The
+          # scan covers the whole tree including .github, so an unbracketed
+          # pattern makes the step fail on its own source, every run, on any
+          # repo — see CR-15. Semantics are unchanged: '[y]' matches 'y'.
+          if grep -R --exclude-dir=.git -n '"private_ke[y]_id"\|"private_ke[y]"\|"type": "service_accoun[t]"' .; then
             echo "Service account JSON keys must not be committed"
               exit 1
           fi

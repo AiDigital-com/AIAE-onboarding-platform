@@ -712,6 +712,69 @@ the hazard that the timestamp-based one leaves open, and that is the part we thi
 
 ---
 
+## CR-15 — the committed-service-account-key scan always fails on its own source
+
+**Severity: high as a CI defect, nil as a security finding. The step can never pass, on any
+repository, in any state — including a repository with no key in it.**
+
+**Status: reproduced.** It failed our first otherwise-green CI run on `PDI_080`.
+
+### The mechanism
+
+`templates/generated-project/.github/workflows/ci.yml:166`, reproduced below with the three
+needles bracketed — `PRIVATE_KEY_ID` etc. stand in for the literal JSON keys — because
+quoting the line as written makes *this document* fail the check too, which is the bug:
+
+```bash
+if grep -R --exclude-dir=.git -n '"PRIVATE_KEY_ID"\|"PRIVATE_KEY"\|"type": "SERVICE_ACCOUNT"' .; then
+  echo "Service account JSON keys must not be committed"
+    exit 1
+fi
+```
+
+The scan root is `.` and the only exclusion is `.git`, so the scan covers
+`.github/workflows/ci.yml` — the file the pattern is written in. The pattern carries the three
+needles as literal text, so it matches its own source line and the step exits 1.
+
+This is unconditional. It does not depend on repository contents; a freshly materialized
+project with an otherwise empty tree fails it the moment `has_backend == 'true'`.
+
+### Why it stayed hidden
+
+The step is the fourth in `static-checks`, and any earlier failing step aborts the job first.
+Here `Run repository structure and policy gates` was failing on two carried assertions, so the
+job never reached this one. Fixing that step is what surfaced this. A template consumer whose
+earlier steps all pass meets it on their first run.
+
+### Proposed change
+
+Break the self-match; do not narrow the scan. Bracketing one character in each needle leaves
+the regex semantics identical — `[y]` matches `y` — and keeps coverage of `.github`, which is
+a plausible place for someone to paste a key inline:
+
+```bash
+if grep -R --exclude-dir=.git -n '"private_ke[y]_id"\|"private_ke[y]"\|"type": "service_accoun[t]"' .; then
+```
+
+We checked both patterns against a fixture holding a real-shaped service account JSON: they
+return the same three matching lines, and the bracketed one no longer matches a workflow line
+carrying it. Detection is unchanged.
+
+`--exclude-dir=.github` also clears the failure, but blinds the check to workflow files, so we
+did not take it.
+
+### Note on the indentation
+
+`exit 1` sits two columns deeper than its block. Harmless in shell, but it reads as though it
+were conditional on the `echo`. Worth straightening while the lines are being touched.
+
+### What we are asking for
+
+The pattern fix upstream. We have applied it locally on `PDI_080`; it is a divergence we would
+rather not carry, since the next template sync will conflict on it.
+
+---
+
 ## Summary
 
 | ID | Gate | Severity | Blocking us? | We need |
@@ -730,6 +793,7 @@ the hazard that the timestamp-based one leaves open, and that is the part we thi
 | CR-12 | `import-section-order` declares `fixable`, ships no fixer | Low | No | Implement the fixer, or drop the meta claim |
 | CR-13 | checkers misparse Windows `python3` CRLF stdout | Medium | No — diverged | `tr -d '\r'` upstream, or `newline="\n"` in the embedded Python |
 | CR-14 | cache-invalidation cursor can skip an event permanently | **High** | No — unverified | An overlap window on the poll, or an explicit accepted-limitation note |
+| CR-15 | service-account-key scan matches its own source, always fails | **High** (CI defect) | **Yes** — diverged | The bracketed pattern upstream, so we can drop the local edit |
 
 Everything else in our audit is our own work and is in progress. We are happy to supply the
 full audit, reproduction commands, or a patch for any of the above.
