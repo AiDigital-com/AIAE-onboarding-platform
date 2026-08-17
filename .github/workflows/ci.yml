@@ -29,14 +29,18 @@ jobs:
     name: Static checks
     runs-on: ubuntu-latest
     # AIAE convergence (P15 step 4): `continue-on-error: true` removed to match
-    # the standard's ci.yml exactly, which carries no such flag. This file
-    # still executes nowhere — no CI service runs in this migration
-    # (docs/aiae-migration-plan.md §1) — so the flag's removal is pure
-    # documentation of the converged, blocking shape for a future remote, not
-    # an observed behavior change. local-verify.sh is the only enforcement
-    # that actually runs, and it still carries the five known red assertions
-    # (docs/aiae-migration-plan.md P15) every time — that does not change
-    # here.
+    # the standard's ci.yml, which carries no such flag.
+    #
+    # An earlier revision of this comment said "this file still executes
+    # nowhere — no CI service runs in this migration", and treated removing the
+    # flag as documentation rather than a behaviour change. That was true only
+    # while the work stayed local, which was the migration's working rule — but
+    # it was written as a property of the file instead of as a condition, and
+    # it stopped holding the moment the branch was pushed and Actions picked it
+    # up. The first pull request went red on a carried assertion.
+    #
+    # This job is live and blocking. What it blocks on is the failure LIST, not
+    # the gates' exit codes — see the gate step below.
     outputs:
       has_backend: ${{ steps.detect.outputs.has_backend }}
       has_frontend: ${{ steps.detect.outputs.has_frontend }}
@@ -142,10 +146,17 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Run repository structure and policy gates
-        run: |
-          set -euo pipefail
-          bash scripts/structure-lint.sh
-          bash scripts/verify-gates.sh
+        # Runs both gates to completion and compares their combined failure
+        # list against scripts/carried-assertions.txt — the set this project
+        # fails on purpose, each entry a recorded decision (P15).
+        #
+        # It does NOT test the gates' exit codes. Both exit non-zero on a
+        # healthy tree here and would still exit non-zero after a real
+        # regression, so the code carries no information. The list does.
+        #
+        # The previous form ran both under `set -euo pipefail`, which aborted
+        # the step on structure-lint and never executed verify-gates at all.
+        run: bash scripts/check-carried-assertions.sh
 
       - name: Verify auth placeholders in .env.example
         if: steps.detect.outputs.has_backend == 'true'

@@ -1368,16 +1368,35 @@ next pass. Do not descope.
 4. **Make `local-verify.sh` blocking, and converge `ci.yml` as documentation.** *Merged from
    the former steps 1 and 5, which duplicated each other.* Remove the report-only mode
    installed in P2 step 5 so it exits non-zero on gate failure, and remove
-   `continue-on-error` from `static-checks` in `ci.yml`. **`ci.yml` executes nowhere** — it is
-   converged for a future remote; `local-verify.sh` is the only enforcement that exists.
+   `continue-on-error` from `static-checks` in `ci.yml`.
+
+   *Corrected 2026-08-15.* This step read **"`ci.yml` executes nowhere — it is converged for
+   a future remote; `local-verify.sh` is the only enforcement that exists"**, and removing
+   the flag was justified as documentation rather than a behaviour change. That claim was
+   true only while the work stayed local — the migration's working rule — but it was written
+   as a **property of the file** instead of as a **condition on it**, and the condition
+   expired at the first push. GitHub Actions ran the workflow and the first pull request went
+   red on a carried assertion. The flag was removed immediately before the file came alive.
 
    **There is no allow-list mechanism.** An earlier revision claimed the carried assertions
    would be "explicitly allow-listed and annotated". `verify-gates.sh` has no such feature —
    no allow-list, no annotations, no exemptions. What the P2 follow-up bought is that it now
    reports *every* failure instead of aborting on the first, so the carried ones are visible
    alongside anything new. Blocking therefore means: **the failure list must equal the
-   carried set below, exactly** — no additions, no disappearances. The comparison is manual
-   until CR-4 lands upstream. The `== 1` tripwire form from P2 stays for CR-1.
+   carried set below, exactly** — no additions, no disappearances.
+
+   That comparison is now **implemented rather than manual**:
+   `scripts/check-carried-assertions.sh` runs both gates to completion, extracts their
+   combined failure list, and diffs it against `scripts/carried-assertions.txt`. It fails in
+   **both** directions — a new failure is a regression, and a carried assertion that starts
+   passing must be removed from the list in the same commit, or the next real regression
+   hides behind it. CI calls exactly that script; run it locally the same way.
+
+   The gates' **exit codes are not the signal** and are deliberately not tested: both exit
+   non-zero on a healthy tree here and would still exit non-zero after a regression. The
+   previous CI step ran both under `set -euo pipefail`, so it aborted on `structure-lint.sh`
+   and never executed `verify-gates.sh` at all — four of the five carried assertions were
+   never even reported. The `== 1` tripwire form from P2 stays for CR-1.
 
 5. Confirm the AIAE `local-verify.sh` runs gates, `mvn clean verify`, the frontend suite and
    the compose syntax check end to end with no skipped step.
