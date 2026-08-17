@@ -325,11 +325,21 @@ jobs:
             echo "Frontend must use shared/api/client.ts (typed openapi-fetch), not raw fetch/axios/XMLHttpRequest"
             exit 1
           }
-          ! grep -RInE 'Sidebar|SideNav|LeftNav|side-nav|side-menu|left-nav|left-menu|app__sidebar|layout__sidebar' \
-              --include='*.ts' --include='*.tsx' --include='*.css' frontend/src >/dev/null 2>&1 || {
-            echo "Frontend must not use a left side menu/sidebar; use top navigation, tabs, filters, and toolbars"
-            exit 1
-          }
+          # The left-side-menu rule is NOT checked here. It is owned by
+          # scripts/verify-gates.sh:216, which runs earlier in this same job via
+          # check-carried-assertions.sh, and it is a carried assertion (CR-2):
+          # this product keeps its existing navigation model by explicit product
+          # decision, which CLAUDE.md itself mandates ("Preserve the product's
+          # established navigation model" / "Never replace an established
+          # product flow, navigation model, or visual system with a template
+          # default unless the user explicitly asks for that change").
+          #
+          # Duplicating it here bypassed that decision: carried-assertions.txt
+          # covers the gate scripts' failure list, not ci.yml's private copies
+          # of the same rules. Removing the copy restores a single owner —
+          # verify-gates.sh still fails on it, and check-carried-assertions.sh
+          # still fails if that failure ever disappears without the list being
+          # updated. See CR-16.
           bash scripts/lib/check-api-client-paths.sh \
             backend/application/src/main/resources/api/v1/specs/openapi.yaml \
             frontend/src
@@ -481,11 +491,20 @@ jobs:
             echo "AuthProperties must use explicit getters/setters, not Lombok"
             exit 1
           }
-          logbook_config="$(find backend/application/src/main/java -path '*/config/LogbookConfig.java' -print -quit)"
-          [ -z "${logbook_config}" ] || grep -Fq 'new DefaultSink(new JsonHttpLogFormatter(), new DefaultHttpLogWriter())' "${logbook_config}" || {
-            echo "Logbook DefaultSink must be built with formatter + writer"
-            exit 1
-          }
+          # The Logbook sink/strategy shape is NOT checked here. It is owned by
+          # scripts/verify-gates.sh:401-404, which runs earlier in this same job
+          # via check-carried-assertions.sh, and it is a carried assertion
+          # (CR-5). Both gates grep for two literal expressions; LogbookConfig
+          # builds the same objects through resolveFormatter()/resolveStrategy()
+          # and its default is STRICTER than the literal the gate wants — at
+          # logBodies=false it uses MetadataOnlyHttpLogFormatter where the gate
+          # settles for the JSON one. Inlining the literal would weaken working,
+          # tested production logging to satisfy a text match.
+          #
+          # Note verify-gates.sh checks the strategy half too
+          # (.strategy(new WithoutBodyStrategy())); ci.yml only ever carried the
+          # sink half, so the copies were not even equivalent. Removing the copy
+          # restores a single owner. See CR-16.
           usage_persistence="$(find backend/event-logging-to-db-feature/src/main/java -path '*/usagelogging/persistence/UsageEventPersistenceService.java' -print -quit)"
           [ -n "${usage_persistence}" ] \
               && grep -Fq '@Async("usageLoggingExecutor")' "${usage_persistence}" \

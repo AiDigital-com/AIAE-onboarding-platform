@@ -775,6 +775,120 @@ rather not carry, since the next template sync will conflict on it.
 
 ---
 
+## CR-16 — `ci.yml` keeps private copies of `verify-gates.sh` rules, and they drift
+
+**Severity: high. The duplicate copies silently bypass the carried-assertion mechanism, so a
+recorded product decision cannot be honoured no matter how correctly it is recorded.**
+
+**Status: reproduced.** Three of the four failures on our first green-ish CI run came from this.
+
+### The mechanism
+
+`scripts/carried-assertions.txt` and `check-carried-assertions.sh` compare the **failure list**
+of `structure-lint.sh` + `verify-gates.sh` against a recorded set. That is the only sanctioned
+way for a project to carry a gate red by decision.
+
+But `ci.yml` re-implements several of the same rules inline, as its own `grep` steps. Those
+copies are not run by either gate script, so their failures never reach the comparison. A
+decision recorded in `carried-assertions.txt` is honoured by `verify-gates.sh` and ignored by
+`ci.yml`, which fails the job anyway.
+
+We hit three:
+
+| Rule | `verify-gates.sh` | `ci.yml` | In carried set |
+|---|---|---|---|
+| raw `fetch`/axios/XHR | :188–212, with CR-1 exclusions | :300, **no exclusions at all** | n/a — passes in the gate |
+| left side menu/sidebar | :216 | :305 | yes (CR-2) |
+| Logbook `DefaultSink` | :401 **and** `.strategy(...)` at :403 | :472, **sink half only** | yes (CR-5) |
+
+### The drift is the point
+
+These are not equivalent copies that happen to be duplicated — they have already diverged:
+
+- The `fetch` rule got its CR-1 exclusions (`--exclude` for the two presigned-upload files and
+  for `*.test.*`) in `verify-gates.sh` only. The `ci.yml` copy scans with no exclusions, so it
+  fails on the exempted files and on test doubles.
+- `verify-gates.sh` additionally guards the exemption's integrity (each exempt file must hold
+  **exactly one** `await fetch(` site). `ci.yml` has nothing equivalent.
+- The Logbook rule is checked in two halves upstream and one half in `ci.yml`.
+
+Whoever edits one copy has no signal that the other exists. That is how all three drifted.
+
+### A second, smaller defect in the same rule
+
+The `fetch` pattern is `fetch[[:space:]]*\(`, which matches the word `fetch()` **inside a
+comment** — `useLessonMutations.ts:316` is prose explaining the presigned upload, and it counts
+as a violation. `verify-gates.sh`'s integrity guard counts `await fetch(` instead and does not
+have this problem.
+
+### Proposed change
+
+Delete the duplicated rules from `ci.yml` and let `verify-gates.sh` own them, with
+`check-carried-assertions.sh` as the single arbiter. The gate scripts already run in that job.
+Any rule worth enforcing belongs in a gate script, where a project can record a decision about
+it; a rule inlined in `ci.yml` is enforceable but not decidable.
+
+If the duplication is deliberate — a fast pre-gate smoke check, say — then the copies need a
+generation step or a test proving they stay identical, because unassisted they do not.
+
+### What we did locally
+
+Aligned the `fetch` copy's exclusions with `verify-gates.sh` (commit `a7f62fe`) and removed the
+sidebar and Logbook copies, leaving a comment at each site naming the owning gate and CR. Three
+divergences we would rather not carry.
+
+---
+
+## CR-17 — `find … | grep -q .` under `set -o pipefail` fails on large modules
+
+**Severity: medium. A latent, size-dependent flake that reports a healthy module as empty.**
+
+**Status: reproduced, 8 runs out of 8, on macOS. Not yet observed on a Linux runner.**
+
+### The mechanism
+
+`ci.yml:431` (module non-emptiness check):
+
+```bash
+[ -d "${module_dir}/src" ] \
+    && find "${module_dir}/src" -type f ! -path '*/target/*' | grep -q . || {
+  echo "Maven module must not be empty/POM-only: ${module}"
+```
+
+`grep -q` exits as soon as it matches the first line. `find` then writes into a closed pipe,
+takes `SIGPIPE`, and exits 141. Under `set -o pipefail` the pipeline inherits 141, so a module
+with hundreds of files is reported as **empty**.
+
+Whether it trips is a race between how much `find` still has to write and the pipe buffer:
+
+| | pipe buffer | `find` output for `backend/service` | result |
+|---|---|---|---|
+| our macOS dev machine | 8 KB | 53 KB | fails, 8/8 |
+| `ubuntu-latest` | 64 KB | 53 KB | passes today |
+
+So the check currently passes on CI and fails locally — the worst arrangement, since it makes
+local reproduction of the CI job untrustworthy in both directions. And it is on a trajectory:
+once `backend/service` outgrows the Linux pipe buffer, CI starts failing too, with a message
+that points at the wrong thing entirely.
+
+### Proposed change
+
+Do not let the reader exit early, or do not put `find` in a pipeline:
+
+```bash
+[ -n "$(find "${module_dir}/src" -type f ! -path '*/target/*' -print -quit)" ]
+```
+
+`-print -quit` stops `find` itself after the first hit — no second process, no SIGPIPE, and it
+is strictly faster. The same shape appears elsewhere in `ci.yml` and is worth a sweep.
+
+### What we are asking for
+
+The `-print -quit` form upstream. We have not applied it locally: the check passes on CI today,
+and we would rather not add a fourth divergence to carry.
+
+---
+
 ## Summary
 
 | ID | Gate | Severity | Blocking us? | We need |
@@ -794,6 +908,8 @@ rather not carry, since the next template sync will conflict on it.
 | CR-13 | checkers misparse Windows `python3` CRLF stdout | Medium | No — diverged | `tr -d '\r'` upstream, or `newline="\n"` in the embedded Python |
 | CR-14 | cache-invalidation cursor can skip an event permanently | **High** | No — unverified | An overlap window on the poll, or an explicit accepted-limitation note |
 | CR-15 | service-account-key scan matches its own source, always fails | **High** (CI defect) | **Yes** — diverged | The bracketed pattern upstream, so we can drop the local edit |
+| CR-16 | `ci.yml` duplicates gate rules, bypassing carried-assertions; copies have drifted | **High** | **Yes** — diverged | The duplicates deleted upstream, gate scripts as single owner |
+| CR-17 | `find \| grep -q .` under `pipefail` reports large modules as empty | Medium | No — latent | `find … -print -quit` instead of the pipeline |
 
 Everything else in our audit is our own work and is in progress. We are happy to supply the
 full audit, reproduction commands, or a patch for any of the above.
