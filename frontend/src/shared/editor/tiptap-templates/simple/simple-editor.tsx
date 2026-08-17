@@ -74,6 +74,7 @@ import {
 import { fetchFilePreviewUrl } from "@/shared/api/files"
 import { isLikelyVideoFile } from "@/shared/lib/videoFileValidation"
 import { extractYoutubeVideoId } from "@/shared/lib/youtube"
+import { repairPastedStorageHtml } from "@/shared/lib/storageKeyFromUrl"
 
 // --- Styles ---
 import "@/shared/editor/styles/variables.css"
@@ -636,6 +637,7 @@ export function SimpleEditor({
 
         return false
       },
+      transformPastedHTML: (html) => repairPastedStorageHtml(html),
     },
     extensions: [
       StarterKit.configure({

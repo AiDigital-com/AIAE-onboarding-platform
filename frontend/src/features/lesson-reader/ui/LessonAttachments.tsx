@@ -326,7 +326,7 @@ function AttachmentCard({
                     {isLink && attachment.linkImageUrl ? (
                         <img src={attachment.linkImageUrl} alt="" />
                     ) : isImage && filePreviewUrl ? (
-                        <img src={filePreviewUrl} alt="" />
+                        <img src={filePreviewUrl} alt="" draggable={false} />
                     ) : isLink ? (
                         <LinkOutlinedIcon />
                     ) : isImage ? (
