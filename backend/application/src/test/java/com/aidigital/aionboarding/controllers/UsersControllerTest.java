@@ -7,12 +7,13 @@ import com.aidigital.aionboarding.api.v1.model.UpdateUserGradeResponseV1;
 import com.aidigital.aionboarding.api.v1.model.UserProfileV1;
 import com.aidigital.aionboarding.mappers.user.UserApiMapper;
 import com.aidigital.aionboarding.service.common.error.AppException;
+import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
-import com.aidigital.aionboarding.service.storage.StorageService;
 import com.aidigital.aionboarding.service.storage.enums.UploadPurpose;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
 import com.aidigital.aionboarding.service.user.services.UserService;
 import com.aidigital.aionboarding.support.ApiResponses;
+import com.aidigital.aionboarding.support.MultipartFileUploadSupport;
 import org.instancio.Instancio;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,12 +23,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,7 +40,7 @@ class UsersControllerTest {
 	@Mock
 	private UserService userService;
 	@Mock
-	private StorageService storageService;
+	private MultipartFileUploadSupport multipartFileUploadSupport;
 	@Mock
 	private UserApiMapper userApiMapper;
 	@Mock
@@ -100,17 +102,15 @@ class UsersControllerTest {
 	}
 
 	@Test
-	void shouldUploadMyAvatarTest() throws IOException {
-		// Given:
+	void shouldUploadMyAvatarTest() {
+		// Given: the null/empty check and the streaming/IOException boilerplate now live in
+		// MultipartFileUploadSupport, which owns the collaborator-specific validation and
+		// try/catch a controller may not express — both are covered by its own test
 		AppUser viewer = viewer();
 		MultipartFile file = mock(MultipartFile.class);
 		AvatarUploadResponseV1 expectedBody = Instancio.create(AvatarUploadResponseV1.class);
 		when(currentUser.requireUser()).thenReturn(viewer);
-		when(file.isEmpty()).thenReturn(false);
-		when(file.getBytes()).thenReturn(new byte[]{0, 1, 2});
-		when(file.getOriginalFilename()).thenReturn("avatar.png");
-		when(file.getContentType()).thenReturn("image/png");
-		when(storageService.putObject(viewer, UploadPurpose.AVATAR, new byte[]{0, 1, 2}, "avatar.png", "image/png"))
+		when(multipartFileUploadSupport.putBuffered(viewer, UploadPurpose.AVATAR, file, "avatar"))
 				.thenReturn("stored-avatar-key");
 		when(apiResponses.avatarUpload("stored-avatar-key")).thenReturn(expectedBody);
 
@@ -119,57 +119,22 @@ class UsersControllerTest {
 
 		// Then:
 		assertThat(response.getBody()).isSameAs(expectedBody);
+		verify(multipartFileUploadSupport).requireNonEmpty(file, "Avatar file is required.");
 	}
 
 	@Test
-	void shouldUseDefaultFilenameWhenOriginalNameIsNullTest() throws IOException {
-		// Given:
-		AppUser viewer = viewer();
-		MultipartFile file = mock(MultipartFile.class);
-		AvatarUploadResponseV1 expectedBody = Instancio.create(AvatarUploadResponseV1.class);
-		when(currentUser.requireUser()).thenReturn(viewer);
-		when(file.isEmpty()).thenReturn(false);
-		when(file.getBytes()).thenReturn(new byte[]{0});
-		when(file.getOriginalFilename()).thenReturn(null);
-		when(file.getContentType()).thenReturn("image/jpeg");
-		when(storageService.putObject(viewer, UploadPurpose.AVATAR, new byte[]{0}, "avatar", "image/jpeg"))
-				.thenReturn("stored-key");
-		when(apiResponses.avatarUpload("stored-key")).thenReturn(expectedBody);
-
-		// When:
-		ResponseEntity<AvatarUploadResponseV1> response = controller.uploadMyAvatar(file);
-
-		// Then:
-		assertThat(response.getBody()).isSameAs(expectedBody);
-	}
-
-	@Test
-	void shouldThrowWhenAvatarFileIsEmptyTest() {
+	void shouldPropagateRejectionOfAMissingAvatarFileFromTheUploadSupportTest() {
 		// Given:
 		AppUser viewer = viewer();
 		MultipartFile file = mock(MultipartFile.class);
 		when(currentUser.requireUser()).thenReturn(viewer);
-		when(file.isEmpty()).thenReturn(true);
+		doThrow(new AppException(ErrorReason.C002, "Avatar file is required."))
+				.when(multipartFileUploadSupport).requireNonEmpty(file, "Avatar file is required.");
 
 		// When / Then:
 		assertThatThrownBy(() -> controller.uploadMyAvatar(file))
 				.isInstanceOf(AppException.class)
 				.satisfies(ex -> assertThat(((AppException) ex).getCode()).isEqualTo("C002"));
-	}
-
-	@Test
-	void shouldThrowWhenAvatarUploadFailsTest() throws IOException {
-		// Given:
-		AppUser viewer = viewer();
-		MultipartFile file = mock(MultipartFile.class);
-		when(currentUser.requireUser()).thenReturn(viewer);
-		when(file.isEmpty()).thenReturn(false);
-		when(file.getBytes()).thenThrow(new IOException("disk full"));
-
-		// When / Then:
-		assertThatThrownBy(() -> controller.uploadMyAvatar(file))
-				.isInstanceOf(AppException.class)
-				.satisfies(ex -> assertThat(((AppException) ex).getCode()).isEqualTo("C000"));
 	}
 
 	@Test

@@ -10,6 +10,7 @@ import com.aidigital.aionboarding.service.common.observability.SecurityMetrics;
 import com.aidigital.aionboarding.service.common.observability.enums.UploadRejectionReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.storage.enums.UploadPurpose;
 import com.aidigital.aionboarding.service.storage.models.FilePreviewRecord;
 import com.aidigital.aionboarding.service.storage.services.entity.PendingUploadEntityService;
@@ -34,8 +35,10 @@ import java.util.Optional;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
@@ -59,7 +62,7 @@ class StorageServiceTest {
 	@Mock
 	private SecurityMetrics securityMetrics;
 	@Spy
-	private CurrentTime currentTime = new CurrentTime();
+	private CurrentTime currentTime = new CurrentTimeImpl();
 
 	@InjectMocks
 	private StorageService service;
@@ -211,6 +214,35 @@ class StorageServiceTest {
 			assertThat(saved.getExpectedSizeBytes()).isEqualTo(500L);
 			assertThat(saved.isConfirmed()).isFalse();
 			assertThat(saved.getExpiresAt()).isAfter(saved.getCreatedAt());
+		}
+
+		@Test
+		void shouldNormalizeAnSvgNamedUploadDeclaredAsPngToAPngStorageKeyTest() {
+			// Given: the audit §2.4 / P8 attack — declare image/png (allowed), name the file with a
+			// .svg extension, so a naive implementation that trusts the file name's extension
+			// stores/serves it as image/svg+xml. This test fails before this phase's change
+			// (the storage key ended in "/payload.svg", verified by reverting StorageService's
+			// sanitize() to its pre-P8 form and re-running this test) and passes after it.
+			AppUser owner = viewer(16L);
+			User ownerEntity = new User();
+			ownerEntity.setId(16L);
+			when(properties.getMaxUploadSizeBytes()).thenReturn(1_000_000L);
+			when(properties.getPresignPutExpiresSeconds()).thenReturn(900);
+			when(storageClient.presignPut(any(), any(), any())).thenReturn("https://bucket.example.com/presigned");
+			when(userEntityService.getReference(16L)).thenReturn(ownerEntity);
+
+			// When:
+			StorageService.PresignedUpload result = service.presignPut(owner, UploadPurpose.MATERIAL_UPLOAD,
+					"payload.svg", "image/png", 500L);
+
+			// Then: the storage key's extension follows the declared, validated content type —
+			// never the attacker-supplied file name — so it can never disagree with what was
+			// actually authorized and stored.
+			assertThat(result.storageKey()).endsWith("/payload.png").doesNotContain(".svg");
+
+			ArgumentCaptor<PendingUpload> captor = ArgumentCaptor.forClass(PendingUpload.class);
+			verify(pendingUploadEntityService).save(captor.capture());
+			assertThat(captor.getValue().getExpectedContentType()).isEqualTo("image/png");
 		}
 
 		@Test
@@ -425,6 +457,28 @@ class StorageServiceTest {
 		}
 
 		@Test
+		void shouldThrowAndRecordAMetricWhenStoredContentTypeDoesNotMatchTheExpectedOneTest() {
+			// Given: this is the negative case for wiring PendingUpload.expectedContentType into
+			// confirmUpload (P8) — before this change, the field was written at presign time and
+			// read nowhere, so a stored object whose content type disagreed with what was
+			// declared/authorized at presign time was silently accepted.
+			AppUser owner = viewer(17L);
+			PendingUpload pendingUpload = pendingUploadFor(17L, "key-9", 100L,
+					LocalDateTime.now(ZoneOffset.UTC).plusMinutes(10), false);
+			when(pendingUploadEntityService.findByStorageKey("key-9")).thenReturn(Optional.of(pendingUpload));
+			when(storageClient.headObject("key-9")).thenReturn(Optional.of(new ObjectMetadataRecord(100L,
+					"image/svg+xml")));
+
+			// When-Then: pendingUploadFor's default expectedContentType is "video/mp4", so the
+			// stored "image/svg+xml" disagrees with it.
+			assertThatThrownBy(() -> service.confirmUpload(owner, "key-9"))
+					.isInstanceOf(AppException.class);
+			assertThat(pendingUpload.isConfirmed()).isFalse();
+			verify(pendingUploadEntityService, never()).save(any());
+			verify(securityMetrics).uploadRejected(UploadRejectionReason.CONTENT_TYPE_MISMATCH);
+		}
+
+		@Test
 		void shouldConfirmWhenOwnedNotExpiredAndSizeMatchesTest() {
 			// Given:
 			AppUser owner = viewer(11L);
@@ -464,7 +518,7 @@ class StorageServiceTest {
 		@Test
 		void shouldReturnZeroAndSkipDeletesWhenNothingExpiredTest() {
 			// Given:
-			when(pendingUploadEntityService.findExpiredUnconfirmed(any(), any())).thenReturn(List.of());
+			when(pendingUploadEntityService.claimExpiredUnconfirmed(any(), anyInt())).thenReturn(List.of());
 
 			// When:
 			int result = service.cleanupAbandonedUploads();
@@ -479,7 +533,7 @@ class StorageServiceTest {
 			// Given:
 			PendingUpload expired = pendingUploadFor(12L, "key-7", 100L,
 					LocalDateTime.now(ZoneOffset.UTC).minusHours(1), false);
-			when(pendingUploadEntityService.findExpiredUnconfirmed(any(), any())).thenReturn(List.of(expired));
+			when(pendingUploadEntityService.claimExpiredUnconfirmed(any(), anyInt())).thenReturn(List.of(expired));
 
 			try (MockedStatic<TransactionSynchronizationManager> txMgr =
 						 mockStatic(TransactionSynchronizationManager.class)) {
@@ -498,6 +552,60 @@ class StorageServiceTest {
 				syncCaptor.getValue().afterCommit();
 				verify(storageClient).deleteObjects(List.of("key-7"));
 			}
+		}
+	}
+
+	@Nested
+	class DeleteObjectsQuietlyTests {
+
+		@Test
+		void shouldDoNothingForNullInputTest() {
+			// When:
+			service.deleteObjectsQuietly(null);
+
+			// Then:
+			verifyNoInteractions(storageClient);
+		}
+
+		@Test
+		void shouldDoNothingForEmptyInputTest() {
+			// When:
+			service.deleteObjectsQuietly(List.of());
+
+			// Then:
+			verifyNoInteractions(storageClient);
+		}
+
+		@Test
+		void shouldDoNothingWhenOnlyBlankAndNullKeysGivenTest() {
+			// When:
+			service.deleteObjectsQuietly(java.util.Arrays.asList(null, "  ", ""));
+
+			// Then:
+			verifyNoInteractions(storageClient);
+		}
+
+		@Test
+		void shouldFilterBlankAndDuplicateKeysBeforeDeletingTest() {
+			// Given:
+			List<String> keys = java.util.Arrays.asList("key-1", null, "key-1", "  ", "key-2");
+
+			// When:
+			service.deleteObjectsQuietly(keys);
+
+			// Then:
+			verify(storageClient).deleteObjects(List.of("key-1", "key-2"));
+		}
+
+		@Test
+		void shouldSwallowRuntimeExceptionFromStorageClientTest() {
+			// Given:
+			List<String> keys = List.of("key-3");
+			org.mockito.Mockito.doThrow(new RuntimeException("S3 unavailable"))
+					.when(storageClient).deleteObjects(keys);
+
+			// When-Then:
+			assertThatCode(() -> service.deleteObjectsQuietly(keys)).doesNotThrowAnyException();
 		}
 	}
 }

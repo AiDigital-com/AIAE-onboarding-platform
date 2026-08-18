@@ -2,14 +2,13 @@ package com.aidigital.aionboarding.service.material.services.impl;
 
 import com.aidigital.aionboarding.domain.material.entities.Material;
 import com.aidigital.aionboarding.domain.material.entities.MaterialYoutubeUrl;
-import com.aidigital.aionboarding.domain.material.repositories.MaterialYoutubeUrlRepository;
 import com.aidigital.aionboarding.external.youtube.YoutubeClient;
 import com.aidigital.aionboarding.external.youtube.model.YoutubeOEmbedMetadata;
 import com.aidigital.aionboarding.service.common.mapping.TextValueNormalizer;
 import com.aidigital.aionboarding.service.mappers.material.MaterialMapper;
 import com.aidigital.aionboarding.service.material.services.MaterialYoutubeService;
+import com.aidigital.aionboarding.service.material.services.entity.MaterialYoutubeUrlEntityService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -22,28 +21,46 @@ public class MaterialYoutubeServiceImpl implements MaterialYoutubeService {
 
     private static final int YOUTUBE_METADATA_BACKFILL_LIMIT = 12;
 
-    private final MaterialYoutubeUrlRepository materialYoutubeUrlRepository;
+    private final MaterialYoutubeUrlEntityService materialYoutubeUrlEntityService;
     private final YoutubeClient youtubeClient;
     private final TextValueNormalizer textValueNormalizer;
     private final MaterialMapper materialMapper;
 
+    /**
+     * Claims a bounded batch of rows still missing oEmbed metadata (short transaction,
+     * {@code FOR UPDATE SKIP LOCKED}), then fetches each row's metadata from YouTube with no
+     * transaction open, then persists each fetched result in its own short transaction. This
+     * three-phase shape is required by {@code .claude/rules/14-performance.md}: a database
+     * transaction must never span a third-party HTTP call. A row that fails to fetch aborts
+     * the remaining rows in this tick (matching the previous behaviour) but does not roll back
+     * rows already saved earlier in the same tick, since each save already committed on its own.
+     */
     @Override
     public void backfillMissingYoutubeMetadata() {
-        List<MaterialYoutubeUrl> missing = materialYoutubeUrlRepository.findWithMissingMetadata(
-            PageRequest.of(0, YOUTUBE_METADATA_BACKFILL_LIMIT)
-        );
-        for (MaterialYoutubeUrl row : missing) {
+        List<MaterialYoutubeUrl> claimed =
+            materialYoutubeUrlEntityService.claimMissingMetadataBatch(YOUTUBE_METADATA_BACKFILL_LIMIT);
+        for (MaterialYoutubeUrl row : claimed) {
             YoutubeOEmbedMetadata metadata = youtubeClient.fetchOembed(row.getUrl());
-            row.setTitle(textValueNormalizer.raw(metadata.title()));
-            row.setAuthorName(textValueNormalizer.raw(metadata.authorName()));
-            row.setAuthorUrl(textValueNormalizer.raw(metadata.authorUrl()));
-            row.setThumbnailUrl(textValueNormalizer.raw(metadata.thumbnailUrl()));
-            row.setThumbnailWidth(metadata.thumbnailWidth());
-            row.setThumbnailHeight(metadata.thumbnailHeight());
-            row.setProviderName(textValueNormalizer.raw(metadata.providerName()));
-            row.setMetadataError(textValueNormalizer.raw(metadata.error()));
-            materialYoutubeUrlRepository.save(row);
+            applyFetchedMetadata(row, metadata);
+            materialYoutubeUrlEntityService.save(row);
         }
+    }
+
+    /**
+     * Copies fetched oEmbed metadata onto a claimed row, in memory only.
+     *
+     * @param row      claimed row to update
+     * @param metadata fetched oEmbed metadata
+     */
+    void applyFetchedMetadata(MaterialYoutubeUrl row, YoutubeOEmbedMetadata metadata) {
+        row.setTitle(textValueNormalizer.raw(metadata.title()));
+        row.setAuthorName(textValueNormalizer.raw(metadata.authorName()));
+        row.setAuthorUrl(textValueNormalizer.raw(metadata.authorUrl()));
+        row.setThumbnailUrl(textValueNormalizer.raw(metadata.thumbnailUrl()));
+        row.setThumbnailWidth(metadata.thumbnailWidth());
+        row.setThumbnailHeight(metadata.thumbnailHeight());
+        row.setProviderName(textValueNormalizer.raw(metadata.providerName()));
+        row.setMetadataError(textValueNormalizer.raw(metadata.error()));
     }
 
     @Override
@@ -71,18 +88,18 @@ public class MaterialYoutubeServiceImpl implements MaterialYoutubeService {
         for (int index = 0; index < records.size(); index += 1) {
             PreparedYoutubeRecord record = records.get(index);
             MaterialYoutubeUrl entity = materialMapper.toNewMaterialYoutubeUrl(material, record, index);
-            materialYoutubeUrlRepository.save(entity);
+            materialYoutubeUrlEntityService.save(entity);
         }
     }
 
     @Override
     public void deleteByMaterialId(Long materialId) {
-        materialYoutubeUrlRepository.deleteByMaterial_Id(materialId);
+        materialYoutubeUrlEntityService.deleteByMaterialId(materialId);
     }
 
     @Override
     public List<MaterialYoutubeUrl> findByMaterialIdOrderBySortOrderAsc(Long materialId) {
-        return materialYoutubeUrlRepository.findByMaterialIdOrderBySortOrderAsc(materialId);
+        return materialYoutubeUrlEntityService.findByMaterialIdOrderBySortOrderAsc(materialId);
     }
 
     @Override
@@ -90,7 +107,7 @@ public class MaterialYoutubeServiceImpl implements MaterialYoutubeService {
         if (materialIds == null || materialIds.isEmpty()) {
             return List.of();
         }
-        return materialYoutubeUrlRepository.findByMaterialIdInOrderBySortOrderAsc(materialIds);
+        return materialYoutubeUrlEntityService.findByMaterialIdsOrderBySortOrderAsc(materialIds);
     }
 
 }

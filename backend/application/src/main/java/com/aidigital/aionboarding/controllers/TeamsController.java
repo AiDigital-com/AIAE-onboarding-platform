@@ -11,15 +11,13 @@ import com.aidigital.aionboarding.support.ApiResponses;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
-import com.aidigital.aionboarding.service.learning.services.LearningService;
+import com.aidigital.aionboarding.service.learning.services.RoadmapAssignmentService;
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import com.aidigital.aionboarding.service.team.services.TeamService;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
+import com.aidigital.aionboarding.support.PaginationSupport;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,8 +29,9 @@ public class TeamsController implements TeamsApi {
 
     private final CurrentUserSupport currentUser;
     private final TeamService teamService;
-    private final LearningService learningService;
+    private final RoadmapAssignmentService roadmapAssignmentService;
     private final PermissionService permissionService;
+    private final PaginationSupport paginationSupport;
     private final TeamApiMapper teamApiMapper;
     private final ApiResponses apiResponses;
 
@@ -48,8 +47,8 @@ public class TeamsController implements TeamsApi {
     ) {
         AppUser viewer = currentUser.requireUser();
         return ResponseEntity.ok(teamApiMapper.toTeamsResponseV1(
-            teamService.getTeams(viewer, teamsQuery, pageable(teamsPage, teamsSize)),
-            teamService.getTeamCandidateUsers(viewer, usersQuery, pageable(usersPage, usersSize)),
+            teamService.getTeams(viewer, teamsQuery, paginationSupport.sortedByNameEmail(teamsPage, teamsSize)),
+            teamService.getTeamCandidateUsers(viewer, usersQuery, paginationSupport.sortedByNameEmail(usersPage, usersSize)),
             permissionService.getUserPermissionMap(viewer)
         ));
     }
@@ -59,13 +58,11 @@ public class TeamsController implements TeamsApi {
     @Transactional
     public ResponseEntity<AddTeamMemberResponseV1> addTeamMember(Long leadId, AddTeamMemberRequestV1 request) {
         AppUser viewer = currentUser.requireUser();
-        if (!permissionService.canManageTeam(viewer, leadId)) {
-            throw new AppException(ErrorReason.C004);
-        }
+        permissionService.requireCanManageTeam(viewer, leadId);
         teamService.getUserById(leadId).orElseThrow(() -> new AppException(ErrorReason.C001, leadId));
-        String memberRef = request.getMember() != null ? request.getMember() : request.getEmail();
-        UserRecord member = teamService.addTeamMember(leadId, request.getMemberId(), memberRef);
-        learningService.syncNewTeamMemberEnrollments(leadId, member.id());
+        UserRecord member = teamService.addTeamMember(leadId, request.getMemberId(),
+                teamApiMapper.resolveMemberRef(request));
+        roadmapAssignmentService.syncNewTeamMemberEnrollments(leadId, member.id());
         return ResponseEntity.ok(teamApiMapper.toAddTeamMemberResponseV1(member));
     }
 
@@ -74,9 +71,7 @@ public class TeamsController implements TeamsApi {
     @Transactional
     public ResponseEntity<OkResponseV1> removeTeamMember(Long leadId, RemoveTeamMemberRequestV1 request) {
         AppUser viewer = currentUser.requireUser();
-        if (!permissionService.canManageTeam(viewer, leadId)) {
-            throw new AppException(ErrorReason.C004);
-        }
+        permissionService.requireCanManageTeam(viewer, leadId);
         teamService.removeTeamMember(leadId, request.getMemberId());
         return ResponseEntity.ok(apiResponses.ok());
     }
@@ -86,19 +81,8 @@ public class TeamsController implements TeamsApi {
     @Transactional
     public ResponseEntity<OkResponseV1> removeTeamMemberById(Long leadId, Long memberId) {
         AppUser viewer = currentUser.requireUser();
-        if (!permissionService.canManageTeam(viewer, leadId)) {
-            throw new AppException(ErrorReason.C004);
-        }
+        permissionService.requireCanManageTeam(viewer, leadId);
         teamService.removeTeamMember(leadId, memberId);
         return ResponseEntity.ok(apiResponses.ok());
-    }
-
-    Pageable pageable(Integer page, Integer size) {
-        int normalizedPage = page == null || page < 0 ? 0 : page;
-        int normalizedSize = size == null ? 20 : Math.min(Math.max(size, 1), 100);
-        return PageRequest.of(normalizedPage, normalizedSize, Sort.by(
-            Sort.Order.asc("name").ignoreCase(),
-            Sort.Order.asc("email").ignoreCase()
-        ));
     }
 }

@@ -2,14 +2,12 @@ package com.aidigital.aionboarding.service.user.services.impl;
 
 import com.aidigital.aionboarding.domain.common.dictionary.UserRoleCode;
 import com.aidigital.aionboarding.domain.common.dictionary.entities.UserRole;
-import com.aidigital.aionboarding.domain.grade.entities.Grade;
 import com.aidigital.aionboarding.domain.user.entities.User;
 import com.aidigital.aionboarding.service.common.dictionary.DictionaryLookupService;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
-import com.aidigital.aionboarding.service.grade.services.entity.GradeEntityService;
-import com.aidigital.aionboarding.service.group.support.GroupAccessPolicy;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.mappers.user.UserRecordMapper;
 import com.aidigital.aionboarding.service.permission.models.PermissionSnapshotRecord;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
@@ -17,8 +15,8 @@ import com.aidigital.aionboarding.service.storage.StorageService;
 import com.aidigital.aionboarding.service.team.services.TeamService;
 import com.aidigital.aionboarding.service.user.models.AdminUserStatsRecord;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
-import com.aidigital.aionboarding.service.user.services.UserGradeAssignmentSyncService;
 import com.aidigital.aionboarding.service.user.services.entity.UserEntityService;
+import com.aidigital.aionboarding.service.user.support.UserGradeUpdateSupport;
 import org.instancio.Instancio;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -50,12 +48,6 @@ class UserServiceImplTest {
 	@Mock
 	private DictionaryLookupService dictionaryLookupService;
 	@Mock
-	private GradeEntityService gradeEntityService;
-	@Mock
-	private GroupAccessPolicy groupAccessPolicy;
-	@Mock
-	private UserGradeAssignmentSyncService userGradeAssignmentSyncService;
-	@Mock
 	private UserRecordMapper userMapper;
 	@Mock
 	private TeamService teamService;
@@ -63,9 +55,11 @@ class UserServiceImplTest {
 	private PermissionService permissionService;
 	@Mock
 	private StorageService storageService;
+	@Mock
+	private UserGradeUpdateSupport userGradeUpdateSupport;
 
 	@Spy
-	private CurrentTime currentTime = new CurrentTime();
+	private CurrentTime currentTime = new CurrentTimeImpl();
 
 	@InjectMocks
 	private UserServiceImpl service;
@@ -275,85 +269,19 @@ class UserServiceImplTest {
 	class UpdateGrade {
 
 		@Test
-		void shouldRejectWhenViewerCannotEditMemberGradeTest() {
-			// Given:
-			AppUser lead = new AppUser(2L, "clerk-lead", "lead@test.com", "Lead", "teamlead", "Lead", null, null,
-					null);
-			when(groupAccessPolicy.canEditMemberGrade(lead, 5L)).thenReturn(false);
-
-			// When-Then:
-			assertThatThrownBy(() -> service.updateGrade(lead, 5L, 10L)).isInstanceOf(AppException.class);
-			verify(userEntityService, never()).save(org.mockito.ArgumentMatchers.any());
-		}
-
-		@Test
-		void shouldSetGradeAndTriggerSyncWhenGradeChangesTest() {
+		void shouldDelegateToUserGradeUpdateSupportTest() {
 			// Given:
 			AppUser admin = new AppUser(1L, "clerk-admin", "admin@test.com", "Admin", "admin", "Admin", null, null,
 					null);
-			User user = Instancio.of(User.class).set(field(User::getGrade), null).create();
-			Grade grade = Instancio.of(Grade.class).set(field(Grade::getId), 10L).create();
-			when(groupAccessPolicy.canEditMemberGrade(admin, 5L)).thenReturn(true);
-			when(userEntityService.findById(5L)).thenReturn(Optional.of(user));
-			when(gradeEntityService.findById(10L)).thenReturn(Optional.of(grade));
-			when(userEntityService.save(user)).thenReturn(user);
 			UserRecord updatedRecord = new UserRecord(5L, "clerk-5", "Name", "user@test.com", "member", null, null,
 					null, 10L, "junior", "Junior");
-			when(userMapper.toRecord(user)).thenReturn(updatedRecord);
+			when(userGradeUpdateSupport.updateGrade(admin, 5L, 10L)).thenReturn(updatedRecord);
 
 			// When:
 			UserRecord result = service.updateGrade(admin, 5L, 10L);
 
 			// Then:
-			assertThat(result.gradeId()).isEqualTo(10L);
-			assertThat(user.getGrade()).isEqualTo(grade);
-			verify(userGradeAssignmentSyncService).onGradeChanged(5L, 10L);
-		}
-
-		@Test
-		void shouldClearGradeWhenGradeIdIsNullTest() {
-			// Given:
-			AppUser admin = new AppUser(1L, "clerk-admin", "admin@test.com", "Admin", "admin", "Admin", null, null,
-					null);
-			Grade existingGrade = Instancio.of(Grade.class).set(field(Grade::getId), 10L).create();
-			User user = Instancio.of(User.class).set(field(User::getGrade), existingGrade).create();
-			when(groupAccessPolicy.canEditMemberGrade(admin, 5L)).thenReturn(true);
-			when(userEntityService.findById(5L)).thenReturn(Optional.of(user));
-			when(userEntityService.save(user)).thenReturn(user);
-			UserRecord updatedRecord = new UserRecord(5L, "clerk-5", "Name", "user@test.com", "member", null, null,
-					null, null, null, null);
-			when(userMapper.toRecord(user)).thenReturn(updatedRecord);
-
-			// When:
-			UserRecord result = service.updateGrade(admin, 5L, null);
-
-			// Then:
-			assertThat(result.gradeId()).isNull();
-			assertThat(user.getGrade()).isNull();
-			verify(userGradeAssignmentSyncService).onGradeChanged(5L, null);
-		}
-
-		@Test
-		void shouldNotTriggerSyncWhenGradeIsUnchangedTest() {
-			// Given:
-			AppUser admin = new AppUser(1L, "clerk-admin", "admin@test.com", "Admin", "admin", "Admin", null, null,
-					null);
-			Grade existingGrade = Instancio.of(Grade.class).set(field(Grade::getId), 10L).create();
-			User user = Instancio.of(User.class).set(field(User::getGrade), existingGrade).create();
-			when(groupAccessPolicy.canEditMemberGrade(admin, 5L)).thenReturn(true);
-			when(userEntityService.findById(5L)).thenReturn(Optional.of(user));
-			when(gradeEntityService.findById(10L)).thenReturn(Optional.of(existingGrade));
-			when(userEntityService.save(user)).thenReturn(user);
-			UserRecord updatedRecord = new UserRecord(5L, "clerk-5", "Name", "user@test.com", "member", null, null,
-					null, 10L, "junior", "Junior");
-			when(userMapper.toRecord(user)).thenReturn(updatedRecord);
-
-			// When:
-			service.updateGrade(admin, 5L, 10L);
-
-			// Then:
-			verify(userGradeAssignmentSyncService, never()).onGradeChanged(org.mockito.ArgumentMatchers.anyLong(),
-					org.mockito.ArgumentMatchers.any());
+			assertThat(result).isSameAs(updatedRecord);
 		}
 	}
 

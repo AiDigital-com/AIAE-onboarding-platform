@@ -30,7 +30,7 @@ public class GradesController implements GradesApi {
     @Transactional(readOnly = true)
     public ResponseEntity<GradesListResponseV1> listGrades(Boolean includeInactive) {
         AppUser viewer = currentUser.requireUser();
-        var grades = Boolean.TRUE.equals(includeInactive) ? gradeService.listAll(viewer) : gradeService.listActive();
+        var grades = gradeService.listGrades(viewer, Boolean.TRUE.equals(includeInactive));
         return ResponseEntity.ok(gradeApiMapper.toGradesListResponseV1(grades));
     }
 

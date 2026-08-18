@@ -1,15 +1,14 @@
 package com.aidigital.aionboarding.service.storage;
 
-import com.aidigital.aionboarding.domain.learning.repositories.UserLessonRepository;
 import com.aidigital.aionboarding.domain.lesson.repositories.LessonAssetRepository;
 import com.aidigital.aionboarding.domain.lesson.repositories.LessonRepository;
-import com.aidigital.aionboarding.domain.material.entities.MaterialFile;
-import com.aidigital.aionboarding.domain.material.repositories.MaterialFileRepository;
+import com.aidigital.aionboarding.domain.learning.repositories.UserLessonRepository;
 import com.aidigital.aionboarding.domain.material.repositories.MaterialRepository;
 import com.aidigital.aionboarding.domain.user.repositories.UserRepository;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
+import com.aidigital.aionboarding.service.material.services.MaterialFileService;
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import org.junit.jupiter.api.Nested;
@@ -34,7 +33,7 @@ import static org.mockito.Mockito.when;
 class StorageKeyAuthorizationServiceTest {
 
 	@Mock
-	private MaterialFileRepository materialFileRepository;
+	private MaterialFileService materialFileService;
 	@Mock
 	private LessonAssetRepository lessonAssetRepository;
 	@Mock
@@ -85,7 +84,7 @@ class StorageKeyAuthorizationServiceTest {
 
 			// Verification
 			assertEquals(ErrorReason.C004.getCode(), ex.getCode());
-			verify(materialFileRepository, never()).findByStorageKey(anyString());
+			verify(materialFileService, never()).existsByStorageKey(anyString());
 			verify(lessonAssetRepository, never()).findLessonIdByStorageKey(anyString());
 			verify(userRepository, never()).existsByAvatarStorageKey(anyString());
 			verify(lessonRepository, never()).existsByCoverImageStorageKey(anyString());
@@ -101,7 +100,7 @@ class StorageKeyAuthorizationServiceTest {
 
 			// Verification
 			assertEquals(ErrorReason.C004.getCode(), ex.getCode());
-			verify(materialFileRepository, never()).findByStorageKey(anyString());
+			verify(materialFileService, never()).existsByStorageKey(anyString());
 			verify(lessonAssetRepository, never()).findLessonIdByStorageKey(anyString());
 		}
 	}
@@ -113,7 +112,7 @@ class StorageKeyAuthorizationServiceTest {
 
 		@Test
 		void requireAccess_materialFileMatch_adminUser_passes() {
-			when(materialFileRepository.findByStorageKey(KEY)).thenReturn(Optional.of(new MaterialFile()));
+			when(materialFileService.existsByStorageKey(KEY)).thenReturn(true);
 			AppUser admin = adminUser();
 
 			// Execution + Verification
@@ -122,7 +121,7 @@ class StorageKeyAuthorizationServiceTest {
 
 		@Test
 		void requireAccess_materialFileMatch_userWithLessonsManage_passes() {
-			when(materialFileRepository.findByStorageKey(KEY)).thenReturn(Optional.of(new MaterialFile()));
+			when(materialFileService.existsByStorageKey(KEY)).thenReturn(true);
 			AppUser manager = managerUser();
 			when(permissionService.userHasPermission(manager, PermissionKeys.LESSONS_MANAGE)).thenReturn(true);
 
@@ -132,7 +131,7 @@ class StorageKeyAuthorizationServiceTest {
 
 		@Test
 		void requireAccess_materialFileMatch_userWithoutLessonsManageAndNotAdmin_throwsC004() {
-			when(materialFileRepository.findByStorageKey(KEY)).thenReturn(Optional.of(new MaterialFile()));
+			when(materialFileService.existsByStorageKey(KEY)).thenReturn(true);
 			AppUser learner = learnerUser();
 			when(permissionService.userHasPermission(learner, PermissionKeys.LESSONS_MANAGE)).thenReturn(false);
 
@@ -152,7 +151,7 @@ class StorageKeyAuthorizationServiceTest {
 
 		@Test
 		void requireAccess_lessonAssetMatch_userWithLessonsManage_passes() {
-			when(materialFileRepository.findByStorageKey(KEY)).thenReturn(Optional.empty());
+			when(materialFileService.existsByStorageKey(KEY)).thenReturn(false);
 			when(lessonAssetRepository.findLessonIdByStorageKey(KEY)).thenReturn(Optional.of(LESSON_ID));
 			AppUser manager = managerUser();
 			when(permissionService.userHasPermission(manager, PermissionKeys.LESSONS_MANAGE)).thenReturn(true);
@@ -164,7 +163,7 @@ class StorageKeyAuthorizationServiceTest {
 
 		@Test
 		void requireAccess_lessonAssetMatch_enrolledLearner_passes() {
-			when(materialFileRepository.findByStorageKey(KEY)).thenReturn(Optional.empty());
+			when(materialFileService.existsByStorageKey(KEY)).thenReturn(false);
 			when(lessonAssetRepository.findLessonIdByStorageKey(KEY)).thenReturn(Optional.of(LESSON_ID));
 			AppUser learner = learnerUser();
 			when(permissionService.userHasPermission(learner, PermissionKeys.LESSONS_MANAGE)).thenReturn(false);
@@ -177,7 +176,7 @@ class StorageKeyAuthorizationServiceTest {
 
 		@Test
 		void requireAccess_lessonAssetMatch_nonEnrolledLearnerWithoutLessonsManage_throwsC004() {
-			when(materialFileRepository.findByStorageKey(KEY)).thenReturn(Optional.empty());
+			when(materialFileService.existsByStorageKey(KEY)).thenReturn(false);
 			when(lessonAssetRepository.findLessonIdByStorageKey(KEY)).thenReturn(Optional.of(LESSON_ID));
 			AppUser learner = learnerUser();
 			when(permissionService.userHasPermission(learner, PermissionKeys.LESSONS_MANAGE)).thenReturn(false);
@@ -199,7 +198,7 @@ class StorageKeyAuthorizationServiceTest {
 
 		@Test
 		void requireAccess_userAvatarMatch_anyAuthenticatedUser_passes() {
-			when(materialFileRepository.findByStorageKey(KEY)).thenReturn(Optional.empty());
+			when(materialFileService.existsByStorageKey(KEY)).thenReturn(false);
 			when(lessonAssetRepository.findLessonIdByStorageKey(KEY)).thenReturn(Optional.empty());
 			when(userRepository.existsByAvatarStorageKey(KEY)).thenReturn(true);
 			AppUser learner = learnerUser();
@@ -210,7 +209,7 @@ class StorageKeyAuthorizationServiceTest {
 
 		@Test
 		void requireAccess_lessonCoverMatch_anyAuthenticatedUser_passes() {
-			when(materialFileRepository.findByStorageKey(KEY)).thenReturn(Optional.empty());
+			when(materialFileService.existsByStorageKey(KEY)).thenReturn(false);
 			when(lessonAssetRepository.findLessonIdByStorageKey(KEY)).thenReturn(Optional.empty());
 			when(userRepository.existsByAvatarStorageKey(KEY)).thenReturn(false);
 			when(lessonRepository.existsByCoverImageStorageKey(KEY)).thenReturn(true);
@@ -222,7 +221,7 @@ class StorageKeyAuthorizationServiceTest {
 
 		@Test
 		void requireAccess_materialCoverMatch_anyAuthenticatedUser_passes() {
-			when(materialFileRepository.findByStorageKey(KEY)).thenReturn(Optional.empty());
+			when(materialFileService.existsByStorageKey(KEY)).thenReturn(false);
 			when(lessonAssetRepository.findLessonIdByStorageKey(KEY)).thenReturn(Optional.empty());
 			when(userRepository.existsByAvatarStorageKey(KEY)).thenReturn(false);
 			when(lessonRepository.existsByCoverImageStorageKey(KEY)).thenReturn(false);
@@ -235,7 +234,7 @@ class StorageKeyAuthorizationServiceTest {
 
 		@Test
 		void requireAccess_noEntityMatchesStorageKey_throwsC004() {
-			when(materialFileRepository.findByStorageKey(KEY)).thenReturn(Optional.empty());
+			when(materialFileService.existsByStorageKey(KEY)).thenReturn(false);
 			when(lessonAssetRepository.findLessonIdByStorageKey(KEY)).thenReturn(Optional.empty());
 			when(userRepository.existsByAvatarStorageKey(KEY)).thenReturn(false);
 			when(lessonRepository.existsByCoverImageStorageKey(KEY)).thenReturn(false);

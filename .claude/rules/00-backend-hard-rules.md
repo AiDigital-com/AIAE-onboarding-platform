@@ -5,7 +5,7 @@ description: Always-on backend engineering rules.
 # Backend Hard Rules
 
 - Backend stack is fixed: Java 21, Spring Boot 3.x, Maven multi-module, PostgreSQL, Liquibase.
-- New Liquibase `changeSet`s declare direct `preConditions` (existing applied changelogs are not retrofitted for this).
+- Every Liquibase `changeSet` must include direct `preConditions`; publish gates reject changelogs without them.
 - Discover and preserve one production package root. Do not introduce
   `com.example`, `org.example`, `io.replit`, or another parallel package root.
 - Backend controllers implement generated OpenAPI interfaces and stay thin.
@@ -15,10 +15,11 @@ description: Always-on backend engineering rules.
 - Outbound integrations live in `backend/external-services`, not in backend `application` or `service` orchestration classes.
 - Every third-party Spring HTTP client is created through the shared pooled
   client factory and registers both `ExternalClientMetricsInterceptor` and
-  `org.zalando.logbook.spring.LogbookClientHttpRequestInterceptor`. SDK-managed
-  calls use the reusable `ExternalCallTimer`. Both live in
-  `backend/external-services`. Logbook configuration, inbound correlation,
-  structured logging, Actuator, and Prometheus remain application-owned.
+  `org.zalando.logbook.spring.LogbookClientHttpRequestInterceptor`.
+- Reusable outbound metrics live in `backend/observability`, which owns
+  `ExternalClientMetricsInterceptor` and `ExternalCallTimer`. Logbook
+  configuration, inbound correlation, structured logging, Actuator, and
+  Prometheus remain application-owned.
 - Use `@ConfigurationProperties` for backend configuration; do not use `@Value`.
 - Do not introduce static methods on backend services or Spring beans.
 - Lombok is mandatory in every backend Maven submodule: every child

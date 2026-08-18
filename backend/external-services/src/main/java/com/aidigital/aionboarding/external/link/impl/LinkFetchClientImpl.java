@@ -78,13 +78,13 @@ public class LinkFetchClientImpl implements LinkFetchClient {
 		try {
 			current = new URI(url.trim()).normalize();
 		} catch (URISyntaxException | NullPointerException ex) {
-			return LinkFetchResult.failure("Invalid URL.");
+			return new LinkFetchResult("Invalid URL.");
 		}
 
 		for (int hop = 0; hop <= properties.getMaxRedirects(); hop++) {
 			LinkFetchFailureReason blockReason = urlPolicy.validate(current);
 			if (blockReason != null) {
-				return LinkFetchResult.securityBlocked(blockReason, "Blocked by outbound link policy.");
+				return new LinkFetchResult(blockReason, "Blocked by outbound link policy.");
 			}
 
 			LinkFetchAttempt attempt;
@@ -99,7 +99,7 @@ public class LinkFetchClientImpl implements LinkFetchClient {
 			}
 			current = current.resolve(attempt.redirectTo());
 		}
-		return LinkFetchResult.securityBlocked(
+		return new LinkFetchResult(
 				LinkFetchFailureReason.REDIRECT_LIMIT_EXCEEDED, "Too many redirects.");
 	}
 
@@ -122,15 +122,15 @@ public class LinkFetchClientImpl implements LinkFetchClient {
 						URI location = response.getHeaders().getLocation();
 						response.getBody().readNBytes(MAX_REDIRECT_BODY_DRAIN_BYTES);
 						if (location == null) {
-							return LinkFetchAttempt.result(LinkFetchResult.failure("Redirect with no Location header" +
+							return new LinkFetchAttempt(new LinkFetchResult("Redirect with no Location header" +
 									"."));
 						}
-						return LinkFetchAttempt.redirect(location);
+						return new LinkFetchAttempt(location);
 					}
 					if (status >= 400) {
-						return LinkFetchAttempt.result(LinkFetchResult.failure("HTTP " + status));
+						return new LinkFetchAttempt(new LinkFetchResult("HTTP " + status));
 					}
-					return LinkFetchAttempt.result(readBoundedBody(response.getHeaders().getContentType(), response));
+					return new LinkFetchAttempt(readBoundedBody(response.getHeaders().getContentType(), response));
 				});
 	}
 
@@ -168,7 +168,7 @@ public class LinkFetchClientImpl implements LinkFetchClient {
 		Charset charset = contentType != null && contentType.getCharset() != null
 				? contentType.getCharset()
 				: StandardCharsets.UTF_8;
-		return LinkFetchResult.success(new String(bytes, charset), contentTypeValue);
+		return new LinkFetchResult(new String(bytes, charset), contentTypeValue);
 	}
 
 	/**
@@ -204,13 +204,13 @@ public class LinkFetchClientImpl implements LinkFetchClient {
 		LinkFetchBlockedException blocked = findBlockedException(ex);
 		if (blocked != null) {
 			LOG.warn("Link fetch blocked by outbound-security policy: reason={}", blocked.reason().value());
-			return LinkFetchResult.securityBlocked(blocked.reason(), blocked.getMessage());
+			return new LinkFetchResult(blocked.reason(), blocked.getMessage());
 		}
 		if (isTimeout(ex)) {
-			return LinkFetchResult.securityBlocked(LinkFetchFailureReason.TIMEOUT, "Request timed out.");
+			return new LinkFetchResult(LinkFetchFailureReason.TIMEOUT, "Request timed out.");
 		}
 		LOG.debug("Link fetch failed: {}", ex.getMessage());
-		return LinkFetchResult.failure(ex.getMessage() == null ? "Failed to fetch link." : ex.getMessage());
+		return new LinkFetchResult(ex.getMessage() == null ? "Failed to fetch link." : ex.getMessage());
 	}
 
 	/**

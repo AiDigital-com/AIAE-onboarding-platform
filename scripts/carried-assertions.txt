@@ -1,0 +1,47 @@
+# Gate assertions this repository fails on purpose.
+#
+# Read by scripts/check-carried-assertions.sh, which compares the live failure
+# list from structure-lint.sh + verify-gates.sh against this file and fails CI
+# only on a difference — in either direction.
+#
+# One assertion text per line, exactly as the gate prints it. Blank lines and
+# lines starting with # are ignored. Order does not matter.
+#
+# THE SET IS CLOSED. A new gate failure is a regression: fix it. Add a line here
+# only when it records a deliberate decision, and say why in the same commit and
+# in docs/aiae-migration-plan.md (P15). Removing a line is required — in the same
+# commit — whenever a carried assertion is genuinely fixed; otherwise the next
+# real regression hides behind it.
+#
+# Full rationale for each: docs/aiae-migration-plan.md, section P15.
+
+# --- verify-gates.sh ---
+
+# Product decision: the UI is carried over from the existing product unchanged.
+# Renaming Sidebar to NavRail would change nothing real and destroy the signal
+# for everyone after. Tracked upstream as CR-2.
+Frontend must not use a left side menu/sidebar
+
+# Same decision. ~2222 findings, raw px units and form accessibility. Clearing
+# them means rewriting the visual layer, which is out of scope by explicit
+# product call.
+check-frontend-ui-rules.sh reported violations
+
+# Decided 2026-08-14 (option B). verify-gates.sh:401,403 grep for two literal
+# expressions; LogbookConfig builds the same objects through resolveFormatter()
+# and resolveStrategy(), and its default is STRICTER than the gate asks for —
+# at logBodies=false it uses MetadataOnlyHttpLogFormatter where the gate settles
+# for the JSON formatter. Inlining the literals would weaken working, tested
+# production logging to satisfy a text match. Tracked upstream as CR-5.
+Logbook DefaultSink must be built with formatter + writer
+Production/Replit Logbook must use metadata-only WithoutBodyStrategy
+
+# --- structure-lint.sh ---
+
+# False negative. structure-lint.sh:117 tests for a hardcoded path,
+# db/changelog/changes/0001-usage-events.xml. This project is brownfield and
+# versions its schema history differently: the table is created by
+# db/changelog/1.0.0/sql/usage_events.sql, included from 1.0.0/db.version-master.xml.
+# The migration exists; the checker looks in the wrong place. Tracked upstream
+# as CR-8.
+present event-logging module requires the usage-events migration

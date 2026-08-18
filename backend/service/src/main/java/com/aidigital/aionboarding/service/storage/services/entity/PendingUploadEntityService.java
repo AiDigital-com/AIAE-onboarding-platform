@@ -3,7 +3,6 @@ package com.aidigital.aionboarding.service.storage.services.entity;
 import com.aidigital.aionboarding.domain.storage.entities.PendingUpload;
 import com.aidigital.aionboarding.domain.storage.repositories.PendingUploadRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,16 +34,18 @@ public class PendingUploadEntityService {
 	}
 
 	/**
-	 * Loads a bounded page of unconfirmed pending uploads that expired before the given cutoff,
-	 * for abandoned-object cleanup.
+	 * Atomically claims a bounded batch of unconfirmed pending uploads that expired before the
+	 * given cutoff, for abandoned-object cleanup. See
+	 * {@link PendingUploadRepository#claimExpiredUnconfirmed(LocalDateTime, int)} for the
+	 * locking shape.
 	 *
-	 * @param cutoff   expiry cutoff instant
-	 * @param pageable bounds the batch size
-	 * @return matching pending uploads, oldest expiry first
+	 * @param cutoff expiry cutoff instant
+	 * @param limit  bounds the batch size
+	 * @return claimed pending uploads, oldest expiry first
 	 */
-	@Transactional(readOnly = true)
-	public List<PendingUpload> findExpiredUnconfirmed(LocalDateTime cutoff, Pageable pageable) {
-		return pendingUploadRepository.findByConfirmedFalseAndExpiresAtBefore(cutoff, pageable);
+	@Transactional
+	public List<PendingUpload> claimExpiredUnconfirmed(LocalDateTime cutoff, int limit) {
+		return pendingUploadRepository.claimExpiredUnconfirmed(cutoff, limit);
 	}
 
 	/**

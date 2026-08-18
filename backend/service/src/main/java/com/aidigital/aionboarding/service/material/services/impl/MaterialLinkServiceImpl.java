@@ -5,6 +5,7 @@ import com.aidigital.aionboarding.domain.material.entities.MaterialLink;
 import com.aidigital.aionboarding.domain.material.repositories.MaterialLinkRepository;
 import com.aidigital.aionboarding.domain.material.repositories.MaterialLinkSummaryProjection;
 import com.aidigital.aionboarding.service.common.mapping.TextValueNormalizer;
+import com.aidigital.aionboarding.service.link.models.LinkMetadataRecord;
 import com.aidigital.aionboarding.service.link.services.LinkMetadataService;
 import com.aidigital.aionboarding.service.mappers.material.MaterialMapper;
 import com.aidigital.aionboarding.service.material.services.MaterialLinkService;
@@ -14,7 +15,6 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -29,15 +29,15 @@ public class MaterialLinkServiceImpl implements MaterialLinkService {
 	public List<PreparedLinkRecord> prepareLinks(List<String> urls) {
 		List<PreparedLinkRecord> records = new ArrayList<>();
 		for (String url : urls) {
-			Map<String, Object> metadata = linkMetadataService.fetch(url);
+			LinkMetadataRecord metadata = linkMetadataService.fetch(url);
 			records.add(new PreparedLinkRecord(
 					url,
-					textValueNormalizer.raw(metadata.get("title")),
-					textValueNormalizer.raw(metadata.get("description")),
-					textValueNormalizer.raw(metadata.get("imageUrl")),
-					textValueNormalizer.raw(metadata.get("siteName")),
-					textValueNormalizer.raw(metadata.get("extractedText")),
-					textValueNormalizer.raw(metadata.get("error"))
+					textValueNormalizer.raw(metadata.title()),
+					textValueNormalizer.raw(metadata.description()),
+					textValueNormalizer.raw(metadata.imageUrl()),
+					textValueNormalizer.raw(metadata.siteName()),
+					textValueNormalizer.raw(metadata.extractedText()),
+					textValueNormalizer.raw(metadata.error())
 			));
 		}
 		return records;

@@ -1,5 +1,7 @@
 package com.aidigital.aionboarding.service.permission.services;
 
+import com.aidigital.aionboarding.service.common.error.AppException;
+import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.permission.models.PermissionSnapshotRecord;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
@@ -80,15 +82,6 @@ public interface PermissionService {
 	void resetOverrides(Long userId);
 
 	/**
-	 * Checks whether one user is the team lead of another.
-	 *
-	 * @param leadUserId   team lead internal user id
-	 * @param memberUserId team member internal user id
-	 * @return {@code true} when the lead-member relationship exists
-	 */
-	boolean isTeamLeadForMember(Long leadUserId, Long memberUserId);
-
-	/**
 	 * Checks whether a user may manage a lesson created by another user.
 	 *
 	 * @param user            authenticated user
@@ -114,4 +107,19 @@ public interface PermissionService {
 	 * @return {@code true} when the user is an admin or the team lead
 	 */
 	boolean canManageTeam(AppUser user, Long leadUserId);
+
+	/**
+	 * Asserts that a user may manage a team owned by a lead, wrapping {@link #canManageTeam} so
+	 * callers get the enforcement and the check in one call.
+	 *
+	 * @param user       authenticated user
+	 * @param leadUserId team lead internal user id
+	 * @throws com.aidigital.aionboarding.service.common.error.AppException with reason {@code C004}
+	 *                                                                      when the user may not manage the team
+	 */
+	default void requireCanManageTeam(AppUser user, Long leadUserId) {
+		if (!canManageTeam(user, leadUserId)) {
+			throw new AppException(ErrorReason.C004);
+		}
+	}
 }

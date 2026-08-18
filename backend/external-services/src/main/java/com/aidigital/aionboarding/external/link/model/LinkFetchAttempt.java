@@ -15,19 +15,17 @@ public record LinkFetchAttempt(LinkFetchResult result, URI redirectTo) {
 	 * Builds a terminal attempt outcome.
 	 *
 	 * @param result the terminal result
-	 * @return a terminal attempt
 	 */
-	public static LinkFetchAttempt result(LinkFetchResult result) {
-		return new LinkFetchAttempt(result, null);
+	public LinkFetchAttempt(LinkFetchResult result) {
+		this(result, null);
 	}
 
 	/**
 	 * Builds a redirect attempt outcome.
 	 *
 	 * @param redirectTo the next hop to follow
-	 * @return a redirect attempt
 	 */
-	public static LinkFetchAttempt redirect(URI redirectTo) {
-		return new LinkFetchAttempt(null, redirectTo);
+	public LinkFetchAttempt(URI redirectTo) {
+		this(null, redirectTo);
 	}
 }

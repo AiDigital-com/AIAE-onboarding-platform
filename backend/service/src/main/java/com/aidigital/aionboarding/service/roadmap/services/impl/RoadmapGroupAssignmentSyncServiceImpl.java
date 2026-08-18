@@ -7,7 +7,7 @@ import com.aidigital.aionboarding.domain.roadmap.entities.RoadmapGroupAssignment
 import com.aidigital.aionboarding.domain.user.entities.User;
 import com.aidigital.aionboarding.service.group.services.entity.GroupMemberEntityService;
 import com.aidigital.aionboarding.service.learning.models.RoadmapAssignmentEnrollmentRecord;
-import com.aidigital.aionboarding.service.learning.services.LearningEnrollmentService;
+import com.aidigital.aionboarding.service.learning.services.RoadmapEnrollmentService;
 import com.aidigital.aionboarding.service.learning.support.LearningEnrollmentSupport;
 import com.aidigital.aionboarding.service.roadmap.services.RoadmapGroupAssignmentSyncService;
 import com.aidigital.aionboarding.service.roadmap.services.entity.RoadmapGroupAssignmentEntityService;
@@ -28,7 +28,7 @@ public class RoadmapGroupAssignmentSyncServiceImpl implements RoadmapGroupAssign
     private final RoadmapGroupAssignmentEntityService roadmapGroupAssignmentEntityService;
     private final GroupMemberEntityService groupMemberEntityService;
     private final UserEntityService userEntityService;
-    private final LearningEnrollmentService learningEnrollmentService;
+    private final RoadmapEnrollmentService roadmapEnrollmentService;
     private final LearningEnrollmentSupport learningEnrollmentSupport;
 
     @Override
@@ -93,7 +93,7 @@ public class RoadmapGroupAssignmentSyncServiceImpl implements RoadmapGroupAssign
         if (targetUserIds.isEmpty()) {
             return List.of();
         }
-        var enrollmentRows = learningEnrollmentService.enrollUsersInRoadmap(targetUserIds, roadmapId);
+        var enrollmentRows = roadmapEnrollmentService.enrollUsersInRoadmap(targetUserIds, roadmapId);
         List<RoadmapAssignmentEnrollmentRecord> enrollments = new ArrayList<>();
         for (int i = 0; i < targetUserIds.size(); i++) {
             enrollments.add(learningEnrollmentSupport.toRoadmapAssignmentEnrollment(enrollmentRows.get(i), targetUserIds.get(i)));

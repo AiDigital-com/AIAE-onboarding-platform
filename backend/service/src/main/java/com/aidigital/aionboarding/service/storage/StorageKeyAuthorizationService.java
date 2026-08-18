@@ -3,13 +3,12 @@ package com.aidigital.aionboarding.service.storage;
 import com.aidigital.aionboarding.domain.learning.repositories.UserLessonRepository;
 import com.aidigital.aionboarding.domain.lesson.repositories.LessonAssetRepository;
 import com.aidigital.aionboarding.domain.lesson.repositories.LessonRepository;
-import com.aidigital.aionboarding.domain.material.entities.MaterialFile;
-import com.aidigital.aionboarding.domain.material.repositories.MaterialFileRepository;
 import com.aidigital.aionboarding.domain.material.repositories.MaterialRepository;
 import com.aidigital.aionboarding.domain.user.repositories.UserRepository;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
+import com.aidigital.aionboarding.service.material.services.MaterialFileService;
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import lombok.RequiredArgsConstructor;
@@ -31,13 +30,19 @@ import java.util.Optional;
  *   <li>Material.coverImageStorageKey — any authenticated user
  *   <li>No match — throws AppException(C004)
  * </ol>
+ *
+ * <p>This is a deliberate cross-entity authorization lookup spanning six entities. The
+ * {@code MaterialFile} step goes through {@link MaterialFileService#existsByStorageKey}
+ * rather than {@code MaterialFileRepository} directly, per the entity-service boundary rule
+ * (P11a). The other five repositories (lesson asset, user, lesson, material, user-lesson) are
+ * still injected directly here and are a known, separate, wider instance of the same rule
+ * gap — recorded in the P11a migration-log row rather than fixed in that pass.
  */
-// EXCEPTION-003 (see .planning/EXCEPTIONS.md): intentional cross-entity authorization lookup chain per DEC-05-03
 @Service
 @RequiredArgsConstructor
 public class StorageKeyAuthorizationService {
 
-    private final MaterialFileRepository materialFileRepository;
+    private final MaterialFileService materialFileService;
     private final LessonAssetRepository lessonAssetRepository;
     private final UserRepository userRepository;
     private final LessonRepository lessonRepository;
@@ -53,8 +58,7 @@ public class StorageKeyAuthorizationService {
         }
 
         // Step 1: MaterialFile — requires LESSONS_MANAGE or admin
-        Optional<MaterialFile> materialFile = materialFileRepository.findByStorageKey(storageKey);
-        if (materialFile.isPresent()) {
+        if (materialFileService.existsByStorageKey(storageKey)) {
             if (!viewer.isAdmin() && !permissionService.userHasPermission(viewer, PermissionKeys.LESSONS_MANAGE)) {
                 throw new AppException(ErrorReason.C004);
             }

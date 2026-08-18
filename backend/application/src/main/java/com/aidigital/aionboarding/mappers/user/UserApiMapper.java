@@ -35,32 +35,27 @@ public interface UserApiMapper extends PageInfoApiMapper {
 
     AdminUserStatsV1 toAdminUserStatsV1(AdminUserStatsRecord stats);
 
-    default AdminUserStatsResponseV1 toAdminUserStatsResponseV1(AdminUserStatsRecord stats) {
-        AdminUserStatsResponseV1 response = new AdminUserStatsResponseV1();
-        response.setStats(toAdminUserStatsV1(stats));
-        return response;
-    }
+    @Mapping(target = "stats", source = "stats")
+    AdminUserStatsResponseV1 toAdminUserStatsResponseV1(AdminUserStatsRecord stats);
 
-    default AdminUsersListResponseV1 toAdminUsersListResponseV1(Page<UserRecord> users) {
-        AdminUsersListResponseV1 response = new AdminUsersListResponseV1();
-        response.setUsers(users.stream().map(this::toUserSummaryV1).toList());
-        response.setPage(toPageInfoV1(users));
-        return response;
-    }
+    @Mapping(target = "users", expression = "java(users.stream().map(this::toUserSummaryV1).toList())")
+    @Mapping(target = "page", expression = "java(toPageInfoV1(users))")
+    AdminUsersListResponseV1 toAdminUsersListResponseV1(Page<UserRecord> users);
 
+    @Mapping(target = "users", expression = "java(users.stream().map(this::toAssignableUserSummaryV1).toList())")
+    @Mapping(target = "page", expression = "java(toPageInfoV1(users))")
+    UsersListResponseV1 toUsersListResponseV1(Page<UserRecord> users);
+
+    /**
+     * Builds the users list response from a plain list, wrapping it in a page so it can reuse
+     * the {@link #toUsersListResponseV1(Page)} mapping.
+     *
+     * @param users the users, or {@code null}
+     * @return the users list response
+     */
     default UsersListResponseV1 toUsersListResponseV1(List<UserRecord> users) {
-        UsersListResponseV1 response = new UsersListResponseV1();
-        response.setUsers(users == null ? List.of() : users.stream().map(this::toAssignableUserSummaryV1).toList());
-        response.setPage(toPageInfoV1(new org.springframework.data.domain.PageImpl<>(
-            users == null ? List.of() : users
-        )));
-        return response;
+        return toUsersListResponseV1(
+                new org.springframework.data.domain.PageImpl<>(users == null ? List.of() : users));
     }
 
-    default UsersListResponseV1 toUsersListResponseV1(Page<UserRecord> users) {
-        UsersListResponseV1 response = new UsersListResponseV1();
-        response.setUsers(users.stream().map(this::toAssignableUserSummaryV1).toList());
-        response.setPage(toPageInfoV1(users));
-        return response;
-    }
 }

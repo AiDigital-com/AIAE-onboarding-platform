@@ -61,7 +61,7 @@ class MaterialPreparationMapBuilderTest {
 
 		when(materialLinkService.findByMaterialIdOrderBySortOrderAsc(70L)).thenReturn(List.of(link));
 		when(materialYoutubeService.findByMaterialIdOrderBySortOrderAsc(70L)).thenReturn(List.of(youtubeUrl));
-		when(materialFileService.findByMaterialId(70L)).thenReturn(List.of(file));
+		when(materialFileService.findByMaterialIdsOrderByCreatedAtAsc(List.of(70L))).thenReturn(List.of(file));
 		when(lessonTextUtil.normalizeText(org.mockito.ArgumentMatchers.anyString()))
 				.thenAnswer(invocation -> invocation.getArgument(0));
 

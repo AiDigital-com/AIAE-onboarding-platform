@@ -1,5 +1,5 @@
 // LogbookConfig — JSON HTTP request/response logging with required masking.
-// Canonical spec: templates/generated-project/observability/logbook-http-logging-rules.md.
+// Canonical spec: .claude/agent_docs/observability/logbook-http-logging-rules.md.
 // Binds app.logbook.* properties (see application.yml baseline). Logbook's
 // permissive defaults are NOT enough — this config enforces the company
 // rules (Authorization/JWT masked; secret-like JSON fields masked;

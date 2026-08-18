@@ -26,7 +26,7 @@
 //     another *ServiceImpl bean (e.g. an orchestrator calling a helper service),
 //     that nested call proceeds normally but does not emit its own event —
 //     otherwise one user action fans out into several usage_events rows/INSERTs.
-// Full contract: `templates/generated-project/observability/usage-logging-rules.md`.
+// Full contract: `.claude/agent_docs/observability/usage-logging-rules.md`.
 
 package com.aidigital.aionboarding.usagelogging;
 

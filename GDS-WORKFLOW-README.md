@@ -1,70 +1,105 @@
-# GSD Workflow for this repo
+# Optional GSD Workflow
 
-This repository ships with GSD Core, a spec-driven development framework for AI
-coding agents. The framework lives in `.claude/` and is committed to the repo,
-so the team shares the same rules, commands, agents, and hooks.
+GSD is useful for multi-phase features, migrations, long-running investigations,
+and work that must persist across Claude Code sessions. It is unnecessary for a
+small, bounded change; use the focused project skills and `verification-gate`
+instead.
 
-## One-time setup
+The repository does not vendor GSD runtime files. This avoids committing hundreds
+of generated upstream files, stale absolute paths, update churn, and Claude hooks
+for developers who do not use GSD. Replit never initializes GSD automatically:
+Replit Agent does not consume Claude Code's GSD runtime, and setup must not spend
+agent credits on an unused workflow.
 
-1. Install Node.js 18+ and Claude Code.
-2. Refresh local Claude settings when needed:
+## Install locally
 
-```bash
-npx @opengsd/gsd-core@latest --claude --local
-```
-
-3. Open the repo in Claude Code and reload so it picks up `.claude/commands`,
-   `.claude/agents`, and `.claude/settings.json`.
-
-Verify the install:
+Run from the project root when you intend to use GSD with Claude Code:
 
 ```bash
-cat .claude/gsd-core/VERSION
-ls .claude/commands/gsd | wc -l
+npx -y @opengsd/gsd-core@latest --claude --local
 ```
 
-## Engineering rules integration
-
-GSD and the shared engineering contract coexist in `.claude/`:
-
-- GSD owns `agents/`, `commands/`, `gsd-core/`, hooks, and install metadata.
-- The engineering contract owns `agent_docs/`, `rules/`, custom `skills/`, and
-  the repository-root `CLAUDE.md`.
-- GSD planners, executors, reviewers, and fixers must treat `CLAUDE.md` and
-  project skills as hard constraints.
-- Do not remove or replace GSD when updating engineering rules.
-
-After a GSD upgrade, verify that both surfaces still exist:
+Reload Claude Code, then verify:
 
 ```bash
 test -f .claude/gsd-core/VERSION
 test -f CLAUDE.md
 test -f .claude/rules/00-backend-hard-rules.md
-test -f .claude/skills/task-workflow/SKILL.md
+test -f .claude/skills/backend-rule-review/SKILL.md
 ```
 
-## Phase loop
+The installer-generated runtime stays local through `.gitignore`. Commit only
+the engineering contract: `CLAUDE.md`, `.claude/agent_docs/`, `.claude/rules/`,
+`.claude/skills/`, and `.claude/tasks/README.md`.
 
-Run these inside Claude Code:
+## Normal GSD lifecycle
 
-| Step | Command | What it does |
-| --- | --- | --- |
-| 1. Discuss | `/gsd-discuss-phase` | Capture decisions before code is written |
-| 2. Plan | `/gsd-plan-phase` | Research and decompose work into `PLAN.md` |
-| 3. Execute | `/gsd-execute-phase` | Build the plan |
-| 4. Verify | `/gsd-verify-work` | Validate the result and generate fix plans if needed |
-| 5. Ship | `/gsd-ship` | Open a PR and archive the completed phase |
+Run slash commands inside Claude Code, not in the terminal:
 
-Helpful anytime:
+```text
+/gsd-map-codebase
+/gsd-new-milestone
+/gsd-discuss-phase
+/gsd-plan-phase
+/gsd-execute-phase
+/gsd-verify-work
+/gsd-ship
+```
 
-- `/gsd-help`
-- `/gsd-progress`
-- `/gsd-stats`
+Use `/gsd-help` for the installed command list and `/gsd-progress` to resume.
 
-## Maintenance
+## Backend rules audit and automatic fixes
+
+For a quick read-only check, GSD is unnecessary. Run this in Claude Code:
+
+```text
+/backend-rule-review
+
+Review the entire backend against CLAUDE.md, .claude/rules/00-backend-hard-rules.md,
+and all backend agent docs. Confirm every scanner hit by reading the code. Report
+only high-confidence findings with file:line, impact, required fix, and missing
+verification. Do not edit code.
+```
+
+For a full autonomous audit-to-fix loop, use GSD:
+
+```text
+/gsd-audit-fix
+
+Audit the entire backend against CLAUDE.md, .claude/rules/00-backend-hard-rules.md,
+.claude/rules/10-architecture.md, .claude/rules/12-database.md,
+.claude/rules/20-tests.md, .claude/rules/30-web-openapi.md, and the backend agent
+docs. Treat backend-rule-review findings as mandatory input. Verify every finding
+against current code before editing. Fix confirmed gaps one by one without
+reverting unrelated work. Run the strongest affected Maven tests, structure lint,
+and verification gates. Continue until review passes or report a concrete blocker.
+```
+
+Then run independent completion checks:
+
+```text
+/gsd-code-review
+
+Review the resulting backend diff against CLAUDE.md and the original audit.
+Prioritize correctness, security, architecture violations, and missing behavioral
+tests. Findings first, ordered by severity.
+```
+
+```text
+/gsd-verify-work
+
+Verify every fixed audit item with fresh command output. Do not accept build-only
+evidence for behavioral claims. Report passed, failed, and unverified items.
+```
+
+For one narrow confirmed gap, prefer `/gsd-quick <concrete fix>` rather than
+starting a milestone.
+
+## Update or remove local GSD
 
 ```bash
-npx @opengsd/gsd-core@latest --claude --local
-npx @opengsd/gsd-core@latest --claude --local --dry-run
-npx @opengsd/gsd-core@latest --claude --local --uninstall
+npx -y @opengsd/gsd-core@latest --claude --local
+npx -y @opengsd/gsd-core@latest --claude --local --uninstall
 ```
+
+After either command, ensure the committed project rules and custom skills remain.

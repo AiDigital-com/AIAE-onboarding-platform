@@ -4,6 +4,8 @@ import com.aidigital.aionboarding.domain.group.entities.Group;
 import com.aidigital.aionboarding.domain.group.entities.GroupLead;
 import com.aidigital.aionboarding.domain.group.entities.GroupMember;
 import com.aidigital.aionboarding.domain.user.entities.User;
+import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.group.models.GroupDetailRecord;
 import com.aidigital.aionboarding.service.group.models.GroupMemberRecord;
 import com.aidigital.aionboarding.service.group.models.GroupSummaryRecord;
@@ -11,10 +13,12 @@ import com.aidigital.aionboarding.service.group.services.entity.GroupLeadEntityS
 import com.aidigital.aionboarding.service.group.services.entity.GroupMemberEntityService;
 import com.aidigital.aionboarding.service.mappers.user.UserRecordMapper;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -37,6 +41,8 @@ class GroupRecordAssemblerTest {
 	private GroupMemberEntityService groupMemberEntityService;
 	@Mock
 	private UserRecordMapper userMapper;
+	@Spy
+	private CurrentTime currentTime = new CurrentTimeImpl();
 
 	@InjectMocks
 	private GroupRecordAssembler assembler;
@@ -145,5 +151,89 @@ class GroupRecordAssemblerTest {
 		// Then:
 		assertThat(result.getContent()).hasSize(1);
 		assertThat(result.getContent().get(0).user()).isEqualTo(memberRecord);
+	}
+
+	@Test
+	void shouldMapUserToUserRecordTest() {
+		// Given:
+		User user = new User();
+		user.setId(40L);
+		UserRecord userRecord = new UserRecord(40L, "clerk-40", "Candidate", "candidate@test.com", "member", null,
+				null, null, null, null, null);
+		when(userMapper.toRecord(user)).thenReturn(userRecord);
+
+		// When:
+		UserRecord result = assembler.toUserRecord(user);
+
+		// Then:
+		assertThat(result).isSameAs(userRecord);
+	}
+
+	@Nested
+	class BuildNewGroup {
+
+		@Test
+		void shouldStampNameDescriptionCreatorAndTimestampsTest() {
+			// Given:
+			User creator = new User();
+			creator.setId(50L);
+
+			// When:
+			Group result = assembler.buildNewGroup("CS Campaign", "cs campaign", "desc", creator);
+
+			// Then:
+			assertThat(result.getName()).isEqualTo("CS Campaign");
+			assertThat(result.getNormalizedName()).isEqualTo("cs campaign");
+			assertThat(result.getDescription()).isEqualTo("desc");
+			assertThat(result.getCreatedByUser()).isSameAs(creator);
+			assertThat(result.getCreatedAt()).isNotNull();
+			assertThat(result.getUpdatedAt()).isEqualTo(result.getCreatedAt());
+		}
+	}
+
+	@Nested
+	class BuildGroupLead {
+
+		@Test
+		void shouldLinkGroupAndLeadWithTimestampTest() {
+			// Given:
+			Group group = new Group();
+			group.setId(60L);
+			User leadUser = new User();
+			leadUser.setId(70L);
+
+			// When:
+			GroupLead result = assembler.buildGroupLead(group, 70L, leadUser);
+
+			// Then:
+			assertThat(result.getId().getGroupId()).isEqualTo(60L);
+			assertThat(result.getId().getLeadUserId()).isEqualTo(70L);
+			assertThat(result.getGroup()).isSameAs(group);
+			assertThat(result.getLeadUser()).isSameAs(leadUser);
+			assertThat(result.getCreatedAt()).isNotNull();
+		}
+	}
+
+	@Nested
+	class ApplyUpdate {
+
+		@Test
+		void shouldMutateNameDescriptionAndUpdatedAtTest() {
+			// Given:
+			Group group = new Group();
+			group.setName("Old Name");
+			group.setNormalizedName("old name");
+			group.setDescription("old desc");
+			group.setUpdatedAt(LocalDateTime.parse("2020-01-01T00:00:00"));
+
+			// When:
+			assembler.applyUpdate(group, "New Name", "new name", "new desc");
+
+			// Then:
+			assertThat(group.getName()).isEqualTo("New Name");
+			assertThat(group.getNormalizedName()).isEqualTo("new name");
+			assertThat(group.getDescription()).isEqualTo("new desc");
+			assertThat(group.getUpdatedAt()).isAfter(LocalDateTime.parse("2020-01-01T00:00:00"));
+		}
 	}
 }

@@ -4,6 +4,7 @@ import com.aidigital.aionboarding.api.v1.model.DashboardPeriodV1;
 import com.aidigital.aionboarding.api.v1.model.TeamDashboardV1;
 import com.aidigital.aionboarding.mappers.teamdashboard.TeamDashboardApiMapper;
 import com.aidigital.aionboarding.service.common.error.AppException;
+import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.teamdashboard.models.TeamDashboardPeriod;
 import com.aidigital.aionboarding.service.teamdashboard.models.TeamDashboardRecord;
@@ -43,6 +44,7 @@ class TeamProgressControllerTest {
 		TeamDashboardRecord record = Instancio.create(TeamDashboardRecord.class);
 		TeamDashboardV1 expectedBody = Instancio.create(TeamDashboardV1.class);
 		when(currentUser.requireUser()).thenReturn(viewer);
+		when(teamDashboardApiMapper.periodCode(DashboardPeriodV1.MONTH)).thenReturn("month");
 		when(teamDashboardSupport.resolvePeriod("month")).thenReturn(TeamDashboardPeriod.MONTH);
 		when(teamDashboardService.getTeamDashboardData(viewer, TeamDashboardPeriod.MONTH)).thenReturn(record);
 		when(teamDashboardApiMapper.toTeamDashboardV1(record)).thenReturn(expectedBody);
@@ -73,10 +75,14 @@ class TeamProgressControllerTest {
 	}
 
 	@Test
-	void shouldRejectNonAdminNonTeamLeadTest() {
-		// Given:
+	void shouldPropagateRejectionOfNonAdminNonTeamLeadFromTheServiceTest() {
+		// Given: the admin-or-team-lead guard now lives in TeamDashboardServiceImpl (see its own
+		// test), not the controller — this pins that the controller does not swallow it
 		AppUser viewer = memberViewer();
 		when(currentUser.requireUser()).thenReturn(viewer);
+		when(teamDashboardSupport.resolvePeriod(null)).thenReturn(TeamDashboardPeriod.MONTH);
+		when(teamDashboardService.getTeamDashboardData(viewer, TeamDashboardPeriod.MONTH))
+				.thenThrow(new AppException(ErrorReason.C004));
 
 		// When / Then:
 		assertThatThrownBy(() -> controller.getTeamDashboardData(DashboardPeriodV1.MONTH))

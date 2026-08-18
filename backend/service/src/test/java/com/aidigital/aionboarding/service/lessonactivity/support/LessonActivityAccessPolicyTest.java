@@ -5,6 +5,7 @@ import com.aidigital.aionboarding.service.common.dictionary.DictionaryLookupServ
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.learning.services.entity.LearningEnrollmentEntityService;
 import com.aidigital.aionboarding.service.lesson.services.entity.LessonEntityService;
+import com.aidigital.aionboarding.service.lessonactivity.enums.QuizQuestionTypeResolver;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import org.junit.jupiter.api.Nested;
@@ -31,7 +32,8 @@ class LessonActivityAccessPolicyTest {
 	@Mock
 	private PermissionService permissionService;
 
-	private final LessonActivityPayloadAssembler payloadAssembler = new LessonActivityPayloadAssembler();
+	private final LessonActivityPayloadAssembler payloadAssembler =
+			new LessonActivityPayloadAssembler(new QuizQuestionTypeResolver());
 
 	private LessonActivityAccessPolicy accessPolicy() {
 		return new LessonActivityAccessPolicy(

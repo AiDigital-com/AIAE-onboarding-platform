@@ -3,8 +3,8 @@ package com.aidigital.aionboarding.service.lessonactivity.services;
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityCompletionResultRecord;
+import com.aidigital.aionboarding.service.lessonactivity.models.SubmitActivityProgressInput;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Persists learner activity progress, quiz attempts, and lesson completion side effects.
@@ -33,7 +33,7 @@ public interface LessonActivityProgressService {
         AppUser viewer,
         Lesson lesson,
         Long activityId,
-        Map<String, Object> request
+        SubmitActivityProgressInput request
     );
 
     /**

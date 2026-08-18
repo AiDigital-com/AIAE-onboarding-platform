@@ -41,12 +41,9 @@ public interface RoadmapApiMapper extends PageInfoApiMapper {
     @Mapping(target = "roadmap", source = ".")
     RoadmapResponseV1 toRoadmapResponseV1(RoadmapRecord roadmap);
 
-    default RoadmapsListResponseV1 toRoadmapsListResponseV1(Page<RoadmapRecord> roadmaps) {
-        RoadmapsListResponseV1 response = new RoadmapsListResponseV1();
-        response.setRoadmaps(roadmaps.getContent().stream().map(this::toRoadmapV1).toList());
-        response.setPage(toPageInfoV1(roadmaps));
-        return response;
-    }
+    @Mapping(target = "roadmaps", expression = "java(roadmaps.getContent().stream().map(this::toRoadmapV1).toList())")
+    @Mapping(target = "page", expression = "java(toPageInfoV1(roadmaps))")
+    RoadmapsListResponseV1 toRoadmapsListResponseV1(Page<RoadmapRecord> roadmaps);
 
     default RoadmapListQuery toRoadmapListQuery(SearchRoadmapsV1 request) {
         return new RoadmapListQuery(

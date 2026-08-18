@@ -4,8 +4,6 @@ import com.aidigital.aionboarding.api.v1.TeamProgressApi;
 import com.aidigital.aionboarding.api.v1.model.DashboardPeriodV1;
 import com.aidigital.aionboarding.api.v1.model.TeamDashboardV1;
 import com.aidigital.aionboarding.mappers.teamdashboard.TeamDashboardApiMapper;
-import com.aidigital.aionboarding.service.common.error.AppException;
-import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.teamdashboard.services.TeamDashboardService;
 import com.aidigital.aionboarding.service.teamdashboard.util.TeamDashboardSupport;
@@ -27,14 +25,10 @@ public class TeamProgressController implements TeamProgressApi {
     @Transactional(readOnly = true)
     public ResponseEntity<TeamDashboardV1> getTeamDashboardData(DashboardPeriodV1 period) {
         AppUser viewer = currentUser.requireUser();
-        if (!viewer.isAdmin() && !viewer.isTeamLead()) {
-            throw new AppException(ErrorReason.C004);
-        }
-        String periodCode = period == null ? null : period.getValue();
         return ResponseEntity.ok(teamDashboardApiMapper.toTeamDashboardV1(
             teamDashboardService.getTeamDashboardData(
                 viewer,
-                teamDashboardSupport.resolvePeriod(periodCode)
+                teamDashboardSupport.resolvePeriod(teamDashboardApiMapper.periodCode(period))
             )
         ));
     }

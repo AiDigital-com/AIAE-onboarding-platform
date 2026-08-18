@@ -70,8 +70,11 @@ class DictionaryLookupServiceTest {
 	}
 
 	@Test
-	void shouldCacheRepeatedLookupsTest() {
-		// Given:
+	void shouldDelegateEveryLookupToTheRepositoryWithoutASecondBeanLevelCacheTest() {
+		// Given: M3 — the ConcurrentHashMap this bean used to keep was removed; the repository's
+		// own @QueryHints(HINT_CACHEABLE) Hibernate query cache is the only cache in play now
+		// (proven live by DictionaryCacheIntegrationTest), so this unit test asserts the opposite
+		// of what it asserted before the fold: no memoization happens at this layer.
 		UserRole role = new UserRole();
 		role.setId(2L);
 		when(userRoleRepository.findByCode("member")).thenReturn(Optional.of(role));
@@ -82,7 +85,7 @@ class DictionaryLookupServiceTest {
 
 		// Then:
 		assertThat(first).isEqualTo(second);
-		verify(userRoleRepository, times(1)).findByCode("member");
+		verify(userRoleRepository, times(2)).findByCode("member");
 	}
 
 	@Test

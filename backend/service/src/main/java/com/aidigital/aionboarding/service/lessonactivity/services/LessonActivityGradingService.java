@@ -1,9 +1,9 @@
 package com.aidigital.aionboarding.service.lessonactivity.services;
 
 import com.aidigital.aionboarding.service.lessonactivity.models.QuizGradingResultRecord;
+import com.aidigital.aionboarding.service.lessonactivity.models.QuizQuestionItemRecord;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Scores quiz activity submissions against stored question payloads.
@@ -11,12 +11,15 @@ import java.util.Map;
 public interface LessonActivityGradingService {
 
 	/**
-	 * Grades submitted answers against the quiz payload.
+	 * Grades submitted answers against the quiz's typed question items. Callers parse the
+	 * persisted payload through
+	 * {@link com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityPayloadAssembler#parseQuizItems}
+	 * first, so this contract never exposes the raw JSONB map.
 	 *
-	 * @param activityPayload  persisted quiz activity payload containing question items
-	 * @param submittedAnswers learner answers in question order; each entry is the list of
-	 *                         option(s) selected for that question
+	 * @param items             quiz question items in stored order
+	 * @param submittedAnswers  learner answers in question order; each entry is the list of
+	 *                          option(s) selected for that question
 	 * @return score, pass flag, per-question results, and counts
 	 */
-	QuizGradingResultRecord gradeQuiz(Map<String, Object> activityPayload, List<List<String>> submittedAnswers);
+	QuizGradingResultRecord gradeQuiz(List<QuizQuestionItemRecord> items, List<List<String>> submittedAnswers);
 }

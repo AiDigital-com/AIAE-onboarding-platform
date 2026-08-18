@@ -6,7 +6,7 @@ import com.aidigital.aionboarding.mappers.learning.LearningApiMapper;
 import com.aidigital.aionboarding.mappers.roadmap.RoadmapApiMapper;
 import com.aidigital.aionboarding.mappers.roadmap.RoadmapGroupAssignmentApiMapper;
 import com.aidigital.aionboarding.service.common.security.AppUser;
-import com.aidigital.aionboarding.service.learning.services.LearningService;
+import com.aidigital.aionboarding.service.learning.services.RoadmapAssignmentService;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapListQuery;
 import com.aidigital.aionboarding.service.roadmap.services.RoadmapGroupAssignmentService;
 import com.aidigital.aionboarding.service.roadmap.services.RoadmapService;
@@ -30,7 +30,7 @@ class RoadmapsControllerTest {
 	@Mock
 	private RoadmapService roadmapService;
 	@Mock
-	private LearningService learningService;
+	private RoadmapAssignmentService roadmapAssignmentService;
 	@Mock
 	private RoadmapGroupAssignmentService roadmapGroupAssignmentService;
 	@Mock

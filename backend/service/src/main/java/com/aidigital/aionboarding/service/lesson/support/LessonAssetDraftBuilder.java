@@ -13,6 +13,7 @@ import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.lesson.models.CreateLessonAssetInput;
 import com.aidigital.aionboarding.service.lesson.services.entity.LessonAssetEntityService;
+import com.aidigital.aionboarding.service.link.models.LinkMetadataRecord;
 import com.aidigital.aionboarding.service.link.services.LinkMetadataService;
 import com.aidigital.aionboarding.service.storage.StorageService;
 import lombok.RequiredArgsConstructor;
@@ -111,7 +112,7 @@ public class LessonAssetDraftBuilder {
 			draft = draft.enrichYoutube(metadata);
 		}
 		if (LessonAssetKindCode.LINK.equals(kind)) {
-			Map<String, Object> metadata = linkMetadataService.fetch(draft.url());
+			LinkMetadataRecord metadata = linkMetadataService.fetch(draft.url());
 			draft = draft.enrichLink(metadata);
 		}
 		if (isUploadedFileKind(kind)) {
@@ -188,18 +189,18 @@ public class LessonAssetDraftBuilder {
 					nextMetadata);
 		}
 
-		AssetDraft enrichLink(Map<String, Object> metadata) {
+		AssetDraft enrichLink(LinkMetadataRecord metadata) {
 			Map<String, Object> nextMetadata = new HashMap<>(metadata());
-			nextMetadata.put("extractedText", stringVal(metadata.get("extractedText")));
-			nextMetadata.put("metadataError", stringVal(metadata.get("error")));
+			nextMetadata.put("extractedText", stringVal(metadata.extractedText()));
+			nextMetadata.put("metadataError", stringVal(metadata.error()));
 			return new AssetDraft(
 					kind,
-					firstNonBlank(title(), stringVal(metadata.get("title")), stringVal(metadata.get("siteName")), "Web" +
+					firstNonBlank(title(), stringVal(metadata.title()), stringVal(metadata.siteName()), "Web" +
 							" link"),
 					url,
-					firstNonBlank(description(), stringVal(metadata.get("description"))),
-					firstNonBlank(imageUrl(), stringVal(metadata.get("imageUrl"))),
-					firstNonBlank(siteName(), stringVal(metadata.get("siteName"))),
+					firstNonBlank(description(), stringVal(metadata.description())),
+					firstNonBlank(imageUrl(), stringVal(metadata.imageUrl())),
+					firstNonBlank(siteName(), stringVal(metadata.siteName())),
 					originalName,
 					storageKey,
 					mimeType,

@@ -1,12 +1,15 @@
 package com.aidigital.aionboarding.service.lessonactivity.support;
 
+import com.aidigital.aionboarding.domain.common.dictionary.entities.ActivityType;
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.domain.lessonactivity.entities.LessonActivity;
 import com.aidigital.aionboarding.domain.lessonactivity.entities.UserLessonActivityAttempt;
 import com.aidigital.aionboarding.domain.lessonactivity.entities.UserLessonActivityProgress;
 import com.aidigital.aionboarding.domain.learning.entities.UserLesson;
+import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.learning.models.LessonEnrollmentRecord;
 import com.aidigital.aionboarding.service.lessonactivity.enums.QuizQuestionType;
+import com.aidigital.aionboarding.service.lessonactivity.enums.QuizQuestionTypeResolver;
 import com.aidigital.aionboarding.service.lessongen.model.LessonGenPrompt;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityAttemptRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityProgressRecord;
@@ -15,6 +18,7 @@ import com.aidigital.aionboarding.service.lessonactivity.models.ActivityPromptRe
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonWithActivitiesRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.QuizAnswerResultRecord;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.math.RoundingMode;
@@ -24,7 +28,45 @@ import java.util.List;
 import java.util.Map;
 
 @Component
+@RequiredArgsConstructor
 public class LessonActivityRecordAssembler {
+
+    private final QuizQuestionTypeResolver quizQuestionTypeResolver;
+    private final CurrentTime currentTime;
+
+    /**
+     * Builds a new, unsaved {@link LessonActivity} from a freshly generated activity payload,
+     * stamping its created-at timestamp to now.
+     *
+     * @param lesson              the lesson the activity belongs to
+     * @param type                the activity type
+     * @param title               activity title extracted from the generated payload
+     * @param itemCount           number of quiz questions or flashcards in the payload
+     * @param payload             the activity's JSONB payload
+     * @param generationMetadata  AI generation metadata for the payload
+     * @param createdByName       display name of the manager who generated the activity
+     * @return the constructed (not yet persisted) activity
+     */
+    public LessonActivity buildNewActivity(
+        Lesson lesson,
+        ActivityType type,
+        String title,
+        int itemCount,
+        Map<String, Object> payload,
+        Map<String, Object> generationMetadata,
+        String createdByName
+    ) {
+        LessonActivity activity = new LessonActivity();
+        activity.setLesson(lesson);
+        activity.setType(type);
+        activity.setTitle(title);
+        activity.setItemCount(itemCount);
+        activity.setPayload(payload);
+        activity.setGenerationMetadata(generationMetadata);
+        activity.setCreatedBy(createdByName);
+        activity.setCreatedAt(currentTime.utcDateTime());
+        return activity;
+    }
 
     public LessonActivityRecord toActivityRecord(LessonActivity activity, UserLessonActivityProgress progress) {
         return new LessonActivityRecord(
@@ -155,7 +197,7 @@ public class LessonActivityRecordAssembler {
 
     public QuizAnswerResultRecord toQuizAnswerResult(Map<String, Object> result) {
         return new QuizAnswerResultRecord(
-            QuizQuestionType.fromValue(stringVal(result.get("type"))).value(),
+            quizQuestionTypeResolver.resolve(stringVal(result.get("type"))).value(),
             stringVal(result.get("question")),
             stringList(result.get("options")),
             stringList(result.get("selectedAnswers")),

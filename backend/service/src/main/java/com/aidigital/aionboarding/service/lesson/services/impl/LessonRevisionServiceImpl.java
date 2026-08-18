@@ -5,8 +5,8 @@ import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
-import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.lesson.models.LessonDetailRecord;
+import com.aidigital.aionboarding.service.lesson.models.LessonGenerationMetadata;
 import com.aidigital.aionboarding.service.lesson.models.ReviseLessonInput;
 import com.aidigital.aionboarding.service.lesson.models.RevisionBriefRecord;
 import com.aidigital.aionboarding.service.lesson.models.RevisionHistoryEntryRecord;
@@ -44,7 +44,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class LessonRevisionServiceImpl implements LessonRevisionService {
 
-    private final CurrentTime currentTime;
     private final LessonEntityService lessonEntityService;
     private final PermissionService permissionService;
     private final MaterialPreparationService materialPreparationService;
@@ -106,8 +105,7 @@ public class LessonRevisionServiceImpl implements LessonRevisionService {
         RevisionProviderMetadataRecord writerProviderMetadata =
             lessonRevisionMetadataMapper.buildProviderMetadata(writerGenResult.metadata());
 
-		RevisionHistoryEntryRecord revisionEntry = new RevisionHistoryEntryRecord(
-				currentTime.utcDateTime().toString(),
+		RevisionHistoryEntryRecord revisionEntry = lessonRevisionMetadataMapper.buildRevisionEntry(
 				validated.revisionRequest(),
 				validated.selectedOptions(),
 				revisionBrief,
@@ -160,6 +158,6 @@ public class LessonRevisionServiceImpl implements LessonRevisionService {
     Lesson applyRevisionAndSave(Lesson lesson, String revisedContent, RevisionHistoryEntryRecord revisionEntry) {
         lessonRevisionMetadataMapper.applyRevisedContent(lesson, revisedContent);
         Map<String, Object> updatedMetadata = lessonRevisionMetadataMapper.mergeRevisionEntry(lesson, revisionEntry);
-        return lessonEntityService.saveRevised(lesson, updatedMetadata);
+        return lessonEntityService.saveRevised(lesson, new LessonGenerationMetadata(updatedMetadata));
     }
 }

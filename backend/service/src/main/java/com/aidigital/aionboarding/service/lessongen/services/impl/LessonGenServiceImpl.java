@@ -124,8 +124,15 @@ public class LessonGenServiceImpl implements LessonGenService {
         return new GeneratedActivityResult(payload, metadata);
     }
 
-    @Override
-    public Map<String, Object> extractJsonPayload(String value) {
+    /**
+     * Delegates first-JSON-object extraction to the support bean. Not part of
+     * {@link LessonGenService}'s public contract — kept package-visible only for the test that
+     * pins the delegation itself.
+     *
+     * @param value raw model output that may contain JSON
+     * @return parsed JSON map, or {@code null} when no valid JSON object is found
+     */
+    Map<String, Object> extractJsonPayload(String value) {
         return lessonGenJsonSupport.extractJsonPayload(value);
     }
 

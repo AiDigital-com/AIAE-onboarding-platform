@@ -37,7 +37,7 @@ public class MaterialPreparationMapBuilder {
 		List<MaterialLink> links = materialLinkService.findByMaterialIdOrderBySortOrderAsc(material.getId());
 		List<MaterialYoutubeUrl> youtubeUrls =
 				materialYoutubeService.findByMaterialIdOrderBySortOrderAsc(material.getId());
-		List<MaterialFile> files = materialFileService.findByMaterialId(material.getId());
+		List<MaterialFile> files = materialFileService.findByMaterialIdsOrderByCreatedAtAsc(List.of(material.getId()));
 
 		List<Map<String, Object>> linkAssets = links.stream().map(this::toLinkAsset).toList();
 		List<String> linkUrlList = links.stream().map(MaterialLink::getUrl).distinct().toList();

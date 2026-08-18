@@ -116,7 +116,7 @@ public class MaterialRecordQueryServiceImpl implements MaterialRecordQueryServic
 				material,
 				materialYoutubeService.findByMaterialIdOrderBySortOrderAsc(material.getId()),
 				materialLinkService.findByMaterialIdOrderBySortOrderAsc(material.getId()),
-				materialFileService.findByMaterialIdOrderByCreatedAtAsc(material.getId()),
+				materialFileService.findByMaterialIdsOrderByCreatedAtAsc(List.of(material.getId())),
 				usageCount
 		);
 	}

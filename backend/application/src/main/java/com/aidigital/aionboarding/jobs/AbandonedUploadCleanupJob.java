@@ -9,6 +9,10 @@ import org.springframework.stereotype.Component;
  * Periodically sweeps presigned uploads that were issued but never registered onto a
  * lesson/material entity, deleting their storage objects and tracking rows so an abandoned
  * upload does not sit in the bucket indefinitely.
+ * <p>
+ * {@link StorageService#cleanupAbandonedUploads()} claims its batch with
+ * {@code FOR UPDATE SKIP LOCKED} so two nodes running this job at the same time claim and
+ * delete disjoint rows instead of both sweeping the same batch.
  */
 @Component
 @RequiredArgsConstructor

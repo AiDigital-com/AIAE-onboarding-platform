@@ -1,5 +1,7 @@
 # AI Onboarding Platform
 
+## What this is
+
 An internal platform for onboarding and continuous learning. Admins and team
 leads build **roadmaps**, **lessons**, and **materials**, then assign them to
 **teams/groups**; employees work through the content and their **progress** is
@@ -32,9 +34,15 @@ Logbook structured logging.
 client generated from the OpenAPI spec via `openapi-fetch`, Tiptap editor, plain
 CSS with BEM.
 
+## API
+
+- **OpenAPI YAML** (source of truth): [`backend/application/src/main/resources/api/v1/specs/openapi.yaml`](./backend/application/src/main/resources/api/v1/specs/openapi.yaml) — served at runtime from `/api/v1/specs/openapi.yaml`.
+- **Swagger UI**: `/swagger-ui/index.html` on a running backend (`springdoc.swagger-ui.url` points at the OpenAPI YAML above).
+- The frontend's typed client (`frontend/src/shared/api`) is generated from the same OpenAPI YAML via `npm run generate:api`; run it before typecheck/build so calls stay aligned with the contract.
+
 ## Layout
 
-- `backend/` — multi-module Maven backend (`domain`, `db`, `service`, `application`, `external-services`, `event-logging-to-db-feature`).
+- `backend/` — multi-module Maven backend (`domain`, `migrations`, `event-logging-to-db-feature`, `service`, `application`, `external-services`).
 - `frontend/` — Vite React app; the API client is generated from `backend/application/src/main/resources/api/v1/specs/openapi.yaml`.
 - `scripts/` — local and Replit build/run/dev wrappers.
 
@@ -47,7 +55,7 @@ JWT validation, and paid external integrations disabled by default.
 cp .env.local.example .env.local
 # set CLERK_PUBLISHABLE_KEY and VITE_CLERK_PUBLISHABLE_KEY in .env.local
 
-docker compose --env-file .env.local -f docker-compose.yaml up -d postgres
+docker compose --env-file .env.local -f docker-compose.yml up -d postgres
 bash scripts/local-dev-backend.sh    # backend on :5000, Liquibase applies the schema
 bash scripts/local-dev-frontend.sh   # Vite on :5173
 bash scripts/local-verify.sh         # build + test gates
@@ -60,11 +68,11 @@ only when a workflow needs the real integration.
 Stop the database without deleting data:
 
 ```bash
-docker compose --env-file .env.local -f docker-compose.yaml stop postgres
+docker compose --env-file .env.local -f docker-compose.yml stop postgres
 ```
 
 Reset the database and volume for a clean migration run:
 
 ```bash
-docker compose --env-file .env.local -f docker-compose.yaml down -v
+docker compose --env-file .env.local -f docker-compose.yml down -v
 ```

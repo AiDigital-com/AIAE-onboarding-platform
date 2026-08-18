@@ -1,0 +1,33 @@
+# Line endings.
+#
+# Default: normalise to LF in the repository and the working tree. `core.autocrlf`
+# is true on at least one machine here, and `scripts/*.sh` fail on Linux with
+# "bad interpreter" under CRLF. The AIAE harness adds 22 runtime scripts and 28
+# checkers to that directory in P2, so this matters beyond cosmetics.
+* text=auto eol=lf
+
+# Exception: `.claude/**` is a managed fixture tree, not our source.
+#
+# Every file in it is checksummed in `.claude/.aiae-fixtures-manifest`, and
+# `install-managed-claude-fixtures.py:141` aborts the whole install with
+# "managed fixture was edited locally; refusing overwrite" on any hash mismatch.
+# There is no override flag.
+#
+# The manifest is *mixed*: files copied verbatim from the standard carry that
+# checkout's CRLF, while files the installer rewrites through
+# `rewrite-installed-documentation-paths.py` come out LF. No single line-ending
+# policy can satisfy it — so git must not apply one. `-text` stores and restores
+# these bytes exactly as the installer wrote them.
+#
+# Do not "tidy" this exemption. Normalising `.claude/**` in either direction
+# breaks the manifest and blocks `install-claude-fixtures.sh` permanently,
+# which P1 step 1 depends on.
+.claude/** -text
+
+# The same applies to the four root-level files the installer also owns and
+# checksums (`managed_root_files` in install-managed-claude-fixtures.py:22).
+# They are listed in the manifest exactly like everything under .claude/.
+CLAUDE.md -text
+AI-DEVELOPMENT-GUIDE.md -text
+GDS-WORKFLOW-README.md -text
+agent-payload.skills -text

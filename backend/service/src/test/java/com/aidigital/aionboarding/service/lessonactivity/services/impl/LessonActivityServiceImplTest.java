@@ -6,14 +6,13 @@ import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
-import com.aidigital.aionboarding.service.learning.services.LearningService;
+import com.aidigital.aionboarding.service.learning.services.RoadmapEnrollmentSyncService;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityAttemptRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityAssemblyService;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityManagementService;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityProgressService;
 import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityAccessPolicy;
-import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityPayloadAssembler;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -39,7 +38,7 @@ class LessonActivityServiceImplTest {
 	@Mock
 	private PermissionService permissionService;
 	@Mock
-	private LearningService learningService;
+	private RoadmapEnrollmentSyncService roadmapEnrollmentSyncService;
 	@Mock
 	private LessonActivityAccessPolicy accessPolicy;
 	@Mock
@@ -48,8 +47,6 @@ class LessonActivityServiceImplTest {
 	private LessonActivityManagementService managementService;
 	@Mock
 	private LessonActivityAssemblyService assemblyService;
-	@Mock
-	private LessonActivityPayloadAssembler payloadAssembler;
 
 	@InjectMocks
 	private LessonActivityServiceImpl service;

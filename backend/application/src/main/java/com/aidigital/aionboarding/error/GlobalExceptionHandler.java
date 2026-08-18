@@ -2,16 +2,18 @@
 // Catches AppException + Spring validation/security exceptions and converts
 // them to the OpenAPI-generated ApiErrorV1 DTO. Controllers throw nothing
 // of their own; services throw AppException with ErrorReason.
+//
+// Response-body construction (timestamp, correlation id, DTO mapping) lives in
+// GlobalExceptionResponseHelper so this class stays limited to status mapping.
 
 package com.aidigital.aionboarding.error;
 
 import com.aidigital.aionboarding.api.v1.model.ApiErrorV1;
-import com.aidigital.aionboarding.api.v1.model.ValidationParameterV1;
+import com.aidigital.aionboarding.error.mapper.GlobalExceptionResponseHelper;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.error.ValidationMessage;
 import com.aidigital.aionboarding.service.common.error.ValidationParameter;
-import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -19,7 +21,6 @@ import lombok.RequiredArgsConstructor;
 import org.hibernate.LazyInitializationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -31,9 +32,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.HandlerMapping;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
 /**
  * Converts service and framework exceptions into the committed OpenAPI error shape.
  */
@@ -42,11 +40,6 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
 	private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
-
-	/**
-	 * MDC key for the per-request correlation id (set by a request filter).
-	 */
-	private static final String MDC_CORRELATION_ID = "correlationId";
 
 	/**
 	 * Error-code prefixes that map to specific HTTP statuses.
@@ -68,7 +61,7 @@ public class GlobalExceptionHandler {
 	 */
 	private static final String LAZY_INIT_METRIC = "app.errors.lazy_initialization";
 
-	private final CurrentTime currentTime;
+	private final GlobalExceptionResponseHelper responseHelper;
 	private final MeterRegistry meterRegistry;
 
 	/**
@@ -85,7 +78,7 @@ public class GlobalExceptionHandler {
 		} else {
 			LOG.warn("AppException {}: {}", ex.getCode(), ex.getMessage());
 		}
-		return ResponseEntity.status(status).body(toDto(ex.getValidationMessage()));
+		return responseHelper.buildApiError(ex.getValidationMessage(), status);
 	}
 
 	/**
@@ -100,9 +93,8 @@ public class GlobalExceptionHandler {
 	})
 	public ResponseEntity<ApiErrorV1> handleValidation(Exception ex) {
 		LOG.warn("Validation failed: {}", ex.getMessage());
-		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-				toDto(new ValidationMessage(ErrorReason.C002,
-						new ValidationParameter("detail", ex.getMessage()))));
+		return responseHelper.buildApiError(new ValidationMessage(ErrorReason.C002,
+				new ValidationParameter("detail", ex.getMessage())), HttpStatus.BAD_REQUEST);
 	}
 
 	/**
@@ -113,8 +105,7 @@ public class GlobalExceptionHandler {
 	 */
 	@ExceptionHandler(AuthenticationException.class)
 	public ResponseEntity<ApiErrorV1> handleAuth(AuthenticationException ex) {
-		return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
-				toDto(new ValidationMessage(ErrorReason.C005)));
+		return responseHelper.buildApiError(new ValidationMessage(ErrorReason.C005), HttpStatus.UNAUTHORIZED);
 	}
 
 	/**
@@ -125,9 +116,8 @@ public class GlobalExceptionHandler {
 	 */
 	@ExceptionHandler(AccessDeniedException.class)
 	public ResponseEntity<ApiErrorV1> handleAccessDenied(AccessDeniedException ex) {
-		return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
-				toDto(new ValidationMessage(ErrorReason.C004,
-						new ValidationParameter("detail", ex.getMessage()))));
+		return responseHelper.buildApiError(new ValidationMessage(ErrorReason.C004,
+				new ValidationParameter("detail", ex.getMessage())), HttpStatus.FORBIDDEN);
 	}
 
 	/**
@@ -150,9 +140,8 @@ public class GlobalExceptionHandler {
 		String route = resolveRouteTemplate(request);
 		LOG.error("LazyInitializationException on {}: {}", route, ex.getMessage(), ex);
 		meterRegistry.counter(LAZY_INIT_METRIC, "uri", route).increment();
-		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-				toDto(new ValidationMessage(ErrorReason.C000,
-						new ValidationParameter("class", ex.getClass().getSimpleName()))));
+		return responseHelper.buildApiError(new ValidationMessage(ErrorReason.C000,
+				new ValidationParameter("class", ex.getClass().getSimpleName())), HttpStatus.INTERNAL_SERVER_ERROR);
 	}
 
 	/**
@@ -175,10 +164,9 @@ public class GlobalExceptionHandler {
 		} else {
 			LOG.warn("Concurrency failure ({}): {}", ex.getClass().getSimpleName(), ex.getMessage());
 		}
-		return ResponseEntity.status(HttpStatus.CONFLICT).body(
-				toDto(new ValidationMessage(ErrorReason.C006,
-						new ValidationParameter("detail", "This item was changed by someone else. Reload and try again" +
-								"."))));
+		return responseHelper.buildApiError(new ValidationMessage(ErrorReason.C006,
+				new ValidationParameter("detail", "This item was changed by someone else. Reload and try again.")),
+				HttpStatus.CONFLICT);
 	}
 
 	/**
@@ -190,9 +178,8 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<ApiErrorV1> handleUnknown(Exception ex) {
 		LOG.error("Unhandled exception", ex);
-		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-				toDto(new ValidationMessage(ErrorReason.C000,
-						new ValidationParameter("class", ex.getClass().getSimpleName()))));
+		return responseHelper.buildApiError(new ValidationMessage(ErrorReason.C000,
+				new ValidationParameter("class", ex.getClass().getSimpleName())), HttpStatus.INTERNAL_SERVER_ERROR);
 	}
 
 	// ----- helpers -----
@@ -245,31 +232,5 @@ public class GlobalExceptionHandler {
 		}
 		// All other "Cxxx" codes and any domain-specific code → 400.
 		return HttpStatus.BAD_REQUEST;
-	}
-
-	/**
-	 * Builds the ApiErrorV1 wire payload from an internal {@link ValidationMessage}.
-	 * Timestamp is recorded in UTC as a {@code LocalDateTime} to match the
-	 * project-wide time convention (see backend SKILL "Time types").
-	 *
-	 * @param msg internal validation message
-	 * @return OpenAPI error response DTO
-	 */
-	ApiErrorV1 toDto(ValidationMessage msg) {
-		ApiErrorV1 dto = new ApiErrorV1();
-		dto.setCode(msg.getCode());
-		dto.setMessage(msg.getMessage());
-		dto.setTimestamp(currentTime.utcDateTime());
-		dto.setCorrelationId(MDC.get(MDC_CORRELATION_ID));
-		List<ValidationParameterV1> params = msg.getParameters().stream()
-				.map(p -> {
-					ValidationParameterV1 v = new ValidationParameterV1();
-					v.setCode(p.getCode());
-					v.setValue(p.getValue());
-					return v;
-				})
-				.collect(Collectors.toList());
-		dto.setParameters(params);
-		return dto;
 	}
 }

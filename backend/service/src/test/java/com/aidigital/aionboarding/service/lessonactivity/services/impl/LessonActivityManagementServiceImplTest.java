@@ -5,7 +5,6 @@ import com.aidigital.aionboarding.domain.common.dictionary.entities.ActivityType
 import com.aidigital.aionboarding.domain.common.dictionary.entities.LessonStatus;
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.service.common.security.AppUser;
-import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityPromptRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.GenerateActivityResultRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
@@ -23,7 +22,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Map;
@@ -52,9 +50,6 @@ class LessonActivityManagementServiceImplTest {
 	private LessonActivityRecordAssembler lessonActivityMapper;
 	@Mock
 	private LessonActivityPersistenceHelper persistenceHelper;
-
-	@Spy
-	private CurrentTime currentTime = new CurrentTime();
 
 	@InjectMocks
 	private LessonActivityManagementServiceImpl service;
@@ -91,9 +86,14 @@ class LessonActivityManagementServiceImplTest {
 		when(payloadAssembler.stringVal(normalizedPayload.get("title"))).thenReturn("Quiz 1");
 		when(payloadAssembler.getActivityItemCount("QUIZ", normalizedPayload)).thenReturn(3);
 
+		com.aidigital.aionboarding.domain.lessonactivity.entities.LessonActivity builtActivity =
+				mock(com.aidigital.aionboarding.domain.lessonactivity.entities.LessonActivity.class);
+		when(lessonActivityMapper.buildNewActivity(
+				lesson, activityType, "Quiz 1", 3, normalizedPayload, generatedActivity.metadata(), viewer.name()))
+				.thenReturn(builtActivity);
 		com.aidigital.aionboarding.domain.lessonactivity.entities.LessonActivity savedActivity =
 				mock(com.aidigital.aionboarding.domain.lessonactivity.entities.LessonActivity.class);
-		when(persistenceHelper.save(any())).thenReturn(savedActivity);
+		when(persistenceHelper.save(builtActivity)).thenReturn(savedActivity);
 
 		LessonActivityRecord activityRecord = mock(LessonActivityRecord.class);
 		when(lessonActivityMapper.toActivityRecord(savedActivity, null)).thenReturn(activityRecord);
@@ -104,7 +104,7 @@ class LessonActivityManagementServiceImplTest {
 		GenerateActivityResultRecord result = service.generateActivity(viewer, lessonId, "QUIZ", 5);
 
 		// Verification
-		verify(persistenceHelper).save(any());
+		verify(persistenceHelper).save(builtActivity);
 		verify(lessonGenService).generateLessonActivityPayload(prompt);
 	}
 }

@@ -6,8 +6,8 @@
   module so *ServiceImpl classes can carry @LogUsage; `application` picks
   it up transitively through the service edge.
 
-  Database migrations live in the `db` module — NOT here. Migrations are
-  intentionally single-sourced: `backend/db/src/main/resources/db/changelog/`
+  Database migrations live in the `migrations` module — NOT here. Migrations are
+  intentionally single-sourced: `backend/migrations/src/main/resources/db/changelog/`
   is the ONE place Liquibase changelogs sit, regardless of which feature
   module owns the corresponding @Entity. Splitting changelogs across modules
   hides the table-creation contract from the migration owner and makes
@@ -38,7 +38,17 @@
 	<name>AIAE Onboarding Platform — event-logging-to-db-feature</name>
 
 	<!-- Self-contained, removable feature. Must NOT depend on any other internal
-		 module (domain/service/application). ID semantics live in this module. -->
+		 module (domain/service/application). ID semantics live in this module.
+
+		 The five spring-boot-starter-* aggregators below are POM-only — no
+		 classes of their own — so maven-dependency-plugin:analyze-only always
+		 reports them "unused declared" once the actual JPA/AOP/web/security
+		 types this module references directly are declared explicitly (below).
+		 They stay: they supply the autoconfiguration and Spring AOP proxying
+		 infrastructure this module's own Spring-context tests
+		 (UsageLoggingAspectTest, UsageLoggingConfigTest) boot against, none of
+		 which is representable as a direct class reference. See
+		 backend/DEPENDENCY-ANALYSIS.md. -->
 	<dependencies>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
@@ -79,11 +89,110 @@
 			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
 		</dependency>
 
+		<!-- Direct types used by UsageLoggingAspect / UsageEventEntity /
+			 UsageEventPersistenceService / UsageLoggingConfig / RoutingUsageEventSink,
+			 declared explicitly per maven-dependency-plugin:analyze-only. Versions
+			 come from the Spring Boot BOM (spring-boot-starter-parent), same as the
+			 starters above. -->
+		<dependency>
+			<groupId>jakarta.persistence</groupId>
+			<artifactId>jakarta.persistence-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.hibernate.orm</groupId>
+			<artifactId>hibernate-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.data</groupId>
+			<artifactId>spring-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-context</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-web</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-tx</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-beans</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-autoconfigure</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-oauth2-jose</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.aspectj</groupId>
+			<artifactId>aspectjweaver</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.tomcat.embed</groupId>
+			<artifactId>tomcat-embed-core</artifactId>
+		</dependency>
+
+		<!-- Test-only: JwtAuthenticationConverter is exercised only from
+			 UsageLoggingAspectTest, never from main sources. -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-oauth2-resource-server</artifactId>
+			<scope>test</scope>
+		</dependency>
+
 		<!-- Test: JUnit 5 + Mockito + AssertJ + Spring test context. Proves the
 			 aspect auto-intercepts every public *ServiceImpl method. -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-api</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.assertj</groupId>
+			<artifactId>assertj-core</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-test</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

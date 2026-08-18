@@ -7,7 +7,6 @@ import com.aidigital.aionboarding.domain.lessonactivity.entities.LessonActivity;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
-import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.lessonactivity.models.GenerateActivityResultRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.UpdateActivityInput;
@@ -43,7 +42,6 @@ public class LessonActivityManagementServiceImpl implements LessonActivityManage
 	private final LessonActivityPayloadAssembler payloadAssembler;
 	private final LessonActivityRecordAssembler lessonActivityMapper;
 	private final LessonActivityPersistenceHelper persistenceHelper;
-	private final CurrentTime currentTime;
 
 	@Override
 	public GenerateActivityResultRecord generateActivity(AppUser viewer, Long lessonId, String type, Integer count) {
@@ -70,15 +68,15 @@ public class LessonActivityManagementServiceImpl implements LessonActivityManage
 				activityRequest
 		);
 
-		LessonActivity activity = new LessonActivity();
-		activity.setLesson(lesson);
-		activity.setType(accessPolicy.requireActivityType(activityRequest.type()));
-		activity.setTitle(payloadAssembler.stringVal(payload.get("title")));
-		activity.setItemCount(payloadAssembler.getActivityItemCount(activityRequest.type(), payload));
-		activity.setPayload(payload);
-		activity.setGenerationMetadata(generatedActivity.metadata());
-		activity.setCreatedBy(viewer.name());
-		activity.setCreatedAt(currentTime.utcDateTime());
+		LessonActivity activity = lessonActivityMapper.buildNewActivity(
+				lesson,
+				accessPolicy.requireActivityType(activityRequest.type()),
+				payloadAssembler.stringVal(payload.get("title")),
+				payloadAssembler.getActivityItemCount(activityRequest.type(), payload),
+				payload,
+				generatedActivity.metadata(),
+				viewer.name()
+		);
 
 		return new GenerateActivityResultRecord(
 				lessonActivityMapper.toActivityRecord(persistenceHelper.save(activity), null),

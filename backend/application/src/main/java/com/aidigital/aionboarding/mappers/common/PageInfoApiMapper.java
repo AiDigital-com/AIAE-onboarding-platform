@@ -4,6 +4,7 @@ import com.aidigital.aionboarding.api.v1.model.CountResponseV1;
 import com.aidigital.aionboarding.api.v1.model.PageInfoV1;
 import com.aidigital.aionboarding.config.ApplicationMapperConfig;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.springframework.data.domain.Page;
 
 /**
@@ -19,16 +20,13 @@ public interface PageInfoApiMapper {
 	 * @param page the page whose metadata should be exposed
 	 * @return the equivalent {@link PageInfoV1} contract value
 	 */
-	default PageInfoV1 toPageInfoV1(Page<?> page) {
-		PageInfoV1 info = new PageInfoV1();
-		info.setPage(page.getNumber());
-		info.setSize(page.getSize());
-		info.setTotalElements(page.getTotalElements());
-		info.setTotalPages(page.getTotalPages());
-		info.setHasNext(page.hasNext());
-		info.setHasPrevious(page.hasPrevious());
-		return info;
-	}
+	@Mapping(target = "page", expression = "java(page.getNumber())")
+	@Mapping(target = "size", expression = "java(page.getSize())")
+	@Mapping(target = "totalElements", expression = "java(page.getTotalElements())")
+	@Mapping(target = "totalPages", expression = "java(page.getTotalPages())")
+	@Mapping(target = "hasNext", expression = "java(page.hasNext())")
+	@Mapping(target = "hasPrevious", expression = "java(page.hasPrevious())")
+	PageInfoV1 toPageInfoV1(Page<?> page);
 
 	/**
 	 * Builds a count-only response body from a total-elements count.
@@ -36,9 +34,6 @@ public interface PageInfoApiMapper {
 	 * @param totalElements the total number of items matching the filter
 	 * @return the equivalent {@link CountResponseV1} contract value
 	 */
-	default CountResponseV1 toCountResponseV1(long totalElements) {
-		CountResponseV1 response = new CountResponseV1();
-		response.setTotalElements(totalElements);
-		return response;
-	}
+	@Mapping(target = "totalElements", expression = "java(totalElements)")
+	CountResponseV1 toCountResponseV1(Long totalElements);
 }

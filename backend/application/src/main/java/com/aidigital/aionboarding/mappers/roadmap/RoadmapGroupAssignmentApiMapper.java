@@ -15,6 +15,8 @@ import com.aidigital.aionboarding.service.roadmap.models.RoadmapGroupAssignmentR
 import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 
 @Mapper(config = ApplicationMapperConfig.class, uses = { UserApiMapper.class, GradeApiMapper.class, LearningApiMapper.class })
 public interface RoadmapGroupAssignmentApiMapper {
@@ -25,10 +27,25 @@ public interface RoadmapGroupAssignmentApiMapper {
     @Mapping(target = "enrollments", source = "enrollments")
     RoadmapGroupAssignmentResponseV1 toRoadmapGroupAssignmentResponseV1(RoadmapGroupAssignmentResultRecord result);
 
+    /**
+     * Builds the group assignments list response. Declared over {@link Page} rather than
+     * {@link List} directly: MapStruct cannot generate a bean-mapping method whose sole
+     * parameter is a bare {@code java.util} iterable type.
+     *
+     * @param assignments the assignments, wrapped in a page
+     * @return the group assignments list response
+     */
+    @Mapping(target = "assignments", expression = "java(assignments.getContent().stream().map(this::toRoadmapGroupAssignmentV1).toList())")
+    RoadmapGroupAssignmentsListResponseV1 toRoadmapGroupAssignmentsListResponseV1(Page<RoadmapGroupAssignmentRecord> assignments);
+
+    /**
+     * Builds the group assignments list response from a plain list.
+     *
+     * @param assignments the assignments
+     * @return the group assignments list response
+     */
     default RoadmapGroupAssignmentsListResponseV1 toRoadmapGroupAssignmentsListResponseV1(List<RoadmapGroupAssignmentRecord> assignments) {
-        RoadmapGroupAssignmentsListResponseV1 response = new RoadmapGroupAssignmentsListResponseV1();
-        response.setAssignments(assignments.stream().map(this::toRoadmapGroupAssignmentV1).toList());
-        return response;
+        return toRoadmapGroupAssignmentsListResponseV1(new PageImpl<>(assignments));
     }
 
     RoadmapGroupAssignmentPreviewV1 toRoadmapGroupAssignmentPreviewV1(RoadmapGroupAssignmentPreviewRecord preview);

@@ -3,17 +3,18 @@ package com.aidigital.aionboarding.service.material.services.impl;
 import com.aidigital.aionboarding.domain.material.entities.Material;
 import com.aidigital.aionboarding.domain.material.entities.MaterialFile;
 import com.aidigital.aionboarding.domain.material.repositories.MaterialFileRepository;
+import com.aidigital.aionboarding.domain.material.repositories.MaterialFileSummaryProjection;
 import com.aidigital.aionboarding.service.common.dictionary.DictionaryLookupService;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.mapping.TextValueNormalizer;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.mappers.material.MaterialMapper;
 import com.aidigital.aionboarding.service.mappers.material.MaterialMapperImpl;
 import com.aidigital.aionboarding.service.material.models.MaterialAttachmentInput;
 import com.aidigital.aionboarding.service.material.models.MaterialOpenAiUploadInput;
 import com.aidigital.aionboarding.service.material.models.MaterialOpenAiUploadRecord;
-import com.aidigital.aionboarding.service.material.support.MaterialFileQuerySupport;
 import com.aidigital.aionboarding.service.storage.StorageService;
 import org.instancio.Instancio;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,12 +47,10 @@ class MaterialFileServiceImplTest {
 	private StorageService storageService;
 	@Spy
 	private MaterialMapper materialMapper = new MaterialMapperImpl();
-	@Mock
-	private MaterialFileQuerySupport materialFileQuerySupport;
 	@Spy
 	private TextValueNormalizer textValueNormalizer = new TextValueNormalizer();
 	@Spy
-	private CurrentTime currentTime = new CurrentTime();
+	private CurrentTime currentTime = new CurrentTimeImpl();
 
 	@InjectMocks
 	private MaterialFileServiceImpl service;
@@ -201,32 +201,111 @@ class MaterialFileServiceImplTest {
 	}
 
 	@Test
-	void findByMaterialIdShouldDelegateToQuerySupportTest() {
+	void collectStorageKeysShouldFilterBlankAndNullKeysTest() {
 		// Given:
-		Long materialId = 60L;
-		List<MaterialFile> expected = List.of(Instancio.create(MaterialFile.class));
-		when(materialFileQuerySupport.findByMaterialId(materialId)).thenReturn(expected);
+		MaterialFile withKey = Instancio.of(MaterialFile.class)
+				.set(field(MaterialFile::getStorageKey), "storage-key")
+				.create();
+		MaterialFile blankKey = Instancio.of(MaterialFile.class)
+				.set(field(MaterialFile::getStorageKey), " ")
+				.create();
+		when(materialFileRepository.findByMaterialId(80L)).thenReturn(List.of(withKey, blankKey));
 
 		// When:
-		List<MaterialFile> result = service.findByMaterialId(materialId);
+		List<String> result = service.collectStorageKeys(80L);
 
 		// Then:
-		assertThat(result).isSameAs(expected);
-		verify(materialFileQuerySupport).findByMaterialId(materialId);
+		assertThat(result).containsExactly("storage-key");
 	}
 
 	@Test
-	void findByMaterialIdOrderByCreatedAtAscShouldDelegateToQuerySupportTest() {
+	void findRemovedStorageKeysShouldReturnKeysNotKeptByAttachmentsTest() {
 		// Given:
-		Long materialId = 61L;
-		List<MaterialFile> expected = List.of(Instancio.create(MaterialFile.class));
-		when(materialFileQuerySupport.findByMaterialIdOrderByCreatedAtAsc(materialId)).thenReturn(expected);
+		List<String> existingStorageKeys = List.of("kept-key", "removed-key");
+		MaterialAttachmentInput attachment = Instancio.of(MaterialAttachmentInput.class)
+				.set(field(MaterialAttachmentInput::storageKey), "kept-key")
+				.create();
 
 		// When:
-		List<MaterialFile> result = service.findByMaterialIdOrderByCreatedAtAsc(materialId);
+		List<String> result = service.findRemovedStorageKeys(existingStorageKeys, List.of(attachment));
+
+		// Then:
+		assertThat(result).containsExactly("removed-key");
+	}
+
+	@Test
+	void findAttachmentsForMaterialsShouldReturnEmptyListForNullOrEmptyInputTest() {
+		// When-Then:
+		assertThat(service.findAttachmentsForMaterials(null)).isEmpty();
+		assertThat(service.findAttachmentsForMaterials(List.of())).isEmpty();
+	}
+
+	@Test
+	void findAttachmentsForMaterialsShouldMapFilesFromEachMaterialInOrderTest() {
+		// Given:
+		MaterialFile file = Instancio.create(MaterialFile.class);
+		when(materialFileRepository.findByMaterialIdOrderByCreatedAtAsc(70L)).thenReturn(List.of(file));
+		MaterialAttachmentInput expected = materialMapper.toAttachmentInput(file);
+
+		// When:
+		List<MaterialAttachmentInput> result = service.findAttachmentsForMaterials(Arrays.asList(70L, null));
+
+		// Then:
+		assertThat(result).containsExactly(expected);
+	}
+
+	@Test
+	void findByMaterialIdsOrderByCreatedAtAscShouldReturnEmptyListForNullOrEmptyInputTest() {
+		// When-Then:
+		assertThat(service.findByMaterialIdsOrderByCreatedAtAsc(null)).isEmpty();
+		assertThat(service.findByMaterialIdsOrderByCreatedAtAsc(List.of())).isEmpty();
+	}
+
+	@Test
+	void findByMaterialIdsOrderByCreatedAtAscShouldDelegateToRepositoryTest() {
+		// Given:
+		List<Long> materialIds = List.of(90L, 91L);
+		List<MaterialFile> expected = List.of(Instancio.create(MaterialFile.class));
+		when(materialFileRepository.findByMaterialIdInOrderByCreatedAtAsc(materialIds)).thenReturn(expected);
+
+		// When:
+		List<MaterialFile> result = service.findByMaterialIdsOrderByCreatedAtAsc(materialIds);
 
 		// Then:
 		assertThat(result).isSameAs(expected);
-		verify(materialFileQuerySupport).findByMaterialIdOrderByCreatedAtAsc(materialId);
+	}
+
+	@Test
+	void findSummariesByMaterialIdsShouldReturnEmptyListForNullOrEmptyInputTest() {
+		// When-Then:
+		assertThat(service.findSummariesByMaterialIds(null)).isEmpty();
+		assertThat(service.findSummariesByMaterialIds(List.of())).isEmpty();
+	}
+
+	@Test
+	void findSummariesByMaterialIdsShouldDelegateToRepositoryTest() {
+		// Given:
+		List<Long> materialIds = List.of(95L);
+		List<MaterialFileSummaryProjection> expected = List.of(
+				Instancio.create(MaterialFileSummaryProjection.class));
+		when(materialFileRepository.findSummariesByMaterialIdIn(materialIds)).thenReturn(expected);
+
+		// When:
+		List<MaterialFileSummaryProjection> result = service.findSummariesByMaterialIds(materialIds);
+
+		// Then:
+		assertThat(result).isSameAs(expected);
+	}
+
+	@Test
+	void existsByStorageKeyShouldDelegateToRepositoryTest() {
+		// Given:
+		when(materialFileRepository.existsByStorageKey("uploads/key")).thenReturn(true);
+
+		// When:
+		boolean result = service.existsByStorageKey("uploads/key");
+
+		// Then:
+		assertThat(result).isTrue();
 	}
 }

@@ -5,7 +5,6 @@ import com.aidigital.aionboarding.domain.group.entities.GroupLead;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
-import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.domain.group.entities.GroupMember;
 import com.aidigital.aionboarding.service.group.models.CreateGroupInput;
 import com.aidigital.aionboarding.service.group.models.GroupDetailRecord;
@@ -21,7 +20,6 @@ import com.aidigital.aionboarding.service.group.services.entity.GroupMemberEntit
 import com.aidigital.aionboarding.service.group.support.GroupAccessPolicy;
 import com.aidigital.aionboarding.service.group.support.GroupRecordAssembler;
 import com.aidigital.aionboarding.service.group.support.GroupSpecificationBuilder;
-import com.aidigital.aionboarding.service.mappers.user.UserRecordMapper;
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
@@ -35,7 +33,6 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -52,9 +49,7 @@ public class GroupServiceImpl implements GroupService {
     private final GroupAccessPolicy groupAccessPolicy;
     private final GroupSpecificationBuilder groupSpecificationBuilder;
     private final GroupRecordAssembler groupRecordAssembler;
-    private final UserRecordMapper userMapper;
     private final PermissionService permissionService;
-    private final CurrentTime currentTime;
 
     @Override
     @Transactional(readOnly = true)
@@ -134,12 +129,12 @@ public class GroupServiceImpl implements GroupService {
             Set<Long> excludeIds = groupLeadEntityService.findByGroupIdIn(List.of(groupId)).stream()
                 .map(lead -> lead.getId().getLeadUserId())
                 .collect(Collectors.toSet());
-            return userEntityService.findGroupLeadCandidates(excludeIds, search, pageable).map(userMapper::toRecord);
+            return userEntityService.findGroupLeadCandidates(excludeIds, search, pageable).map(groupRecordAssembler::toUserRecord);
         }
         Set<Long> excludeIds = groupMemberEntityService.findByGroupId(groupId).stream()
             .map(member -> member.getId().getMemberUserId())
             .collect(Collectors.toSet());
-        return userEntityService.findGroupMemberCandidates(excludeIds, search, pageable).map(userMapper::toRecord);
+        return userEntityService.findGroupMemberCandidates(excludeIds, search, pageable).map(groupRecordAssembler::toUserRecord);
     }
 
     @Override
@@ -152,14 +147,10 @@ public class GroupServiceImpl implements GroupService {
             throw new AppException(ErrorReason.C006, "A team with this name already exists.");
         }
 
-        Group group = new Group();
-        group.setName(name);
-        group.setNormalizedName(normalizedName);
-        group.setDescription(input.description() == null ? "" : input.description().trim());
-        group.setCreatedByUser(userEntityService.getReference(viewer.internalId()));
-        LocalDateTime now = currentTime.utcDateTime();
-        group.setCreatedAt(now);
-        group.setUpdatedAt(now);
+        Group group = groupRecordAssembler.buildNewGroup(
+            name, normalizedName,
+            input.description() == null ? "" : input.description().trim(),
+            userEntityService.getReference(viewer.internalId()));
         Group saved = groupEntityService.save(group);
 
         // A non-admin creator (team lead) sees and manages only groups they lead
@@ -167,7 +158,7 @@ public class GroupServiceImpl implements GroupService {
         // they just created is visible and manageable to them. Admins see every
         // group unrestricted, so they need no lead row.
         if (!viewer.isAdmin()) {
-            assignCreatorAsLead(saved, viewer, now);
+            assignCreatorAsLead(saved, viewer);
         }
         return groupRecordAssembler.toDetailRecord(saved);
     }
@@ -177,17 +168,10 @@ public class GroupServiceImpl implements GroupService {
      *
      * @param group the freshly persisted group
      * @param viewer the authenticated creator
-     * @param now the creation timestamp to stamp on the lead assignment
      */
-    void assignCreatorAsLead(Group group, AppUser viewer, LocalDateTime now) {
-        GroupLead groupLead = new GroupLead();
-        GroupLead.GroupLeadId id = new GroupLead.GroupLeadId();
-        id.setGroupId(group.getId());
-        id.setLeadUserId(viewer.internalId());
-        groupLead.setId(id);
-        groupLead.setGroup(group);
-        groupLead.setLeadUser(userEntityService.getReference(viewer.internalId()));
-        groupLead.setCreatedAt(now);
+    void assignCreatorAsLead(Group group, AppUser viewer) {
+        GroupLead groupLead = groupRecordAssembler.buildGroupLead(
+            group, viewer.internalId(), userEntityService.getReference(viewer.internalId()));
         groupLeadEntityService.save(groupLead);
     }
 
@@ -203,10 +187,8 @@ public class GroupServiceImpl implements GroupService {
             throw new AppException(ErrorReason.C006, "A team with this name already exists.");
         }
 
-        group.setName(name);
-        group.setNormalizedName(normalizedName);
-        group.setDescription(input.description() == null ? "" : input.description().trim());
-        group.setUpdatedAt(currentTime.utcDateTime());
+        groupRecordAssembler.applyUpdate(
+            group, name, normalizedName, input.description() == null ? "" : input.description().trim());
         Group saved = groupEntityService.save(group);
         return groupRecordAssembler.toDetailRecord(saved);
     }

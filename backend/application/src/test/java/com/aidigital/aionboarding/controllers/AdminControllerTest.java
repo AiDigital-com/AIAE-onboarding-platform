@@ -7,20 +7,25 @@ import com.aidigital.aionboarding.api.v1.model.TeamLeadAdminViewV1;
 import com.aidigital.aionboarding.api.v1.model.TeamLeadEmailRequestV1;
 import com.aidigital.aionboarding.api.v1.model.UserProfileV1;
 import com.aidigital.aionboarding.api.v1.model.UserRoleCodeV1;
+import com.aidigital.aionboarding.mappers.common.UserRoleCodeApiMapper;
+import com.aidigital.aionboarding.mappers.common.UserRoleCodeApiMapperImpl;
 import com.aidigital.aionboarding.mappers.team.TeamApiMapper;
 import com.aidigital.aionboarding.mappers.user.UserApiMapper;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.team.models.TeamRecord;
+import com.aidigital.aionboarding.service.team.services.TeamLeadPromotionService;
 import com.aidigital.aionboarding.service.team.services.TeamService;
 import com.aidigital.aionboarding.service.user.models.AdminUserStatsRecord;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
 import com.aidigital.aionboarding.service.user.services.UserService;
+import com.aidigital.aionboarding.support.PaginationSupport;
 import org.instancio.Instancio;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -42,7 +47,13 @@ class AdminControllerTest {
 	@Mock
 	private TeamService teamService;
 	@Mock
+	private TeamLeadPromotionService teamLeadPromotionService;
+	@Mock
 	private UserService userService;
+	@Spy
+	private PaginationSupport paginationSupport = new PaginationSupport();
+	@Spy
+	private UserRoleCodeApiMapper userRoleCodeApiMapper = new UserRoleCodeApiMapperImpl();
 	@Mock
 	private TeamApiMapper teamApiMapper;
 	@Mock
@@ -78,7 +89,7 @@ class AdminControllerTest {
 				.create();
 		UserRecord user = Instancio.create(UserRecord.class);
 		UserProfileV1 expectedBody = Instancio.create(UserProfileV1.class);
-		when(teamService.promoteTeamLeadByEmail("lead@example.com")).thenReturn(Optional.of(user));
+		when(teamLeadPromotionService.promoteTeamLeadByEmail("lead@example.com")).thenReturn(Optional.of(user));
 		when(userApiMapper.toUserProfileV1(user)).thenReturn(expectedBody);
 
 		// When:
@@ -94,7 +105,7 @@ class AdminControllerTest {
 		TeamLeadEmailRequestV1 request = Instancio.of(TeamLeadEmailRequestV1.class)
 				.set(field("email"), "missing@example.com")
 				.create();
-		when(teamService.promoteTeamLeadByEmail("missing@example.com")).thenReturn(Optional.empty());
+		when(teamLeadPromotionService.promoteTeamLeadByEmail("missing@example.com")).thenReturn(Optional.empty());
 
 		// When / Then:
 		assertThatThrownBy(() -> controller.promoteTeamLead(request))
@@ -110,7 +121,7 @@ class AdminControllerTest {
 				.create();
 		UserRecord user = Instancio.create(UserRecord.class);
 		UserProfileV1 expectedBody = Instancio.create(UserProfileV1.class);
-		when(teamService.demoteTeamLeadByEmail("lead@example.com")).thenReturn(Optional.of(user));
+		when(teamLeadPromotionService.demoteTeamLeadByEmail("lead@example.com")).thenReturn(Optional.of(user));
 		when(userApiMapper.toUserProfileV1(user)).thenReturn(expectedBody);
 
 		// When:
@@ -126,7 +137,7 @@ class AdminControllerTest {
 		TeamLeadEmailRequestV1 request = Instancio.of(TeamLeadEmailRequestV1.class)
 				.set(field("email"), "missing@example.com")
 				.create();
-		when(teamService.demoteTeamLeadByEmail("missing@example.com")).thenReturn(Optional.empty());
+		when(teamLeadPromotionService.demoteTeamLeadByEmail("missing@example.com")).thenReturn(Optional.empty());
 
 		// When / Then:
 		assertThatThrownBy(() -> controller.demoteTeamLead(request))

@@ -18,11 +18,13 @@ import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.lesson.enums.LessonCreationModeV1;
 import com.aidigital.aionboarding.service.lesson.models.CreateLessonInput;
+import com.aidigital.aionboarding.service.lesson.models.LessonGenerationMetadata;
 import com.aidigital.aionboarding.service.lesson.models.LessonListQuery;
 import com.aidigital.aionboarding.service.lesson.models.LessonSortField;
 import com.aidigital.aionboarding.service.lesson.models.LessonVisibilityFilter;
 import com.aidigital.aionboarding.service.lesson.services.entity.LessonEntityService;
 import com.aidigital.aionboarding.service.lesson.services.entity.LessonMaterialEntityService;
+import com.aidigital.aionboarding.service.lesson.support.LessonGenerationMetadataFactory;
 import com.aidigital.aionboarding.service.lesson.support.LessonHtmlSanitizer;
 import com.aidigital.aionboarding.service.lesson.support.LessonSpecificationBuilder;
 import com.aidigital.aionboarding.service.material.services.entity.MaterialEntityService;
@@ -75,6 +77,8 @@ class LessonEntityServiceTest {
 	@Mock
 	private LessonSpecificationBuilder lessonSpecificationBuilder;
 	@Mock
+	private LessonGenerationMetadataFactory lessonGenerationMetadataFactory;
+	@Mock
 	private LessonHtmlSanitizer lessonHtmlSanitizer;
 	@Mock
 	private CurrentTime currentTime;
@@ -87,6 +91,8 @@ class LessonEntityServiceTest {
 		lenient().when(currentTime.utcDateTime()).thenReturn(LocalDateTime.parse("2026-07-03T12:00:00"));
 		lenient().when(lessonHtmlSanitizer.sanitize(org.mockito.ArgumentMatchers.anyString()))
 				.thenAnswer(invocation -> invocation.getArgument(0));
+		lenient().when(lessonGenerationMetadataFactory.forCreation(any(), any(), any(), any()))
+				.thenReturn(LessonGenerationMetadata.EMPTY);
 	}
 
 	@Test
@@ -200,7 +206,7 @@ class LessonEntityServiceTest {
 		when(lessonStatusEntityService.getReferenceByCode("ready")).thenReturn(status("ready"));
 		when(lessonRepository.save(any(Lesson.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		Map<String, Object> meta = Map.of("provider", "openai");
+		LessonGenerationMetadata meta = new LessonGenerationMetadata(Map.of("provider", "openai"));
 
 		// When
 		Lesson result = lessonEntityService.markReady(lesson, "Final", "<h1>Final</h1>", "# Final", meta);
@@ -227,7 +233,7 @@ class LessonEntityServiceTest {
 
 		// When
 		Lesson result = lessonEntityService.markReady(lesson, "Final", "<h1>Final</h1><script>evil()</script>", "# " +
-				"Final", Map.of());
+				"Final", LessonGenerationMetadata.EMPTY);
 
 		// Then
 		assertThat(result.getContentHtml()).isEqualTo("<h1>Final</h1>");
@@ -243,7 +249,7 @@ class LessonEntityServiceTest {
 		when(lessonRepository.save(any(Lesson.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
 		// When
-		Lesson result = lessonEntityService.markFailed(lesson, "OpenAI timeout", Map.of());
+		Lesson result = lessonEntityService.markFailed(lesson, "OpenAI timeout", LessonGenerationMetadata.EMPTY);
 
 		// Then
 		assertThat(result.getStatus().getCode()).isEqualTo("failed");
@@ -410,6 +416,34 @@ class LessonEntityServiceTest {
 
 			// Then:
 			assertThat(result).containsExactly(1L);
+		}
+	}
+
+	@org.junit.jupiter.api.Nested
+	class ClaimForTeacherVideoRefresh {
+
+		@Test
+		void shouldReturnTrueWhenTheRepositoryUpdatedExactlyOneRowTest() {
+			// Given:
+			when(lessonRepository.claimForTeacherVideoRefresh(10L, 3L)).thenReturn(1);
+
+			// When:
+			boolean result = lessonEntityService.claimForTeacherVideoRefresh(10L, 3L);
+
+			// Then:
+			assertThat(result).isTrue();
+		}
+
+		@Test
+		void shouldReturnFalseWhenAnotherWriterAlreadyChangedTheVersionTest() {
+			// Given:
+			when(lessonRepository.claimForTeacherVideoRefresh(11L, 3L)).thenReturn(0);
+
+			// When:
+			boolean result = lessonEntityService.claimForTeacherVideoRefresh(11L, 3L);
+
+			// Then:
+			assertThat(result).isFalse();
 		}
 	}
 

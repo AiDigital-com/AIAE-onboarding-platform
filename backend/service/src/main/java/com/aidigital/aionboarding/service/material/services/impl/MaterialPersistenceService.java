@@ -147,7 +147,7 @@ public class MaterialPersistenceService {
 			@Override
 			public void afterCommit() {
 				try {
-					materialFileService.deleteStorageKeysQuietly(keysToDelete);
+					storageService.deleteObjectsQuietly(keysToDelete);
 				} catch (RuntimeException e) {
 					log.warn("Storage cleanup failed after material update (non-fatal): {}", e.getMessage());
 				}
@@ -158,5 +158,16 @@ public class MaterialPersistenceService {
 				material,
 				materialRecordQueryService.countLessonUsage(material.getId())
 		);
+	}
+
+	/**
+	 * Deletes storage objects for the given keys without failing the surrounding transaction.
+	 * Exposed so callers that already depend on this persistence boundary (e.g. material
+	 * delete) do not need their own {@code StorageService} injection for a one-line cleanup.
+	 *
+	 * @param storageKeys object storage keys to remove
+	 */
+	public void deleteStorageKeysQuietly(List<String> storageKeys) {
+		storageService.deleteObjectsQuietly(storageKeys);
 	}
 }

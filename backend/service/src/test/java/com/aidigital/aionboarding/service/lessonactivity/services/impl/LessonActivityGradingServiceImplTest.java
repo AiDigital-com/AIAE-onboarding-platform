@@ -1,6 +1,7 @@
 package com.aidigital.aionboarding.service.lessonactivity.services.impl;
 
 import com.aidigital.aionboarding.service.common.error.AppException;
+import com.aidigital.aionboarding.service.lessonactivity.enums.QuizQuestionTypeResolver;
 import com.aidigital.aionboarding.service.lessonactivity.models.QuizAnswerResultRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.QuizGradingResultRecord;
 import com.aidigital.aionboarding.service.lessonactivity.support.LessonActivityPayloadAssembler;
@@ -22,7 +23,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class LessonActivityGradingServiceImplTest {
 
 	@Spy
-	private LessonActivityPayloadAssembler payloadAssembler = new LessonActivityPayloadAssembler();
+	private LessonActivityPayloadAssembler payloadAssembler =
+			new LessonActivityPayloadAssembler(new QuizQuestionTypeResolver());
 
 	@InjectMocks
 	private LessonActivityGradingServiceImpl service;
@@ -63,7 +65,7 @@ class LessonActivityGradingServiceImplTest {
 			List<List<String>> submittedAnswers = List.of(List.of("Red"));
 
 			// When:
-			QuizGradingResultRecord result = service.gradeQuiz(payload, submittedAnswers);
+			QuizGradingResultRecord result = service.gradeQuiz(payloadAssembler.parseQuizItems(payload), submittedAnswers);
 
 			// Then:
 			assertThat(result.correctCount()).isZero();
@@ -77,7 +79,7 @@ class LessonActivityGradingServiceImplTest {
 			List<List<String>> submittedAnswers = List.of(List.of("Yellow", "Red", "Blue"));
 
 			// When:
-			QuizGradingResultRecord result = service.gradeQuiz(payload, submittedAnswers);
+			QuizGradingResultRecord result = service.gradeQuiz(payloadAssembler.parseQuizItems(payload), submittedAnswers);
 
 			// Then:
 			assertThat(result.correctCount()).isEqualTo(1);
@@ -91,7 +93,7 @@ class LessonActivityGradingServiceImplTest {
 			List<List<String>> submittedAnswers = List.of(List.of("Red", "Blue", "Yellow", "Green"));
 
 			// When:
-			QuizGradingResultRecord result = service.gradeQuiz(payload, submittedAnswers);
+			QuizGradingResultRecord result = service.gradeQuiz(payloadAssembler.parseQuizItems(payload), submittedAnswers);
 
 			// Then:
 			assertThat(result.correctCount()).isZero();
@@ -105,7 +107,7 @@ class LessonActivityGradingServiceImplTest {
 			List<List<String>> submittedAnswers = List.of(List.of("Red", "Blue"));
 
 			// When:
-			QuizGradingResultRecord result = service.gradeQuiz(payload, submittedAnswers);
+			QuizGradingResultRecord result = service.gradeQuiz(payloadAssembler.parseQuizItems(payload), submittedAnswers);
 
 			// Then:
 			QuizAnswerResultRecord item = result.results().get(0);
@@ -124,7 +126,7 @@ class LessonActivityGradingServiceImplTest {
 			List<List<String>> submittedAnswers = List.of(List.of("Paris"));
 
 			// When:
-			QuizGradingResultRecord result = service.gradeQuiz(payload, submittedAnswers);
+			QuizGradingResultRecord result = service.gradeQuiz(payloadAssembler.parseQuizItems(payload), submittedAnswers);
 
 			// Then:
 			assertThat(result.correctCount()).isEqualTo(1);
@@ -138,7 +140,7 @@ class LessonActivityGradingServiceImplTest {
 			List<List<String>> submittedAnswers = List.of(List.of("Berlin"));
 
 			// When:
-			QuizGradingResultRecord result = service.gradeQuiz(payload, submittedAnswers);
+			QuizGradingResultRecord result = service.gradeQuiz(payloadAssembler.parseQuizItems(payload), submittedAnswers);
 
 			// Then:
 			assertThat(result.correctCount()).isZero();
@@ -152,7 +154,7 @@ class LessonActivityGradingServiceImplTest {
 			List<List<String>> submittedAnswers = List.of(List.of("Paris"));
 
 			// When:
-			QuizGradingResultRecord result = service.gradeQuiz(payload, submittedAnswers);
+			QuizGradingResultRecord result = service.gradeQuiz(payloadAssembler.parseQuizItems(payload), submittedAnswers);
 
 			// Then:
 			assertThat(result.correctCount()).isEqualTo(1);
@@ -175,7 +177,7 @@ class LessonActivityGradingServiceImplTest {
 					List.of("Paris"), List.of("Paris"), List.of("Paris"), List.of("Paris"), List.of("Berlin"));
 
 			// When:
-			QuizGradingResultRecord result = service.gradeQuiz(payload, submittedAnswers);
+			QuizGradingResultRecord result = service.gradeQuiz(payloadAssembler.parseQuizItems(payload), submittedAnswers);
 
 			// Then:
 			assertThat(result.score()).isEqualTo(80);
@@ -192,7 +194,7 @@ class LessonActivityGradingServiceImplTest {
 			Map<String, Object> payload = activityPayload(invalidItem);
 
 			// When-Then:
-			assertThatThrownBy(() -> service.gradeQuiz(payload, List.of(List.of("A"))))
+			assertThatThrownBy(() -> service.gradeQuiz(payloadAssembler.parseQuizItems(payload), List.of(List.of("A"))))
 					.isInstanceOf(AppException.class);
 		}
 	}

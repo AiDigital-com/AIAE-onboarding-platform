@@ -8,20 +8,25 @@ import com.aidigital.aionboarding.api.v1.model.TeamsResponseV1;
 import com.aidigital.aionboarding.mappers.team.TeamApiMapper;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.security.AppUser;
-import com.aidigital.aionboarding.service.learning.services.LearningService;
+import com.aidigital.aionboarding.service.learning.services.RoadmapAssignmentService;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import com.aidigital.aionboarding.service.team.models.TeamRecord;
 import com.aidigital.aionboarding.service.team.services.TeamService;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
 import com.aidigital.aionboarding.support.ApiResponses;
+import com.aidigital.aionboarding.support.PaginationSupport;
+import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import org.instancio.Instancio;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 
 import java.util.Map;
@@ -31,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.instancio.Select.field;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -42,9 +48,11 @@ class TeamsControllerTest {
 	@Mock
 	private TeamService teamService;
 	@Mock
-	private LearningService learningService;
+	private RoadmapAssignmentService roadmapAssignmentService;
 	@Mock
 	private PermissionService permissionService;
+	@Spy
+	private PaginationSupport paginationSupport = new PaginationSupport();
 	@Mock
 	private TeamApiMapper teamApiMapper;
 	@Mock
@@ -59,10 +67,12 @@ class TeamsControllerTest {
 		AppUser viewer = viewer();
 		Page<TeamRecord> teams = mock(Page.class);
 		Page<UserRecord> candidates = mock(Page.class);
+		Pageable defaultPageable = PageRequest.of(0, 20, Sort.by(
+				Sort.Order.asc("name").ignoreCase(), Sort.Order.asc("email").ignoreCase()));
 		TeamsResponseV1 expectedBody = Instancio.create(TeamsResponseV1.class);
 		when(currentUser.requireUser()).thenReturn(viewer);
-		when(teamService.getTeams(eq(viewer), eq("t-query"), PageRequestMatchers.pageable(0, 20))).thenReturn(teams);
-		when(teamService.getTeamCandidateUsers(eq(viewer), eq("u-query"), PageRequestMatchers.pageable(0, 20))).thenReturn(candidates);
+		when(teamService.getTeams(eq(viewer), eq("t-query"), eq(defaultPageable))).thenReturn(teams);
+		when(teamService.getTeamCandidateUsers(eq(viewer), eq("u-query"), eq(defaultPageable))).thenReturn(candidates);
 		when(permissionService.getUserPermissionMap(eq(viewer))).thenReturn(Map.of("teams.manage_members", true));
 		when(teamApiMapper.toTeamsResponseV1(eq(teams), eq(candidates), eq(Map.of("teams.manage_members", true)))).thenReturn(expectedBody);
 
@@ -85,7 +95,6 @@ class TeamsControllerTest {
 		UserRecord user = Instancio.create(UserRecord.class);
 		AddTeamMemberResponseV1 expectedBody = Instancio.create(AddTeamMemberResponseV1.class);
 		when(currentUser.requireUser()).thenReturn(viewer);
-		when(permissionService.canManageTeam(viewer, 5L)).thenReturn(true);
 		when(teamService.getUserById(5L)).thenReturn(Optional.of(user));
 		when(teamService.addTeamMember(5L, 9L, null)).thenReturn(user);
 		when(teamApiMapper.toAddTeamMemberResponseV1(user)).thenReturn(expectedBody);
@@ -109,8 +118,8 @@ class TeamsControllerTest {
 		UserRecord user = Instancio.create(UserRecord.class);
 		AddTeamMemberResponseV1 expectedBody = Instancio.create(AddTeamMemberResponseV1.class);
 		when(currentUser.requireUser()).thenReturn(viewer);
-		when(permissionService.canManageTeam(viewer, 5L)).thenReturn(true);
 		when(teamService.getUserById(5L)).thenReturn(Optional.of(user));
+		when(teamApiMapper.resolveMemberRef(request)).thenReturn("member-ref");
 		when(teamService.addTeamMember(5L, null, "member-ref")).thenReturn(user);
 		when(teamApiMapper.toAddTeamMemberResponseV1(user)).thenReturn(expectedBody);
 
@@ -127,7 +136,7 @@ class TeamsControllerTest {
 		AppUser viewer = viewer();
 		AddTeamMemberRequestV1 request = Instancio.create(AddTeamMemberRequestV1.class);
 		when(currentUser.requireUser()).thenReturn(viewer);
-		when(permissionService.canManageTeam(viewer, 5L)).thenReturn(false);
+		doThrow(new AppException(ErrorReason.C004)).when(permissionService).requireCanManageTeam(viewer, 5L);
 
 		// When / Then:
 		assertThatThrownBy(() -> controller.addTeamMember(5L, request))
@@ -141,7 +150,6 @@ class TeamsControllerTest {
 		AppUser viewer = viewer();
 		AddTeamMemberRequestV1 request = Instancio.create(AddTeamMemberRequestV1.class);
 		when(currentUser.requireUser()).thenReturn(viewer);
-		when(permissionService.canManageTeam(viewer, 5L)).thenReturn(true);
 		when(teamService.getUserById(5L)).thenReturn(Optional.empty());
 
 		// When / Then:
@@ -159,7 +167,6 @@ class TeamsControllerTest {
 				.create();
 		OkResponseV1 expectedBody = Instancio.create(OkResponseV1.class);
 		when(currentUser.requireUser()).thenReturn(viewer);
-		when(permissionService.canManageTeam(viewer, 5L)).thenReturn(true);
 		when(apiResponses.ok()).thenReturn(expectedBody);
 
 		// When:
@@ -175,7 +182,6 @@ class TeamsControllerTest {
 		AppUser viewer = viewer();
 		OkResponseV1 expectedBody = Instancio.create(OkResponseV1.class);
 		when(currentUser.requireUser()).thenReturn(viewer);
-		when(permissionService.canManageTeam(viewer, 5L)).thenReturn(true);
 		when(apiResponses.ok()).thenReturn(expectedBody);
 
 		// When:
@@ -183,21 +189,6 @@ class TeamsControllerTest {
 
 		// Then:
 		assertThat(response.getBody()).isSameAs(expectedBody);
-	}
-
-	@Test
-	void shouldNormalizePageableBoundsTest() {
-		// When / Then:
-		Pageable first = controller.pageable(null, null);
-		assertThat(first.getPageNumber()).isEqualTo(0);
-		assertThat(first.getPageSize()).isEqualTo(20);
-
-		Pageable clamped = controller.pageable(-1, 500);
-		assertThat(clamped.getPageNumber()).isEqualTo(0);
-		assertThat(clamped.getPageSize()).isEqualTo(100);
-
-		Pageable minSize = controller.pageable(0, 0);
-		assertThat(minSize.getPageSize()).isEqualTo(1);
 	}
 
 	AppUser viewer() {
@@ -212,15 +203,5 @@ class TeamsControllerTest {
 				.set(field("avatarStorageKey"), null)
 				.set(field("avatarColor"), null)
 				.create();
-	}
-
-	static class PageRequestMatchers {
-
-		static Pageable pageable(int page, int size) {
-			return org.mockito.ArgumentMatchers.argThat(p ->
-					p.getPageNumber() == page && p.getPageSize() == size
-							&& p.getSort().getOrderFor("name") != null
-							&& p.getSort().getOrderFor("email") != null);
-		}
 	}
 }

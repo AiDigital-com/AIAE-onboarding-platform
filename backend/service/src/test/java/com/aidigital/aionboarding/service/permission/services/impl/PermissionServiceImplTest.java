@@ -8,13 +8,12 @@ import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.security.RequestAuthenticationCache;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
-import com.aidigital.aionboarding.service.group.services.entity.GroupLeadEntityService;
-import com.aidigital.aionboarding.service.group.services.entity.GroupMemberEntityService;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
 import com.aidigital.aionboarding.service.permission.models.PermissionSnapshotRecord;
+import com.aidigital.aionboarding.service.permission.services.TeamLeadershipService;
 import com.aidigital.aionboarding.service.permission.services.entity.PermissionEntityService;
 import com.aidigital.aionboarding.service.permission.support.PermissionDefaultsProvider;
-import com.aidigital.aionboarding.service.team.services.entity.TeamEntityService;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
 import com.aidigital.aionboarding.service.user.services.entity.UserEntityService;
 import org.instancio.Instancio;
@@ -31,7 +30,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -48,11 +46,7 @@ class PermissionServiceImplTest {
 	@Mock
 	private PermissionEntityService permissionEntityService;
 	@Mock
-	private TeamEntityService teamEntityService;
-	@Mock
-	private GroupLeadEntityService groupLeadEntityService;
-	@Mock
-	private GroupMemberEntityService groupMemberEntityService;
+	private TeamLeadershipService teamLeadershipService;
 	@Mock
 	private UserEntityService userEntityService;
 	@Mock
@@ -61,7 +55,7 @@ class PermissionServiceImplTest {
 	private RequestAuthenticationCache requestAuthenticationCache;
 
 	@Spy
-	private CurrentTime currentTime = new CurrentTime();
+	private CurrentTime currentTime = new CurrentTimeImpl();
 
 	@InjectMocks
 	private PermissionServiceImpl service;
@@ -133,7 +127,7 @@ class PermissionServiceImplTest {
 			Long targetUserId = 12L;
 			User target = userWithRole(targetUserId, UserRoleCode.MEMBER);
 			when(userEntityService.findByIdForUpdate(targetUserId)).thenReturn(Optional.of(target));
-			when(teamEntityService.existsByIdLeadUserIdAndIdMemberUserId(actor.internalId(), targetUserId))
+			when(teamLeadershipService.isTeamLeadForMember(actor.internalId(), targetUserId))
 					.thenReturn(true);
 			when(permissionDefaultsProvider.baseDefaults(UserRoleCode.MEMBER)).thenReturn(allFalseDefaults());
 			when(userEntityService.getReference(actor.internalId())).thenReturn(userWithRole(actor.internalId(),
@@ -160,9 +154,8 @@ class PermissionServiceImplTest {
 			Long targetUserId = 13L;
 			User target = userWithRole(targetUserId, UserRoleCode.MEMBER);
 			when(userEntityService.findByIdForUpdate(targetUserId)).thenReturn(Optional.of(target));
-			when(teamEntityService.existsByIdLeadUserIdAndIdMemberUserId(actor.internalId(), targetUserId))
+			when(teamLeadershipService.isTeamLeadForMember(actor.internalId(), targetUserId))
 					.thenReturn(false);
-			when(groupLeadEntityService.findGroupIdsByLeadUserId(actor.internalId())).thenReturn(Set.of());
 
 			// When-Then:
 			assertThatThrownBy(() -> service.setOverrides(actor, targetUserId, Map.of()))
@@ -205,7 +198,7 @@ class PermissionServiceImplTest {
 			Long targetUserId = 15L;
 			User target = userWithRole(targetUserId, UserRoleCode.MEMBER);
 			when(userEntityService.findByIdForUpdate(targetUserId)).thenReturn(Optional.of(target));
-			when(teamEntityService.existsByIdLeadUserIdAndIdMemberUserId(actor.internalId(), targetUserId))
+			when(teamLeadershipService.isTeamLeadForMember(actor.internalId(), targetUserId))
 					.thenReturn(true);
 			when(permissionDefaultsProvider.baseDefaults(UserRoleCode.MEMBER)).thenReturn(allFalseDefaults());
 			when(userEntityService.getReference(actor.internalId())).thenReturn(userWithRole(actor.internalId(),
@@ -289,72 +282,6 @@ class PermissionServiceImplTest {
 
 			// Then:
 			verify(permissionEntityService).deleteByIdUserId(userId);
-		}
-	}
-
-	@Nested
-	class IsTeamLeadForMember {
-
-		@Test
-		void isTeamLeadForMemberShouldReturnTrueViaLegacyTeamMembershipTest() {
-			// Given:
-			Long leadUserId = 40L;
-			Long memberUserId = 41L;
-			when(teamEntityService.existsByIdLeadUserIdAndIdMemberUserId(leadUserId, memberUserId)).thenReturn(true);
-
-			// When:
-			boolean result = service.isTeamLeadForMember(leadUserId, memberUserId);
-
-			// Then:
-			assertThat(result).isTrue();
-		}
-
-		@Test
-		void isTeamLeadForMemberShouldReturnTrueWhenMemberBelongsToALedGroupTest() {
-			// Given:
-			Long leadUserId = 42L;
-			Long memberUserId = 43L;
-			when(teamEntityService.existsByIdLeadUserIdAndIdMemberUserId(leadUserId, memberUserId)).thenReturn(false);
-			when(groupLeadEntityService.findGroupIdsByLeadUserId(leadUserId)).thenReturn(Set.of(100L, 200L));
-			when(groupMemberEntityService.findGroupIdsByMemberUserId(memberUserId)).thenReturn(Set.of(200L, 300L));
-
-			// When:
-			boolean result = service.isTeamLeadForMember(leadUserId, memberUserId);
-
-			// Then:
-			assertThat(result).isTrue();
-		}
-
-		@Test
-		void isTeamLeadForMemberShouldReturnFalseWhenLeadHasNoLedGroupsTest() {
-			// Given:
-			Long leadUserId = 44L;
-			Long memberUserId = 45L;
-			when(teamEntityService.existsByIdLeadUserIdAndIdMemberUserId(leadUserId, memberUserId)).thenReturn(false);
-			when(groupLeadEntityService.findGroupIdsByLeadUserId(leadUserId)).thenReturn(Set.of());
-
-			// When:
-			boolean result = service.isTeamLeadForMember(leadUserId, memberUserId);
-
-			// Then:
-			assertThat(result).isFalse();
-			verify(groupMemberEntityService, never()).findGroupIdsByMemberUserId(memberUserId);
-		}
-
-		@Test
-		void isTeamLeadForMemberShouldReturnFalseWhenMemberIsNotInAnyLedGroupTest() {
-			// Given:
-			Long leadUserId = 46L;
-			Long memberUserId = 47L;
-			when(teamEntityService.existsByIdLeadUserIdAndIdMemberUserId(leadUserId, memberUserId)).thenReturn(false);
-			when(groupLeadEntityService.findGroupIdsByLeadUserId(leadUserId)).thenReturn(Set.of(100L));
-			when(groupMemberEntityService.findGroupIdsByMemberUserId(memberUserId)).thenReturn(Set.of(200L));
-
-			// When:
-			boolean result = service.isTeamLeadForMember(leadUserId, memberUserId);
-
-			// Then:
-			assertThat(result).isFalse();
 		}
 	}
 

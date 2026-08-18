@@ -1,6 +1,7 @@
 package com.aidigital.aionboarding.service.lesson.support;
 
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
+import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.lesson.models.LessonRevisionPromptRecord;
 import com.aidigital.aionboarding.service.lesson.models.RevisionBriefRecord;
 import com.aidigital.aionboarding.service.lesson.models.RevisionHistoryEntryRecord;
@@ -25,6 +26,7 @@ public class LessonRevisionMetadataMapper {
     private final LessonRecordAssembler lessonRecordAssembler;
     private final LessonContentUtil lessonContentUtil;
     private final LessonHtmlSanitizer lessonHtmlSanitizer;
+    private final CurrentTime currentTime;
 
     /**
      * Converts a typed revision prompt record into a JSONB-ready map.
@@ -147,6 +149,39 @@ public class LessonRevisionMetadataMapper {
             normalizeStringList(briefMap.get("editInstructions")),
             normalizeStringList(briefMap.get("preserveRules")),
             normalizeStringList(briefMap.get("riskNotes"))
+        );
+    }
+
+    /**
+     * Builds a revision history entry stamped with the current time.
+     *
+     * @param revisionRequest        the free-text revision request
+     * @param selectedOptions        the selected revision option codes
+     * @param revisionBrief          the planner's revision brief
+     * @param plannerPrompt          the prompt sent to the planner AI step
+     * @param writerPrompt           the prompt sent to the writer AI step
+     * @param plannerProviderMetadata provider metadata returned by the planner AI step
+     * @param writerProviderMetadata  provider metadata returned by the writer AI step
+     * @return the assembled revision history entry, timestamped to now
+     */
+    public RevisionHistoryEntryRecord buildRevisionEntry(
+        String revisionRequest,
+        List<String> selectedOptions,
+        RevisionBriefRecord revisionBrief,
+        LessonRevisionPromptRecord plannerPrompt,
+        LessonRevisionPromptRecord writerPrompt,
+        RevisionProviderMetadataRecord plannerProviderMetadata,
+        RevisionProviderMetadataRecord writerProviderMetadata
+    ) {
+        return new RevisionHistoryEntryRecord(
+            currentTime.utcDateTime().toString(),
+            revisionRequest,
+            selectedOptions,
+            revisionBrief,
+            plannerPrompt,
+            writerPrompt,
+            plannerProviderMetadata,
+            writerProviderMetadata
         );
     }
 

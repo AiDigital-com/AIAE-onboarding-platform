@@ -6,14 +6,13 @@ import com.aidigital.aionboarding.external.link.model.LinkFetchResult;
 import com.aidigital.aionboarding.service.common.observability.SecurityMetrics;
 import com.aidigital.aionboarding.service.common.observability.enums.SsrfBlockReason;
 import com.aidigital.aionboarding.service.lesson.util.LessonTextUtil;
+import com.aidigital.aionboarding.service.link.models.LinkMetadataRecord;
 import com.aidigital.aionboarding.service.link.services.LinkMetadataService;
 import com.aidigital.aionboarding.service.link.support.LinkHtmlParser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -31,7 +30,7 @@ public class LinkMetadataServiceImpl implements LinkMetadataService {
     private final LinkHtmlParser linkHtmlParser;
 
     @Override
-    public Map<String, Object> fetch(String url) {
+    public LinkMetadataRecord fetch(String url) {
         LinkFetchResult result = linkFetchClient.fetch(url);
         if (!result.success()) {
             if (result.securityBlockReason() != null) {
@@ -41,14 +40,14 @@ public class LinkMetadataServiceImpl implements LinkMetadataService {
         }
 
         String html = result.body();
-        Map<String, Object> parsed = new LinkedHashMap<>();
-        parsed.put("title", getTitle(html));
-        parsed.put("description", getMetaContent(html, "og:description", "description", "twitter:description"));
-        parsed.put("imageUrl", getMetaContent(html, "og:image", "twitter:image"));
-        parsed.put("siteName", getSiteName(html, url));
-        parsed.put("extractedText", extractMainText(html));
-        parsed.put("error", "");
-        return parsed;
+        return new LinkMetadataRecord(
+                getTitle(html),
+                getMetaContent(html, "og:description", "description", "twitter:description"),
+                getMetaContent(html, "og:image", "twitter:image"),
+                getSiteName(html, url),
+                extractMainText(html),
+                ""
+        );
     }
 
     /**
@@ -71,15 +70,8 @@ public class LinkMetadataServiceImpl implements LinkMetadataService {
         };
     }
 
-    Map<String, Object> errorResult(String error) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("title", "");
-        result.put("description", "");
-        result.put("imageUrl", "");
-        result.put("siteName", "");
-        result.put("extractedText", "");
-        result.put("error", error);
-        return result;
+    LinkMetadataRecord errorResult(String error) {
+        return new LinkMetadataRecord("", "", "", "", "", error);
     }
 
     String getTitle(String html) {

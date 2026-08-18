@@ -1,13 +1,19 @@
 package com.aidigital.aionboarding.service.lessonactivity.support;
 
 import com.aidigital.aionboarding.domain.common.dictionary.ActivityTypeCode;
+import com.aidigital.aionboarding.service.lessonactivity.enums.QuizQuestionTypeResolver;
+import com.aidigital.aionboarding.service.lessonactivity.models.QuizQuestionItemRecord;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class LessonActivityPayloadAssembler {
+
+    private final QuizQuestionTypeResolver quizQuestionTypeResolver;
 
     public int getActivityItemCount(String type, Map<String, Object> payload) {
         if (ActivityTypeCode.FLASHCARDS.equals(type)) {
@@ -73,5 +79,34 @@ public class LessonActivityPayloadAssembler {
             result.add(asStringList(item));
         }
         return result;
+    }
+
+    /**
+     * Parses a persisted quiz activity's raw JSONB payload into typed question items, isolating
+     * the {@code Map<String, Object>} boundary here so
+     * {@link com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityGradingService}
+     * never needs to see it.
+     *
+     * @param activityPayload persisted quiz activity payload containing an {@code items} array
+     * @return typed question items in stored order
+     */
+    public List<QuizQuestionItemRecord> parseQuizItems(Map<String, Object> activityPayload) {
+        List<Map<String, Object>> items = asMapList(activityPayload.get("items"));
+        List<QuizQuestionItemRecord> parsed = new ArrayList<>();
+        for (Map<String, Object> item : items) {
+            List<String> correctAnswers = asStringList(item.get("correctAnswers"));
+            String correctAnswer = stringVal(item.get("correctAnswer"));
+            if (correctAnswers.isEmpty() && !correctAnswer.isBlank()) {
+                correctAnswers = List.of(correctAnswer);
+            }
+            parsed.add(new QuizQuestionItemRecord(
+                    quizQuestionTypeResolver.resolve(stringVal(item.get("type"))).value(),
+                    stringVal(item.get("question")),
+                    asStringList(item.get("options")),
+                    correctAnswers,
+                    stringVal(item.get("explanation"))
+            ));
+        }
+        return parsed;
     }
 }

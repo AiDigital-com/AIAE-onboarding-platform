@@ -6,6 +6,7 @@ import com.aidigital.aionboarding.domain.user.repositories.UserRepository;
 import com.aidigital.aionboarding.service.common.mapping.TextValueNormalizer;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.mappers.material.MaterialMapper;
 import com.aidigital.aionboarding.service.mappers.material.MaterialMapperImpl;
 import com.aidigital.aionboarding.service.material.models.MaterialRecord;
@@ -61,7 +62,7 @@ class MaterialPersistenceServiceTest {
 	private MaterialMapper materialMapper = new MaterialMapperImpl();
 
 	@Spy
-	private CurrentTime currentTime = new CurrentTime();
+	private CurrentTime currentTime = new CurrentTimeImpl();
 
 	@InjectMocks
 	private MaterialPersistenceService service;
@@ -105,7 +106,7 @@ class MaterialPersistenceServiceTest {
 			);
 
 			syncCaptor.getValue().afterCommit();
-			verify(materialFileService).deleteStorageKeysQuietly(removedKeys);
+			verify(storageService).deleteObjectsQuietly(removedKeys);
 		}
 	}
 

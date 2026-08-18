@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Liquibase changelogs only. `application` depends on `migrations` so
+     changelogs land on the classpath at runtime for Spring Boot's Liquibase
+     auto-config. No Java code (custom-change Java classes would live here if
+     needed). -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.aidigital.aionboarding</groupId>
+        <artifactId>app-parent</artifactId>
+        <version>1.0.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+    <artifactId>migrations</artifactId>
+    <name>AIAE Onboarding Platform — migrations</name>
+
+    <!-- liquibase-core is declared here, not in `application`, so it travels
+         with the changelog resources and application's Liquibase autoconfig
+         finds it transitively via the module dependency. This module owns no
+         Java class referencing liquibase-core today (see the header comment),
+         so maven-dependency-plugin:analyze-only always reports it "unused
+         declared" — ignored with a documented reason, see
+         backend/DEPENDENCY-ANALYSIS.md. -->
+    <dependencies>
+        <dependency>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+    </dependencies>
+</project>

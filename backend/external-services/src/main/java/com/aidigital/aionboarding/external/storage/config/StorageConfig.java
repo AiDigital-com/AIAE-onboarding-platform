@@ -1,10 +1,11 @@
 package com.aidigital.aionboarding.external.storage.config;
 
-import com.aidigital.aionboarding.external.common.http.ExternalCallTimer;
+import com.aidigital.aionboarding.external.common.time.CurrentTime;
 import com.aidigital.aionboarding.external.storage.StorageClient;
 import com.aidigital.aionboarding.external.storage.impl.CloudFrontUrlSigner;
 import com.aidigital.aionboarding.external.storage.impl.StorageClientImpl;
 import com.aidigital.aionboarding.external.storage.impl.StubStorageClient;
+import com.aidigital.aionboarding.observability.external.ExternalCallTimer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -59,7 +60,8 @@ public class StorageConfig {
 	 * When present, {@link StorageClientImpl#presignGet} returns CloudFront-signed URLs instead
 	 * of S3 presigned URLs; uploads keep using direct S3 presigned PUT regardless.
 	 *
-	 * @param properties storage properties holding the CloudFront domain/key-pair-id/private-key
+	 * @param properties  storage properties holding the CloudFront domain/key-pair-id/private-key
+	 * @param currentTime injectable time boundary used to compute the signature expiration
 	 * @return configured signer
 	 */
 	@Bean
@@ -69,8 +71,8 @@ public class StorageConfig {
 					+ "and '${app.external.storage.cloud-front-domain:}'.length() > 0 "
 					+ "and '${app.external.storage.cloud-front-key-pair-id:}'.length() > 0 "
 					+ "and '${app.external.storage.cloud-front-private-key:}'.length() > 0")
-	public CloudFrontUrlSigner cloudFrontUrlSigner(StorageProperties properties) {
-		return new CloudFrontUrlSigner(properties);
+	public CloudFrontUrlSigner cloudFrontUrlSigner(StorageProperties properties, CurrentTime currentTime) {
+		return new CloudFrontUrlSigner(properties, currentTime);
 	}
 
 	/**

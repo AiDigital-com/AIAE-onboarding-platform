@@ -13,6 +13,6 @@ public class StubLinkFetchClient implements LinkFetchClient {
 
     @Override
     public LinkFetchResult fetch(String url) {
-        return LinkFetchResult.failure(MESSAGE);
+        return new LinkFetchResult(MESSAGE);
     }
 }

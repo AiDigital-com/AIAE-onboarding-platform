@@ -10,18 +10,15 @@ import com.aidigital.aionboarding.service.common.security.RequestAuthenticationC
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
 import com.aidigital.aionboarding.service.permission.models.PermissionSnapshotRecord;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
+import com.aidigital.aionboarding.service.permission.services.TeamLeadershipService;
 import com.aidigital.aionboarding.service.permission.services.entity.PermissionEntityService;
-import com.aidigital.aionboarding.service.group.services.entity.GroupLeadEntityService;
-import com.aidigital.aionboarding.service.group.services.entity.GroupMemberEntityService;
 import com.aidigital.aionboarding.service.permission.support.PermissionDefaultsProvider;
-import com.aidigital.aionboarding.service.team.services.entity.TeamEntityService;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
 import com.aidigital.aionboarding.service.user.services.entity.UserEntityService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,9 +33,7 @@ import java.util.stream.Collectors;
 public class PermissionServiceImpl implements PermissionService {
 
     private final PermissionEntityService permissionEntityService;
-    private final TeamEntityService teamEntityService;
-    private final GroupLeadEntityService groupLeadEntityService;
-    private final GroupMemberEntityService groupMemberEntityService;
+    private final TeamLeadershipService teamLeadershipService;
     private final UserEntityService userEntityService;
     private final PermissionDefaultsProvider permissionDefaultsProvider;
     private final CurrentTime currentTime;
@@ -159,19 +154,6 @@ public class PermissionServiceImpl implements PermissionService {
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public boolean isTeamLeadForMember(Long leadUserId, Long memberUserId) {
-        if (teamEntityService.existsByIdLeadUserIdAndIdMemberUserId(leadUserId, memberUserId)) {
-            return true;
-        }
-        Set<Long> ledGroupIds = groupLeadEntityService.findGroupIdsByLeadUserId(leadUserId);
-        if (ledGroupIds.isEmpty()) {
-            return false;
-        }
-        return !Collections.disjoint(ledGroupIds, groupMemberEntityService.findGroupIdsByMemberUserId(memberUserId));
-    }
-
-    @Override
     public boolean canManageExistingLesson(AppUser user, Long createdByUserId) {
         if (user == null) {
             return false;
@@ -187,7 +169,8 @@ public class PermissionServiceImpl implements PermissionService {
         if (user.isAdmin() || Objects.equals(user.internalId(), authorUserId)) {
             return true;
         }
-        return user.isTeamLead() && authorUserId != null && isTeamLeadForMember(user.internalId(), authorUserId);
+        return user.isTeamLead() && authorUserId != null
+            && teamLeadershipService.isTeamLeadForMember(user.internalId(), authorUserId);
     }
 
     @Override
@@ -206,7 +189,8 @@ public class PermissionServiceImpl implements PermissionService {
             return;
         }
         if (actor.isTeamLead()) {
-            if (!UserRoleCode.MEMBER.equals(targetRoleCode) || !isTeamLeadForMember(actor.internalId(), targetUserId)) {
+            if (!UserRoleCode.MEMBER.equals(targetRoleCode)
+                || !teamLeadershipService.isTeamLeadForMember(actor.internalId(), targetUserId)) {
                 throw new AppException(ErrorReason.C004);
             }
             return;

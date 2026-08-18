@@ -11,9 +11,11 @@ import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.material.models.MaterialListQuery;
 import com.aidigital.aionboarding.service.material.models.MaterialRecord;
 import com.aidigital.aionboarding.service.material.services.MaterialService;
+import com.aidigital.aionboarding.service.material.services.UploadValidator;
 import com.aidigital.aionboarding.service.storage.StorageService;
 import com.aidigital.aionboarding.service.storage.enums.UploadPurpose;
 import com.aidigital.aionboarding.support.ApiResponses;
+import com.aidigital.aionboarding.support.MultipartFileUploadSupport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -22,12 +24,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockMultipartFile;
 
-import java.io.InputStream;
-
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,6 +38,10 @@ class MaterialsControllerTest {
 	private MaterialService materialService;
 	@Mock
 	private StorageService storageService;
+	@Mock
+	private UploadValidator uploadValidator;
+	@Mock
+	private MultipartFileUploadSupport multipartFileUploadSupport;
 	@Mock
 	private MaterialApiMapper materialApiMapper;
 	@Mock
@@ -105,19 +108,19 @@ class MaterialsControllerTest {
 
 		// Then:
 		assertThat(response.getBody()).isSameAs(expectedBody);
+		verify(uploadValidator).validatePresignRequest("clip.mp4", "video/mp4", 1024L);
 	}
 
 	@Test
-	void uploadMaterialFileShouldStreamTheFileWithoutBufferingItIntoAByteArrayTest() throws Exception {
-		// Given:
+	void uploadMaterialFileShouldDelegateStreamingToTheUploadSupportTest() {
+		// Given: the streaming/IOException boilerplate now lives in MultipartFileUploadSupport,
+		// which owns the try/catch a controller may not express
 		AppUser viewer = new AppUser(3L, "clerk-3", "viewer3@test.com", "Viewer3", "member", "Viewer3", null, null,
 				null);
 		MockMultipartFile file = new MockMultipartFile("file", "notes.pdf", "application/pdf", "content".getBytes());
 		UploadedFileResponseV1 expectedBody = mock(UploadedFileResponseV1.class);
 		when(currentUser.requireUser()).thenReturn(viewer);
-		when(storageService.putObjectStreaming(
-				eq(viewer), eq(UploadPurpose.MATERIAL_UPLOAD), any(InputStream.class), eq(7L), eq("notes.pdf"), eq(
-						"application/pdf")))
+		when(multipartFileUploadSupport.putStreaming(viewer, UploadPurpose.MATERIAL_UPLOAD, file))
 				.thenReturn("uploads/def/notes.pdf");
 		when(materialApiMapper.toUploadedFileResponseV1("uploads/def/notes.pdf", "notes.pdf", "application/pdf", 7L))
 				.thenReturn(expectedBody);
@@ -127,5 +130,6 @@ class MaterialsControllerTest {
 
 		// Then:
 		assertThat(response.getBody()).isSameAs(expectedBody);
+		verify(multipartFileUploadSupport).requireValidFile(file);
 	}
 }

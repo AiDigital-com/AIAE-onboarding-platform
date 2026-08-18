@@ -33,11 +33,8 @@ public interface GroupApiMapper extends PageInfoApiMapper {
 
     GroupOrgStatsV1 toGroupOrgStatsV1(GroupOrgStatsRecord stats);
 
-    default GroupOrgStatsResponseV1 toGroupOrgStatsResponseV1(GroupOrgStatsRecord stats) {
-        GroupOrgStatsResponseV1 response = new GroupOrgStatsResponseV1();
-        response.setStats(toGroupOrgStatsV1(stats));
-        return response;
-    }
+    @Mapping(target = "stats", source = "stats")
+    GroupOrgStatsResponseV1 toGroupOrgStatsResponseV1(GroupOrgStatsRecord stats);
 
     GroupV1 toGroupV1(GroupDetailRecord group);
 
@@ -46,28 +43,38 @@ public interface GroupApiMapper extends PageInfoApiMapper {
     @Mapping(target = "group", source = "group")
     GroupResponseV1 toGroupResponseV1(GroupDetailRecord group);
 
-    default GroupsListResponseV1 toGroupsListResponseV1(Page<GroupSummaryRecord> groups) {
-        GroupsListResponseV1 response = new GroupsListResponseV1();
-        response.setGroups(groups.stream().map(this::toGroupSummaryV1).toList());
-        response.setPage(toPageInfoV1(groups));
-        return response;
-    }
+    @Mapping(target = "groups", expression = "java(groups.stream().map(this::toGroupSummaryV1).toList())")
+    @Mapping(target = "page", expression = "java(toPageInfoV1(groups))")
+    GroupsListResponseV1 toGroupsListResponseV1(Page<GroupSummaryRecord> groups);
 
-    default GroupMembersListResponseV1 toGroupMembersListResponseV1(Page<GroupMemberRecord> members) {
-        GroupMembersListResponseV1 response = new GroupMembersListResponseV1();
-        response.setMembers(members.stream().map(this::toGroupMemberV1).toList());
-        response.setPage(toPageInfoV1(members));
-        return response;
-    }
+    @Mapping(target = "members", expression = "java(members.stream().map(this::toGroupMemberV1).toList())")
+    @Mapping(target = "page", expression = "java(toPageInfoV1(members))")
+    GroupMembersListResponseV1 toGroupMembersListResponseV1(Page<GroupMemberRecord> members);
 
-    default GroupCandidateUsersListResponseV1 toGroupCandidateUsersListResponseV1(
+    @Mapping(target = "users", source = "users")
+    @Mapping(target = "page", expression = "java(toPageInfoV1(page))")
+    GroupCandidateUsersListResponseV1 toGroupCandidateUsersListResponseV1(
         List<UserSummaryV1> users,
         Page<?> page
+    );
+
+    /**
+     * Builds the candidate-users list response directly from the paged query result, mapping
+     * each candidate through the given {@link UserApiMapper} since a mapper default method
+     * cannot reach another mapper's {@code uses}-injected instance.
+     *
+     * @param candidates   paged candidate users
+     * @param userApiMapper mapper used to convert each candidate to its summary shape
+     * @return the candidate-users list response
+     */
+    default GroupCandidateUsersListResponseV1 toGroupCandidateUsersListResponseV1(
+        Page<UserRecord> candidates,
+        UserApiMapper userApiMapper
     ) {
-        GroupCandidateUsersListResponseV1 response = new GroupCandidateUsersListResponseV1();
-        response.setUsers(users);
-        response.setPage(toPageInfoV1(page));
-        return response;
+        return toGroupCandidateUsersListResponseV1(
+            candidates.stream().map(userApiMapper::toUserSummaryV1).toList(),
+            candidates
+        );
     }
 
     @Mapping(target = "member", source = "member")

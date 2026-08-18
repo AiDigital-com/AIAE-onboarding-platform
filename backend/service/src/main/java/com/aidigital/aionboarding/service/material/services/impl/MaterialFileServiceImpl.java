@@ -17,12 +17,13 @@ import com.aidigital.aionboarding.service.material.models.MaterialAttachmentInpu
 import com.aidigital.aionboarding.service.material.models.MaterialOpenAiUploadInput;
 import com.aidigital.aionboarding.service.material.models.MaterialOpenAiUploadRecord;
 import com.aidigital.aionboarding.service.material.services.MaterialFileService;
-import com.aidigital.aionboarding.service.material.support.MaterialFileQuerySupport;
 import com.aidigital.aionboarding.service.storage.StorageService;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +37,6 @@ public class MaterialFileServiceImpl implements MaterialFileService {
     private final DictionaryLookupService dictionaryLookupService;
     private final StorageService storageService;
     private final MaterialMapper materialMapper;
-    private final MaterialFileQuerySupport materialFileQuerySupport;
     private final TextValueNormalizer textValueNormalizer;
     private final CurrentTime currentTime;
 
@@ -106,27 +106,11 @@ public class MaterialFileServiceImpl implements MaterialFileService {
     }
 
     @Override
-    public void deleteStorageKeysQuietly(List<String> storageKeys) {
-        if (storageKeys == null || storageKeys.isEmpty()) {
-            return;
-        }
-        List<String> uniqueKeys = storageKeys.stream()
-            .filter(key -> key != null && !key.isBlank())
-            .distinct()
-            .toList();
-        if (uniqueKeys.isEmpty()) {
-            return;
-        }
-        try {
-            storageService.deleteObjects(uniqueKeys);
-        } catch (RuntimeException ignored) {
-            // Match the Next.js route behavior: storage cleanup failures are logged but non-fatal.
-        }
-    }
-
-    @Override
     public List<String> collectStorageKeys(Long materialId) {
-        return materialFileQuerySupport.collectStorageKeys(materialId);
+        return materialFileRepository.findByMaterialId(materialId).stream()
+            .map(MaterialFile::getStorageKey)
+            .filter(key -> key != null && !key.isBlank())
+            .toList();
     }
 
     @Override
@@ -134,7 +118,13 @@ public class MaterialFileServiceImpl implements MaterialFileService {
         List<String> existingStorageKeys,
         List<MaterialAttachmentInput> attachments
     ) {
-        return materialFileQuerySupport.findRemovedStorageKeys(existingStorageKeys, attachments);
+        Set<String> keptStorageKeys = attachments.stream()
+            .map(attachment -> textValueNormalizer.trimmed(attachment.storageKey()))
+            .filter(key -> !key.isBlank())
+            .collect(Collectors.toSet());
+        return existingStorageKeys.stream()
+            .filter(key -> !keptStorageKeys.contains(key))
+            .toList();
     }
 
     @Override
@@ -144,22 +134,27 @@ public class MaterialFileServiceImpl implements MaterialFileService {
 
     @Override
     public List<MaterialAttachmentInput> findAttachmentsForMaterials(List<Long> materialIds) {
-        return materialFileQuerySupport.findAttachmentsForMaterials(materialIds);
-    }
-
-    @Override
-    public List<MaterialFile> findByMaterialId(Long materialId) {
-        return materialFileQuerySupport.findByMaterialId(materialId);
-    }
-
-    @Override
-    public List<MaterialFile> findByMaterialIdOrderByCreatedAtAsc(Long materialId) {
-        return materialFileQuerySupport.findByMaterialIdOrderByCreatedAtAsc(materialId);
+        if (materialIds == null || materialIds.isEmpty()) {
+            return List.of();
+        }
+        List<MaterialAttachmentInput> result = new ArrayList<>();
+        for (Long materialId : materialIds) {
+            if (materialId == null) {
+                continue;
+            }
+            for (MaterialFile file : materialFileRepository.findByMaterialIdOrderByCreatedAtAsc(materialId)) {
+                result.add(materialMapper.toAttachmentInput(file));
+            }
+        }
+        return result;
     }
 
     @Override
     public List<MaterialFile> findByMaterialIdsOrderByCreatedAtAsc(Collection<Long> materialIds) {
-        return materialFileQuerySupport.findByMaterialIdsOrderByCreatedAtAsc(materialIds);
+        if (materialIds == null || materialIds.isEmpty()) {
+            return List.of();
+        }
+        return materialFileRepository.findByMaterialIdInOrderByCreatedAtAsc(materialIds);
     }
 
     @Override
@@ -168,6 +163,11 @@ public class MaterialFileServiceImpl implements MaterialFileService {
             return List.of();
         }
         return materialFileRepository.findSummariesByMaterialIdIn(materialIds);
+    }
+
+    @Override
+    public boolean existsByStorageKey(String storageKey) {
+        return materialFileRepository.existsByStorageKey(storageKey);
     }
 
     /**

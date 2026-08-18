@@ -8,6 +8,7 @@ import com.aidigital.aionboarding.external.youtube.model.YoutubeOEmbedMetadata;
 import com.aidigital.aionboarding.service.common.dictionary.DictionaryLookupService;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.common.time.CurrentTimeImpl;
 import com.aidigital.aionboarding.service.lesson.models.CreateLessonAssetInput;
 import com.aidigital.aionboarding.service.lesson.services.entity.LessonAssetEntityService;
 import com.aidigital.aionboarding.service.link.services.LinkMetadataService;
@@ -40,7 +41,7 @@ class LessonAssetDraftBuilderTest {
 	@Mock
 	private StorageService storageService;
 	@Spy
-	private CurrentTime currentTime = new CurrentTime();
+	private CurrentTime currentTime = new CurrentTimeImpl();
 
 	@InjectMocks
 	private LessonAssetDraftBuilder builder;

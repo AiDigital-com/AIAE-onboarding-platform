@@ -66,12 +66,9 @@ public interface MaterialApiMapper extends PageInfoApiMapper {
 
     MaterialSummaryV1 toMaterialSummaryV1(MaterialSearchSummaryRecord material);
 
-    default MaterialsListResponseV1 toMaterialsListResponseV1(Page<MaterialSearchSummaryRecord> materials) {
-        MaterialsListResponseV1 response = new MaterialsListResponseV1();
-        response.setMaterials(materials.getContent().stream().map(this::toMaterialSummaryV1).toList());
-        response.setPage(toPageInfoV1(materials));
-        return response;
-    }
+    @Mapping(target = "materials", expression = "java(materials.getContent().stream().map(this::toMaterialSummaryV1).toList())")
+    @Mapping(target = "page", expression = "java(toPageInfoV1(materials))")
+    MaterialsListResponseV1 toMaterialsListResponseV1(Page<MaterialSearchSummaryRecord> materials);
 
     default MaterialListQuery toMaterialListQuery(SearchMaterialsV1 request) {
         return new MaterialListQuery(

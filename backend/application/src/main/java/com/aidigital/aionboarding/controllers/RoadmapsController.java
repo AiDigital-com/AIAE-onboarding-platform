@@ -25,7 +25,7 @@ import com.aidigital.aionboarding.mappers.learning.LearningApiMapper;
 import com.aidigital.aionboarding.mappers.roadmap.RoadmapApiMapper;
 import com.aidigital.aionboarding.mappers.roadmap.RoadmapGroupAssignmentApiMapper;
 import com.aidigital.aionboarding.service.common.security.AppUser;
-import com.aidigital.aionboarding.service.learning.services.LearningService;
+import com.aidigital.aionboarding.service.learning.services.RoadmapAssignmentService;
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
 import com.aidigital.aionboarding.service.roadmap.services.RoadmapGroupAssignmentService;
 import com.aidigital.aionboarding.service.roadmap.services.RoadmapService;
@@ -43,7 +43,7 @@ public class RoadmapsController implements RoadmapsApi {
 
 	private final CurrentUserSupport currentUser;
 	private final RoadmapService roadmapService;
-	private final LearningService learningService;
+	private final RoadmapAssignmentService roadmapAssignmentService;
 	private final RoadmapGroupAssignmentService roadmapGroupAssignmentService;
 	private final RoadmapApiMapper roadmapApiMapper;
 	private final LearningApiMapper learningApiMapper;
@@ -104,7 +104,7 @@ public class RoadmapsController implements RoadmapsApi {
 	@Transactional
 	public ResponseEntity<AssignmentResponseV1> assignRoadmap(Long id, AssignmentRequestV1 request) {
 		return ResponseEntity.ok(learningApiMapper.toRoadmapAssignmentResponseV1(
-				learningService.assignRoadmap(currentUser.requireUser(), id, request.getUserIds())
+				roadmapAssignmentService.assignRoadmap(currentUser.requireUser(), id, request.getUserIds())
 		));
 	}
 
@@ -113,7 +113,7 @@ public class RoadmapsController implements RoadmapsApi {
 	@Transactional(readOnly = true)
 	public ResponseEntity<LearningAssigneesResponseV1> listRoadmapAssignees(Long id) {
 		return ResponseEntity.ok(learningApiMapper.toLearningAssigneesResponseV1(
-				learningService.listRoadmapAssignees(currentUser.requireUser(), id)
+				roadmapAssignmentService.listRoadmapAssignees(currentUser.requireUser(), id)
 		));
 	}
 
@@ -121,7 +121,7 @@ public class RoadmapsController implements RoadmapsApi {
 	@PreAuthorize("@perm.has('" + PermissionKeys.LEARNING_ASSIGN + "')")
 	@Transactional
 	public ResponseEntity<OkResponseV1> revokeRoadmapAssignments(Long id, AssignmentRequestV1 request) {
-		learningService.revokeRoadmapAssignments(currentUser.requireUser(), id, request.getUserIds());
+		roadmapAssignmentService.revokeRoadmapAssignments(currentUser.requireUser(), id, request.getUserIds());
 		return ResponseEntity.ok(apiResponses.ok());
 	}
 
@@ -130,7 +130,7 @@ public class RoadmapsController implements RoadmapsApi {
 	@Transactional
 	public ResponseEntity<EnrollmentResponseV1> enrollRoadmap(Long id) {
 		return ResponseEntity.ok(learningApiMapper.toRoadmapEnrollmentResponseV1(
-				learningService.enrollRoadmap(currentUser.requireUser(), id)
+				roadmapAssignmentService.enrollRoadmap(currentUser.requireUser(), id)
 		));
 	}
 
@@ -138,7 +138,7 @@ public class RoadmapsController implements RoadmapsApi {
 	@PreAuthorize("@perm.has('" + PermissionKeys.LEARNING_ENROLL + "')")
 	@Transactional
 	public ResponseEntity<OkResponseV1> unenrollRoadmap(Long id) {
-		learningService.unenrollRoadmap(currentUser.requireUser(), id);
+		roadmapAssignmentService.unenrollRoadmap(currentUser.requireUser(), id);
 		return ResponseEntity.ok(apiResponses.ok());
 	}
 
@@ -147,7 +147,7 @@ public class RoadmapsController implements RoadmapsApi {
 	@Transactional(readOnly = true)
 	public ResponseEntity<RoadmapTeamAssignmentsListResponseV1> listRoadmapTeamAssignments(Long id) {
 		return ResponseEntity.ok(learningApiMapper.toRoadmapTeamAssignmentsListResponseV1(
-				learningService.getRoadmapTeamAssignments(currentUser.requireUser(), id)
+				roadmapAssignmentService.getRoadmapTeamAssignments(currentUser.requireUser(), id)
 		));
 	}
 
@@ -157,7 +157,7 @@ public class RoadmapsController implements RoadmapsApi {
 	public ResponseEntity<RoadmapTeamAssignmentResponseV1> assignRoadmapToTeam(Long id,
 																			   AssignRoadmapToTeamRequestV1 request) {
 		return ResponseEntity.ok(learningApiMapper.toRoadmapTeamAssignmentResponseV1(
-				learningService.assignRoadmapToGroup(currentUser.requireUser(), id, request.getLeadUserId())
+				roadmapAssignmentService.assignRoadmapToGroup(currentUser.requireUser(), id, request.getLeadUserId())
 		));
 	}
 
@@ -165,7 +165,7 @@ public class RoadmapsController implements RoadmapsApi {
 	@PreAuthorize("@perm.has('" + PermissionKeys.LEARNING_ASSIGN + "')")
 	@Transactional
 	public ResponseEntity<OkResponseV1> unassignRoadmapFromTeam(Long id, Long leadUserId) {
-		learningService.unassignRoadmapFromGroup(currentUser.requireUser(), id, leadUserId);
+		roadmapAssignmentService.unassignRoadmapFromGroup(currentUser.requireUser(), id, leadUserId);
 		return ResponseEntity.ok(apiResponses.ok());
 	}
 

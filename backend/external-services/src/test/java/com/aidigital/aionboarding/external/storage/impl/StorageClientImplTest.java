@@ -1,12 +1,13 @@
 package com.aidigital.aionboarding.external.storage.impl;
 
-import com.aidigital.aionboarding.external.common.http.ExternalCallTimer;
 import com.aidigital.aionboarding.external.storage.StorageExternalException;
 import com.aidigital.aionboarding.external.storage.config.StorageProperties;
 import com.aidigital.aionboarding.external.storage.models.ObjectMetadataRecord;
+import com.aidigital.aionboarding.observability.external.ExternalCallTimer;
 import org.instancio.Instancio;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -312,6 +313,30 @@ class StorageClientImplTest {
 		client.deleteObjects(List.of());
 
 		// Then: no exception is thrown
+	}
+
+	@Test
+	void shouldNotOverrideResponseContentTypeFromTheStorageKeysExtensionTest() throws Exception {
+		// Given: this is the negative case for the presignGet split of the audit §2.4 / P8 fix —
+		// before this change, presignGet derived responseContentType from the storage key's
+		// `.svg` extension and set it to "image/svg+xml" regardless of what was actually
+		// stored, which is what let a mislabeled upload be served as SVG. Reverting
+		// presignGet's override removal and re-running this test reproduces that: the captured
+		// request's responseContentType() comes back "image/svg+xml" instead of null.
+		when(properties.getBucket()).thenReturn("test-bucket");
+		when(properties.getPresignGetExpiresSeconds()).thenReturn(600);
+		PresignedGetObjectRequest presigned = mock(PresignedGetObjectRequest.class);
+		when(presigned.url()).thenReturn(URI.create("https://s3.example.com/key").toURL());
+		ArgumentCaptor<GetObjectPresignRequest> captor = ArgumentCaptor.forClass(GetObjectPresignRequest.class);
+		when(presigner.presignGetObject(captor.capture())).thenReturn(presigned);
+
+		// When:
+		String url = client.presignGet("uploads/abc/payload.svg", Duration.ofMinutes(10));
+
+		// Then: S3 is left to serve the object's own stored Content-Type header — the response
+		// carries no override derived from the (attacker-influenced) key extension.
+		assertThat(url).isEqualTo("https://s3.example.com/key");
+		assertThat(captor.getValue().getObjectRequest().responseContentType()).isNull();
 	}
 
 	@Test

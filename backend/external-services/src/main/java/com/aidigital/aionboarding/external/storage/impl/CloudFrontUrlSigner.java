@@ -1,5 +1,6 @@
 package com.aidigital.aionboarding.external.storage.impl;
 
+import com.aidigital.aionboarding.external.common.time.CurrentTime;
 import com.aidigital.aionboarding.external.storage.StorageExternalException;
 import com.aidigital.aionboarding.external.storage.config.StorageProperties;
 import software.amazon.awssdk.services.cloudfront.CloudFrontUtilities;
@@ -12,7 +13,6 @@ import java.security.PrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.RSAPrivateCrtKeySpec;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.Base64;
 
@@ -25,16 +25,19 @@ import java.util.Base64;
 public class CloudFrontUrlSigner {
 
 	private final StorageProperties properties;
+	private final CurrentTime currentTime;
 	private final CloudFrontUtilities cloudFrontUtilities;
 	private final PrivateKey privateKey;
 
 	/**
 	 * Parses the configured PEM private key and prepares the signer.
 	 *
-	 * @param properties storage properties holding the CloudFront domain/key-pair-id/private-key
+	 * @param properties  storage properties holding the CloudFront domain/key-pair-id/private-key
+	 * @param currentTime injectable time boundary used to compute the signature expiration
 	 */
-	public CloudFrontUrlSigner(StorageProperties properties) {
+	public CloudFrontUrlSigner(StorageProperties properties, CurrentTime currentTime) {
 		this.properties = properties;
+		this.currentTime = currentTime;
 		this.cloudFrontUtilities = CloudFrontUtilities.create();
 		this.privateKey = parsePrivateKey(properties.getCloudFrontPrivateKey());
 	}
@@ -53,7 +56,7 @@ public class CloudFrontUrlSigner {
 					.resourceUrl(resourceUrl)
 					.privateKey(privateKey)
 					.keyPairId(properties.getCloudFrontKeyPairId())
-					.expirationDate(Instant.now().plus(expiresIn))
+					.expirationDate(currentTime.instant().plus(expiresIn))
 					.build();
 
 			SignedUrl signedUrl = cloudFrontUtilities.getSignedUrlWithCannedPolicy(request);

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Reusable outbound-observability module. Owns ExternalClientMetricsInterceptor
+  and ExternalCallTimer — the two classes that record the shared
+  `external.client.requests` timer for every outbound HTTP client and SDK call.
+
+  Leaf module, by design: it must stay dependency-free of every other internal
+  module (domain/service/application/migrations/external-services) so both
+  `external-services` (Spring HTTP clients) and `application` (SDK-managed
+  calls, e.g. AWS S3) can depend on it without a cycle.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>com.aidigital.aionboarding</groupId>
+		<artifactId>app-parent</artifactId>
+		<version>1.0.0</version>
+		<relativePath>../pom.xml</relativePath>
+	</parent>
+	<artifactId>observability</artifactId>
+	<name>AIAE Onboarding Platform — observability</name>
+
+	<!-- Leaf module. Depends on Spring web/context + Micrometer only. NO other
+		 internal module (see structure-lint.sh).
+
+		 spring-boot-starter is a POM-only aggregator, so
+		 maven-dependency-plugin:analyze-only always reports it "unused declared"
+		 once spring-context (below) is declared explicitly for the classes this
+		 module actually references. Kept anyway for the autoconfiguration
+		 surface consumers of this module rely on; see
+		 backend/DEPENDENCY-ANALYSIS.md. -->
+	<dependencies>
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-web</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-context</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>io.micrometer</groupId>
+			<artifactId>micrometer-core</artifactId>
+		</dependency>
+
+		<!-- Test scope -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-api</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.assertj</groupId>
+			<artifactId>assertj-core</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+</project>

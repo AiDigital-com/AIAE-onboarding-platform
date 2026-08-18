@@ -4,9 +4,6 @@ import com.aidigital.aionboarding.domain.common.dictionary.LessonStatusCode;
 import com.aidigital.aionboarding.domain.common.dictionary.entities.LessonStatus;
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.domain.user.entities.User;
-import com.aidigital.aionboarding.external.heygen.HeyGenClient;
-import com.aidigital.aionboarding.external.heygen.HeyGenExternalException;
-import com.aidigital.aionboarding.external.heygen.model.HeyGenTeacherVideoResult;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
@@ -17,17 +14,15 @@ import com.aidigital.aionboarding.service.lesson.models.TeacherVideoRecord;
 import com.aidigital.aionboarding.service.lesson.models.TeacherVideoResultRecord;
 import com.aidigital.aionboarding.service.lesson.services.entity.LessonEntityService;
 import com.aidigital.aionboarding.service.lesson.support.LessonRecordAssembler;
-import com.aidigital.aionboarding.service.material.models.PreparedMaterialsResult;
-import com.aidigital.aionboarding.service.material.services.MaterialPreparationService;
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
-import com.aidigital.aionboarding.service.teachervideo.prompt.TeacherVideoPromptBuilder;
 import com.aidigital.aionboarding.service.teachervideo.services.TeacherVideoRefreshService;
+import com.aidigital.aionboarding.service.teachervideo.support.TeacherVideoCreationWorkflow;
 import com.aidigital.aionboarding.service.teachervideo.support.TeacherVideoMetadataSupport;
 import org.instancio.Instancio;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -41,9 +36,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.instancio.Select.field;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -60,123 +52,86 @@ class TeacherVideoServiceImplTest {
 	@Mock
 	private PermissionService permissionService;
 	@Mock
-	private MaterialPreparationService materialPreparationService;
-	@Mock
 	private LessonRecordAssembler lessonMapper;
-	@Mock
-	private HeyGenClient heyGenClient;
-	@Mock
-	private TeacherVideoPromptBuilder teacherVideoPromptBuilder;
 	@Mock
 	private TeacherVideoRefreshService teacherVideoRefreshService;
 	@Mock
 	private TeacherVideoMetadataSupport teacherVideoMetadataSupport;
+	@Mock
+	private TeacherVideoCreationWorkflow teacherVideoCreationWorkflow;
 	@Mock
 	private CurrentTime currentTime;
 
 	@InjectMocks
 	private TeacherVideoServiceImpl service;
 
-	// -------------------------------------------------------------------------
-	// create()
-	// -------------------------------------------------------------------------
+	@Nested
+	class Create {
 
-	@Test
-	void createShouldReturnTeacherVideoResultOnHappyPathTest() {
-		// Given:
-		AppUser admin = new AppUser(1L, "clerk-1", "admin@test.com", "Admin", "admin", "Admin", null, null, null);
-		Long lessonId = 30L;
-		Lesson lesson = Instancio.of(Lesson.class).set(field(Lesson::getId), lessonId).create();
-		Map<String, Object> metadata = new HashMap<>();
-		Map<String, Object> lessonMap = new HashMap<>();
-		TeacherVideoResultRecord expected = mock(TeacherVideoResultRecord.class);
+		@Test
+		void shouldReturnTeacherVideoResultOnHappyPathTest() {
+			// Given:
+			AppUser admin = new AppUser(1L, "clerk-1", "admin@test.com", "Admin", "admin", "Admin", null, null, null);
+			Long lessonId = 30L;
+			Lesson lesson = Instancio.of(Lesson.class).set(field(Lesson::getId), lessonId).create();
+			TeacherVideoResultRecord expected = mock(TeacherVideoResultRecord.class);
 
-		TeacherVideoServiceImpl spyService = spy(service);
-		doReturn(lesson).when(spyService).requireReadyLessonWithContent(admin, lessonId);
-		when(teacherVideoMetadataSupport.mutableMetadata(lesson)).thenReturn(metadata);
-		doNothing().when(spyService).rejectIfActiveGeneration(metadata);
-		doReturn(lessonMap).when(spyService).prepareLessonForPrompt(lesson, lessonId, metadata);
-		doReturn(expected).when(spyService).requestTeacherVideo(lesson, metadata, lessonMap);
+			TeacherVideoServiceImpl spyService = spy(service);
+			doReturn(lesson).when(spyService).requireReadyLessonWithContent(admin, lessonId);
+			when(teacherVideoCreationWorkflow.create(lesson, lessonId)).thenReturn(expected);
 
-		// When:
-		TeacherVideoResultRecord result = spyService.create(admin, lessonId);
+			// When:
+			TeacherVideoResultRecord result = spyService.create(admin, lessonId);
 
-		// Then:
-		assertThat(result).isSameAs(expected);
-		verify(permissionService).requirePermission(admin, PermissionKeys.LESSONS_MANAGE);
-		verify(spyService).requestTeacherVideo(lesson, metadata, lessonMap);
-	}
+			// Then:
+			assertThat(result).isSameAs(expected);
+			verify(permissionService).requirePermission(admin, PermissionKeys.LESSONS_MANAGE);
+			verify(teacherVideoCreationWorkflow).create(lesson, lessonId);
+		}
 
-	@Test
-	void createShouldPropagateExceptionWhenPermissionDeniedTest() {
-		// Given:
-		AppUser viewer = new AppUser(2L, "clerk-2", "viewer@test.com", "Viewer", "member", "Viewer", null, null, null);
-		Long lessonId = 31L;
-		doThrow(new AppException(ErrorReason.C004)).when(permissionService)
-				.requirePermission(viewer, PermissionKeys.LESSONS_MANAGE);
+		@Test
+		void shouldPropagateExceptionWhenPermissionDeniedTest() {
+			// Given:
+			AppUser viewer = new AppUser(2L, "clerk-2", "viewer@test.com", "Viewer", "member", "Viewer", null, null, null);
+			Long lessonId = 31L;
+			doThrow(new AppException(ErrorReason.C004)).when(permissionService)
+					.requirePermission(viewer, PermissionKeys.LESSONS_MANAGE);
 
-		// When-Then:
-		AppException thrown = assertThrows(AppException.class, () -> service.create(viewer, lessonId));
-		assertThat(thrown.getCode()).isEqualTo(ErrorReason.C004.name());
-		verifyNoInteractions(lessonEntityService);
-	}
+			// When-Then:
+			AppException thrown = assertThrows(AppException.class, () -> service.create(viewer, lessonId));
+			assertThat(thrown.getCode()).isEqualTo(ErrorReason.C004.name());
+			verifyNoInteractions(lessonEntityService);
+		}
 
-	@Test
-	void createShouldThrowWhenViewerIsNotAdminTest() {
-		// Given:
-		AppUser member = new AppUser(3L, "clerk-3", "member@test.com", "Member", "member", "Member", null, null, null);
-		Long lessonId = 32L;
+		@Test
+		void shouldThrowWhenViewerIsNotAdminTest() {
+			// Given:
+			AppUser member = new AppUser(3L, "clerk-3", "member@test.com", "Member", "member", "Member", null, null, null);
+			Long lessonId = 32L;
 
-		// When-Then:
-		AppException thrown = assertThrows(AppException.class, () -> service.create(member, lessonId));
-		assertThat(thrown.getCode()).isEqualTo(ErrorReason.C004.name());
-		verify(permissionService).requirePermission(member, PermissionKeys.LESSONS_MANAGE);
-		verifyNoInteractions(lessonEntityService);
-	}
+			// When-Then:
+			AppException thrown = assertThrows(AppException.class, () -> service.create(member, lessonId));
+			assertThat(thrown.getCode()).isEqualTo(ErrorReason.C004.name());
+			verify(permissionService).requirePermission(member, PermissionKeys.LESSONS_MANAGE);
+			verifyNoInteractions(lessonEntityService);
+		}
 
-	@Test
-	void createShouldPropagateExceptionFromRequireReadyLessonWithContentTest() {
-		// Given:
-		AppUser admin = new AppUser(4L, "clerk-4", "admin@test.com", "Admin", "admin", "Admin", null, null, null);
-		Long lessonId = 33L;
-		TeacherVideoServiceImpl spyService = spy(service);
-		doThrow(new AppException(ErrorReason.C002, "Only ready lessons can have teacher videos."))
-				.when(spyService).requireReadyLessonWithContent(admin, lessonId);
+		@Test
+		void shouldPropagateExceptionFromRequireReadyLessonWithContentTest() {
+			// Given:
+			AppUser admin = new AppUser(4L, "clerk-4", "admin@test.com", "Admin", "admin", "Admin", null, null, null);
+			Long lessonId = 33L;
+			TeacherVideoServiceImpl spyService = spy(service);
+			doThrow(new AppException(ErrorReason.C002, "Only ready lessons can have teacher videos."))
+					.when(spyService).requireReadyLessonWithContent(admin, lessonId);
 
-		// When-Then:
-		AppException thrown = assertThrows(AppException.class, () -> spyService.create(admin, lessonId));
-		assertThat(thrown.getCode()).isEqualTo(ErrorReason.C002.name());
-		verify(spyService).requireReadyLessonWithContent(admin, lessonId);
-		// rejectIfActiveGeneration/prepareLessonForPrompt/requestTeacherVideo never ran, so none of their
-		// collaborators were touched.
-		verifyNoInteractions(teacherVideoMetadataSupport);
-		verifyNoInteractions(materialPreparationService);
-		verifyNoInteractions(heyGenClient);
-	}
-
-	@Test
-	void createShouldThrowWhenActiveGenerationAlreadyInProgressTest() {
-		// Given:
-		AppUser admin = new AppUser(5L, "clerk-5", "admin@test.com", "Admin", "admin", "Admin", null, null, null);
-		Long lessonId = 34L;
-		Lesson lesson = Instancio.of(Lesson.class).set(field(Lesson::getId), lessonId).create();
-		Map<String, Object> activeTeacherVideoMap = Map.of("videoId", "video-1", "status", "processing");
-		Map<String, Object> metadata = new HashMap<>(Map.of("teacherVideo", activeTeacherVideoMap));
-		TeacherVideoRecord activeRecord = mock(TeacherVideoRecord.class);
-
-		TeacherVideoServiceImpl spyService = spy(service);
-		doReturn(lesson).when(spyService).requireReadyLessonWithContent(admin, lessonId);
-		when(teacherVideoMetadataSupport.mutableMetadata(lesson)).thenReturn(metadata);
-		when(lessonMapper.toTeacherVideoRecord(activeTeacherVideoMap)).thenReturn(activeRecord);
-		when(teacherVideoMetadataSupport.hasActiveTeacherVideo(activeRecord)).thenReturn(true);
-
-		// When-Then:
-		AppException thrown = assertThrows(AppException.class, () -> spyService.create(admin, lessonId));
-		assertThat(thrown.getCode()).isEqualTo(ErrorReason.C006.name());
-		verify(spyService).requireReadyLessonWithContent(admin, lessonId);
-		// prepareLessonForPrompt/requestTeacherVideo never ran, so their collaborators were never touched.
-		verifyNoInteractions(materialPreparationService);
-		verifyNoInteractions(heyGenClient);
+			// When-Then:
+			AppException thrown = assertThrows(AppException.class, () -> spyService.create(admin, lessonId));
+			assertThat(thrown.getCode()).isEqualTo(ErrorReason.C002.name());
+			verify(spyService).requireReadyLessonWithContent(admin, lessonId);
+			// The creation workflow never ran, so none of its steps were touched.
+			verifyNoInteractions(teacherVideoCreationWorkflow);
+		}
 	}
 
 	// -------------------------------------------------------------------------
@@ -345,133 +300,6 @@ class TeacherVideoServiceImplTest {
 		AppException thrown = assertThrows(AppException.class, () -> service.delete(member, lessonId));
 		assertThat(thrown.getCode()).isEqualTo(ErrorReason.C004.name());
 		verifyNoInteractions(lessonEntityService);
-	}
-
-	// -------------------------------------------------------------------------
-	// requestTeacherVideo()
-	// -------------------------------------------------------------------------
-
-	@Test
-	void requestTeacherVideoShouldPersistMetadataAndReturnResultOnSuccessTest() {
-		// Given:
-		Lesson lesson = Instancio.of(Lesson.class).set(field(Lesson::getId), 7L).create();
-		Map<String, Object> metadata = new HashMap<>();
-		Map<String, Object> lessonMap = new HashMap<>();
-		when(teacherVideoPromptBuilder.buildTeacherVideoPrompt(lessonMap)).thenReturn("generated prompt");
-		HeyGenTeacherVideoResult heyGenResult = new HeyGenTeacherVideoResult(
-				"heygen", "generated prompt", "avatar-1", "voice-1", "session-1", "video-1", "pending");
-		when(heyGenClient.createTeacherVideo("generated prompt")).thenReturn(heyGenResult);
-		when(currentTime.instantString()).thenReturn("2026-07-15T10:00:00Z");
-		when(teacherVideoPromptBuilder.durationLimitSeconds()).thenReturn(60);
-		Map<String, Object> teacherVideoMap = Map.of("videoId", "video-1");
-		when(lessonMapper.toTeacherVideoMap(any(TeacherVideoRecord.class))).thenReturn(teacherVideoMap);
-		LocalDateTime updatedAt = LocalDateTime.parse("2026-07-15T10:05:00");
-		when(currentTime.utcDateTime()).thenReturn(updatedAt);
-		Lesson savedLesson = Instancio.of(Lesson.class).set(field(Lesson::getId), 7L).create();
-		when(lessonEntityService.save(lesson)).thenReturn(savedLesson);
-		TeacherVideoRecord normalized = mock(TeacherVideoRecord.class);
-		when(lessonMapper.normalizeTeacherVideoRecord(any(TeacherVideoRecord.class), eq("2026-07-15T10:00:00Z")))
-				.thenReturn(normalized);
-		LessonDetailRecord detailRecord = mock(LessonDetailRecord.class);
-		when(lessonMapper.toDetailRecord(savedLesson)).thenReturn(detailRecord);
-
-		// When:
-		TeacherVideoResultRecord result = service.requestTeacherVideo(lesson, metadata, lessonMap);
-
-		// Then:
-		ArgumentCaptor<TeacherVideoRecord> captor = ArgumentCaptor.forClass(TeacherVideoRecord.class);
-		verify(lessonMapper).toTeacherVideoMap(captor.capture());
-		TeacherVideoRecord captured = captor.getValue();
-		assertThat(captured.provider()).isEqualTo("heygen");
-		assertThat(captured.prompt()).isEqualTo("generated prompt");
-		assertThat(captured.avatarId()).isEqualTo("avatar-1");
-		assertThat(captured.voiceId()).isEqualTo("voice-1");
-		assertThat(captured.sessionId()).isEqualTo("session-1");
-		assertThat(captured.videoId()).isEqualTo("video-1");
-		assertThat(captured.status()).isEqualTo("pending");
-		assertThat(captured.durationLimitSeconds()).isEqualTo(60);
-		assertThat(captured.checkedAt()).isEqualTo("2026-07-15T10:00:00Z");
-		assertThat(captured.videoUrl()).isEmpty();
-		assertThat(captured.thumbnailUrl()).isEmpty();
-		assertThat(captured.duration()).isNull();
-		assertThat(captured.completedAt()).isNull();
-		assertThat(captured.failedAt()).isNull();
-		assertThat(metadata).containsEntry("teacherVideo", teacherVideoMap);
-		assertThat(lesson.getGenerationMetadata()).isSameAs(metadata);
-		assertThat(lesson.getUpdatedAt()).isEqualTo(updatedAt);
-		assertThat(result.teacherVideo()).isSameAs(normalized);
-		assertThat(result.lesson()).isSameAs(detailRecord);
-	}
-
-	@Test
-	void requestTeacherVideoShouldThrowAppExceptionWhenHeyGenClientFailsTest() {
-		// Given:
-		Lesson lesson = Instancio.of(Lesson.class).set(field(Lesson::getId), 8L).create();
-		Map<String, Object> metadata = new HashMap<>();
-		Map<String, Object> lessonMap = new HashMap<>();
-		when(teacherVideoPromptBuilder.buildTeacherVideoPrompt(lessonMap)).thenReturn("prompt");
-		when(heyGenClient.createTeacherVideo("prompt")).thenThrow(new HeyGenExternalException("HeyGen unavailable"));
-
-		// When-Then:
-		AppException thrown = assertThrows(AppException.class,
-				() -> service.requestTeacherVideo(lesson, metadata, lessonMap));
-		assertThat(thrown.getCode()).isEqualTo(ErrorReason.C003.name());
-		verifyNoInteractions(lessonEntityService);
-	}
-
-	// -------------------------------------------------------------------------
-	// prepareLessonForPrompt()
-	// -------------------------------------------------------------------------
-
-	@Test
-	void prepareLessonForPromptShouldMergePreparedMaterialsIntoMetadataAndLessonMapTest() {
-		// Given:
-		Long lessonId = 11L;
-		Lesson lesson = Instancio.of(Lesson.class).set(field(Lesson::getId), lessonId).create();
-		Map<String, Object> metadata = new HashMap<>();
-		Map<String, Object> lessonMap = new HashMap<>(Map.of("title", "Lesson title"));
-		when(lessonMapper.toDetailMap(lesson)).thenReturn(lessonMap);
-		PreparedMaterialsResult preparedMaterialsResult = mock(PreparedMaterialsResult.class);
-		Map<String, Object> preparedMap = Map.of("materials", List.of());
-		when(preparedMaterialsResult.toLegacyMap()).thenReturn(preparedMap);
-		when(materialPreparationService.prepareForLesson(lessonId)).thenReturn(preparedMaterialsResult);
-
-		// When:
-		Map<String, Object> result = service.prepareLessonForPrompt(lesson, lessonId, metadata);
-
-		// Then:
-		assertThat(result).isSameAs(lessonMap);
-		assertThat(metadata).containsEntry("preparedMaterials", preparedMap);
-		assertThat(result.get("generationMetadata")).isSameAs(metadata);
-	}
-
-	// -------------------------------------------------------------------------
-	// rejectIfActiveGeneration()
-	// -------------------------------------------------------------------------
-
-	@Test
-	void rejectIfActiveGenerationShouldNotThrowWhenNoActiveTeacherVideoExistsTest() {
-		// Given:
-		Map<String, Object> metadata = new HashMap<>();
-		when(lessonMapper.toTeacherVideoRecord(Map.of())).thenReturn(null);
-		when(teacherVideoMetadataSupport.hasActiveTeacherVideo(null)).thenReturn(false);
-
-		// When-Then:
-		assertDoesNotThrow(() -> service.rejectIfActiveGeneration(metadata));
-	}
-
-	@Test
-	void rejectIfActiveGenerationShouldThrowWhenTeacherVideoIsActiveTest() {
-		// Given:
-		Map<String, Object> existingTeacherVideoMap = Map.of("videoId", "video-9", "status", "processing");
-		Map<String, Object> metadata = new HashMap<>(Map.of("teacherVideo", existingTeacherVideoMap));
-		TeacherVideoRecord existingRecord = mock(TeacherVideoRecord.class);
-		when(lessonMapper.toTeacherVideoRecord(existingTeacherVideoMap)).thenReturn(existingRecord);
-		when(teacherVideoMetadataSupport.hasActiveTeacherVideo(existingRecord)).thenReturn(true);
-
-		// When-Then:
-		AppException thrown = assertThrows(AppException.class, () -> service.rejectIfActiveGeneration(metadata));
-		assertThat(thrown.getCode()).isEqualTo(ErrorReason.C006.name());
 	}
 
 	// -------------------------------------------------------------------------

@@ -45,13 +45,6 @@ public interface MaterialFileService {
     MaterialOpenAiUploadRecord updateMaterialFileOpenAIUpload(Long fileId, MaterialOpenAiUploadInput input);
 
     /**
-     * Deletes storage objects for the given keys without failing the surrounding transaction.
-     *
-     * @param storageKeys object storage keys to remove
-     */
-    void deleteStorageKeysQuietly(List<String> storageKeys);
-
-    /**
      * Returns non-blank storage keys currently associated with a material.
      *
      * @param materialId material identifier
@@ -86,23 +79,10 @@ public interface MaterialFileService {
     List<MaterialAttachmentInput> findAttachmentsForMaterials(List<Long> materialIds);
 
     /**
-     * Returns all file rows for the given material, joined with their kind.
-     *
-     * @param materialId material identifier
-     * @return file attachments for the material, unordered
-     */
-    List<MaterialFile> findByMaterialId(Long materialId);
-
-    /**
-     * Returns all file rows for the given material, ordered by creation time ascending.
-     *
-     * @param materialId material identifier
-     * @return file attachments for the material, oldest first
-     */
-    List<MaterialFile> findByMaterialIdOrderByCreatedAtAsc(Long materialId);
-
-    /**
      * Returns file rows for exactly the given materials, ordered by creation time ascending.
+     * A single-material caller passes a one-element collection; there is no separate
+     * single-id variant, since the {@code IN} query already returns the same rows in the
+     * same order for exactly one id.
      *
      * @param materialIds material identifiers to load rows for
      * @return file attachments for the given materials, oldest first
@@ -117,4 +97,14 @@ public interface MaterialFileService {
      * @return attachment summaries for the given materials, oldest first
      */
     List<MaterialFileSummaryProjection> findSummariesByMaterialIds(Collection<Long> materialIds);
+
+    /**
+     * Returns whether a material file row is currently stored under the given storage key.
+     * Used by cross-entity storage-key authorization to test for a match without loading the
+     * entity or depending on {@code MaterialFileRepository} directly.
+     *
+     * @param storageKey object storage key to check
+     * @return {@code true} when a material file row uses that storage key
+     */
+    boolean existsByStorageKey(String storageKey);
 }

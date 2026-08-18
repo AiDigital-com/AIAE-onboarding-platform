@@ -216,4 +216,57 @@ class GradeServiceImplTest {
 					.isInstanceOf(AppException.class);
 		}
 	}
+
+	@Nested
+	class ListGrades {
+
+		@Test
+		void listGradesShouldDelegateToListActiveWhenIncludeInactiveIsFalseTest() {
+			// Given:
+			AppUser admin = new AppUser(1L, "clerk-admin", "admin@test.com", "Admin", "admin", "Admin", null, null,
+					null);
+			Grade active = new Grade();
+			active.setIsActive(true);
+			when(gradeEntityService.findActiveOrderByDisplayOrder()).thenReturn(List.of(active));
+
+			// When:
+			List<GradeRecord> result = service.listGrades(admin, false);
+
+			// Then:
+			assertThat(result).hasSize(1);
+			verify(gradeEntityService, never()).findAllOrderByDisplayOrder();
+			verify(permissionService, never()).requirePermission(admin, PermissionKeys.GRADES_MANAGE);
+		}
+
+		@Test
+		void listGradesShouldDelegateToListAllWhenIncludeInactiveIsTrueTest() {
+			// Given:
+			AppUser admin = new AppUser(1L, "clerk-admin", "admin@test.com", "Admin", "admin", "Admin", null, null,
+					null);
+			Grade inactive = new Grade();
+			inactive.setIsActive(false);
+			when(gradeEntityService.findAllOrderByDisplayOrder()).thenReturn(List.of(inactive));
+
+			// When:
+			List<GradeRecord> result = service.listGrades(admin, true);
+
+			// Then:
+			assertThat(result).hasSize(1);
+			verify(permissionService).requirePermission(admin, PermissionKeys.GRADES_MANAGE);
+			verify(gradeEntityService, never()).findActiveOrderByDisplayOrder();
+		}
+
+		@Test
+		void listGradesShouldRequireGradesManagePermissionWhenIncludeInactiveIsTrueTest() {
+			// Given:
+			AppUser member = new AppUser(3L, "clerk-member", "member@test.com", "Member", "member", "Member", null,
+					null, null);
+			doThrow(new AppException(com.aidigital.aionboarding.service.common.error.ErrorReason.C004))
+					.when(permissionService).requirePermission(member, PermissionKeys.GRADES_MANAGE);
+
+			// When-Then:
+			assertThatThrownBy(() -> service.listGrades(member, true))
+					.isInstanceOf(AppException.class);
+		}
+	}
 }

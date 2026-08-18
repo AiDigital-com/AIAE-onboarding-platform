@@ -3,6 +3,14 @@ name: verification-gate
 description: Verify implementation claims with fresh, scope-appropriate evidence before declaring work complete, fixed, passing, ready to commit, or ready for PR. Use at the end of ad-hoc work and before handoff; use GSD verify-work instead when operating inside a GSD phase.
 ---
 
+<!--
+Generated file. Do not edit directly.
+Source: AIAE-llm-aux/skills/verification-gate/SKILL.md
+Revision: 690a9748657adf81d01702dafa2c7ecc8afcf5c5
+Target: claude
+-->
+
+
 # Verification Gate
 
 Require evidence before completion claims.
