@@ -4,6 +4,20 @@ hidden = [".idea", ".vscode", "target", "node_modules", "generated-sources", ".c
 # Boot hook — idempotent cleanup; no-op materialization since backend/ already exists.
 onBoot = "bash scripts/setup-project.sh"
 
+[userenv]
+
+[userenv.shared]
+CLERK_PUBLISHABLE_KEY = "pk_test_bGl2aW5nLWluc2VjdC02MC5jbGVyay5hY2NvdW50cy5kZXYk"
+AUTH_AUTHORIZED_PARTIES = "https://ai-onboarding-platform-poc.replit.app, https://ef470bbc-73d7-4b41-a937-273ced204772-00-1jsl8gtyv5yzd.worf.replit.dev,https://aiae-onboarding.aidigital.tech"
+AUTH_ALLOWED_EMAIL_DOMAIN = "aidigital.com"
+VITE_CLERK_JWT_TEMPLATE = "aidigital-api"
+OPENAI_ENABLED = "true"
+STORAGE_ENABLED = "true"
+YOUTUBE_ENABLED = "true"
+CLOUDFRONT_ENABLED = "true"
+REGION = "us-east-1"
+BUCKET = "aidigital-onboarding-platform-389473156764-us-east-1-an"
+
 [nix]
 channel = "stable-24_11"
 
