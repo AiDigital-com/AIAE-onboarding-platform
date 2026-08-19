@@ -1,7 +1,5 @@
 package com.aidigital.aionboarding.service.lesson.support;
 
-import com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode;
-import com.aidigital.aionboarding.domain.common.dictionary.LessonStatusCode;
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.domain.lesson.entities.LessonAssistantConversation;
 import com.aidigital.aionboarding.service.common.error.AppException;
@@ -10,6 +8,7 @@ import com.aidigital.aionboarding.service.common.observability.SecurityMetrics;
 import com.aidigital.aionboarding.service.common.observability.enums.ContinuationRejectionReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.learning.services.LearningEnrollmentService;
 import com.aidigital.aionboarding.service.learning.services.entity.LearningEnrollmentEntityService;
 import com.aidigital.aionboarding.service.lesson.enums.LessonAssistantPreset;
 import com.aidigital.aionboarding.service.lesson.models.AskLessonResultRecord;
@@ -52,6 +51,7 @@ public class LessonAssistantAnswerWorkflow {
     private final LessonEntityService lessonEntityService;
     private final UserEntityService userEntityService;
     private final LearningEnrollmentEntityService learningEnrollmentEntityService;
+    private final LearningEnrollmentService learningEnrollmentService;
     private final MaterialPreparationService materialPreparationService;
     private final LessonRecordAssembler lessonMapper;
     private final LessonGenService lessonGenService;
@@ -81,7 +81,8 @@ public class LessonAssistantAnswerWorkflow {
      * @param history  prior chat turns for context
      * @param preset   assistant response mode
      * @return the assistant's answer and generation metadata
-     * @throws AppException C001 if the lesson is missing, not enrolled, or not ready/published
+     * @throws AppException C001 if the lesson is missing, not enrolled, or not learnable (not
+     *     ready, or archived)
      * @throws AppException C002 if the question is blank or too long
      * @throws AppException C003 if the AI provider returns an incomplete or empty result
      */
@@ -99,8 +100,7 @@ public class LessonAssistantAnswerWorkflow {
             .orElseThrow(() -> new AppException(ErrorReason.C001, lessonId));
 
         Lesson lesson = lessonEntityService.findByIdWithFetches(lessonId);
-        if (!LessonStatusCode.READY.equals(lesson.getStatus().getCode())
-            || !LessonPublicationStatusCode.PUBLISHED.equals(lesson.getPublicationStatus().getCode())) {
+        if (!learningEnrollmentService.isLearnable(lesson)) {
             throw new AppException(ErrorReason.C001, lessonId);
         }
 

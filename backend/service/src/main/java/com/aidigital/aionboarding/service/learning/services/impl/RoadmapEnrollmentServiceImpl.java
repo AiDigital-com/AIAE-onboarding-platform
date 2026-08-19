@@ -118,7 +118,7 @@ public class RoadmapEnrollmentServiceImpl implements RoadmapEnrollmentService {
 		}
 		List<RoadmapLesson> roadmapLessons = roadmapEntityService.findByIdRoadmapIdOrderBySortOrderAsc(roadmapId);
 		List<RoadmapLesson> enrollableLessons = roadmapLessons.stream()
-				.filter(roadmapLesson -> learningEnrollmentService.isEnrollable(roadmapLesson.getLesson()))
+				.filter(roadmapLesson -> learningEnrollmentService.isLearnable(roadmapLesson.getLesson()))
 				.toList();
 		if (enrollableLessons.isEmpty()) {
 			return;

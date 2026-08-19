@@ -979,7 +979,7 @@ paths:
   /api/v1/lessons/{id}/status:
     patch:
       summary: Change lesson status
-      description: Publishes, privatizes, or archives a lesson.
+      description: Publishes (Public), unpublishes (back to Private), archives, or restores (archived back to Private) a lesson. Requires the lessons.publish_archive permission.
       tags: [ lessons ]
       operationId: changeLessonStatus
       security: [ { bearerAuth: [ ] } ]
@@ -1913,7 +1913,7 @@ components:
           allOf:
             - $ref: '#/components/schemas/LessonGenerationStatusV1'
         publicationStatus:
-          description: Restricts results to lessons in this publication visibility state.
+          description: Restricts results to lessons in this publication visibility state. Narrows visibility only - a non-manager viewer's results are additionally always limited to public lessons plus lessons assigned to them, regardless of the value supplied here, so this filter can never widen what the viewer is authorized to see.
           allOf:
             - $ref: '#/components/schemas/LessonVisibilityV1'
         createdByUserId:
@@ -1937,7 +1937,7 @@ components:
           type: boolean
           x-unconstrained-reason: Boolean type already constrains the value domain to true/false; no additional bound applies.
     SearchRoadmapsV1:
-      description: Roadmap search, filter, sort, and pagination criteria.
+      description: Roadmap search, filter, sort, and pagination criteria. Roadmaps are private by default - results are always restricted to roadmaps assigned to the viewer (directly or via their group), plus, for a viewer who may manage roadmaps, roadmaps they authored or (for a Team Lead) roadmaps authored by a member of their team. An Admin sees every roadmap.
       type: object
       additionalProperties: false
       properties:
@@ -2024,9 +2024,13 @@ components:
           allOf:
             - $ref: '#/components/schemas/LessonGenerationStatusV1'
     LessonVisibilityV1:
-      description: Lesson publication visibility state.
+      description: Lesson publication visibility state. 'published' (Public) is always visible in the Library to every authenticated viewer. 'private' (Private) is visible in the Library only to the lesson's author/managers and to viewers with an existing lesson assignment (enrollment); a Team Lead/Admin may still assign a private lesson, but a member cannot self-enroll in one. 'archived' is hidden from the Library for learners even when they remain enrolled.
       type: string
       enum: [ published, private, archived ]
+      x-enumDescriptions:
+        published: Public - always visible in the Library to every authenticated viewer.
+        private: Private - visible in the Library only to the author/managers and to viewers explicitly assigned (enrolled); assignable by a Team Lead/Admin, not self-enrollable.
+        archived: Hidden from the Library for learners, including previously enrolled learners.
     LessonContentFormatV1:
       description: Lesson content storage format.
       type: string
@@ -2036,9 +2040,14 @@ components:
       type: string
       enum: [ targeted, substantial, near-complete ]
     LessonPublishActionV1:
-      description: Publish or archive lifecycle action for a lesson.
+      description: Publication lifecycle action for a lesson. 'publish' sets the lesson Public. 'unpublish' returns a Public lesson to Private (visible in the Library only to assigned users), leaving its original publishedAt timestamp untouched. 'archive' hides the lesson from the Library entirely. 'restore' returns an archived lesson to Private.
       type: string
-      enum: [ publish, archive, restore ]
+      enum: [ publish, unpublish, archive, restore ]
+      x-enumDescriptions:
+        publish: Sets the lesson to Public - always visible in the Library.
+        unpublish: Returns a Public lesson to Private - visible in the Library only to assigned users. Does not change publishedAt.
+        archive: Hides the lesson from the Library entirely.
+        restore: Returns an archived lesson to Private.
     LessonCreationModeV1:
       description: Versioned lesson creation mode. 'generate' runs AI generation from prepared materials; 'create-manual' persists pre-authored HTML directly.
       type: string

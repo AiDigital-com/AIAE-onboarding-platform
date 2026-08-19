@@ -88,6 +88,37 @@ class LearningAssignmentAccessPolicyTest {
 	}
 
 	@Nested
+	class AssignableUserIds {
+
+		@Test
+		void shouldReturnEveryAssignableUserIdTest() {
+			// Given:
+			AppUser actor = adminActor();
+			when(teamService.getAssignableLearningUsers(actor))
+					.thenReturn(List.of(assignableUserRecord(20L), assignableUserRecord(21L)));
+
+			// When:
+			var result = policy.assignableUserIds(actor);
+
+			// Then:
+			assertThat(result).containsExactlyInAnyOrder(20L, 21L);
+		}
+
+		@Test
+		void shouldReturnEmptySetWhenActorMayManageNoOneTest() {
+			// Given: a plain member holds no assignable learners
+			AppUser actor = teamLeadActor();
+			when(teamService.getAssignableLearningUsers(actor)).thenReturn(List.of());
+
+			// When:
+			var result = policy.assignableUserIds(actor);
+
+			// Then:
+			assertThat(result).isEmpty();
+		}
+	}
+
+	@Nested
 	class RequireManageableTeam {
 
 		@Test

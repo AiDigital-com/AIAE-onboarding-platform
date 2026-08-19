@@ -47,9 +47,10 @@ public class LessonSpecificationBuilder {
     /**
      * Builds the search specification for the given filter and visibility rule.
      * <p>
-     * Mirrors {@code LessonServiceImpl.canView}: an admin sees everything, a viewer who manages
-     * lessons sees their own lessons regardless of publication state, and everyone else sees only
-     * published lessons. Eagerly fetches {@code status}, {@code publicationStatus}, and
+     * Mirrors {@code LessonMutationSupport.canView}: an admin sees everything, a viewer who
+     * manages lessons sees their own lessons regardless of publication state, and everyone else
+     * sees published (Public) lessons plus private (assigned-only) lessons they are enrolled in.
+     * Eagerly fetches {@code status}, {@code publicationStatus}, and
      * {@code createdByUser} when the query targets {@link Lesson} rows (skipped for the derived
      * count query), since those to-one fetches are otherwise dereferenced lazily per row by the
      * summary mapper.
@@ -59,7 +60,8 @@ public class LessonSpecificationBuilder {
      * @param statusId            resolved id for {@code filter.statusCode()}, or {@code null}
      * @param publicationStatusId resolved id for {@code filter.publicationStatusCode()}, or {@code null}
      * @param readyStatusId       resolved id for the "ready" lesson status
-     * @param publishedStatusId   resolved id for the "published" publication status
+     * @param publishedStatusId   resolved id for the "published" (Public) publication status
+     * @param privateStatusId     resolved id for the "private" publication status
      * @return the JPA Criteria specification
      */
     public Specification<Lesson> build(
@@ -68,7 +70,8 @@ public class LessonSpecificationBuilder {
         Long statusId,
         Long publicationStatusId,
         Long readyStatusId,
-        Long publishedStatusId
+        Long publishedStatusId,
+        Long privateStatusId
     ) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -115,7 +118,7 @@ public class LessonSpecificationBuilder {
                 predicates.add(hasAnyActivity(query, cb, root, filter.hasActivities()));
             }
 
-            predicates.add(visibilityPredicate(cb, root, visibility, publishedStatusId));
+            predicates.add(visibilityPredicate(query, cb, root, visibility, publishedStatusId, privateStatusId));
 
             // Applies to every result shape except the derived COUNT(Long) query — including the
             // lean summary projection, which (unlike the full-entity query above) is never fetch-joined.
@@ -137,24 +140,35 @@ public class LessonSpecificationBuilder {
     }
 
     /**
-     * Mirrors {@code LessonServiceImpl.canView}: admin sees all, a manage-holder sees their own
-     * lessons regardless of publication state, everyone else sees only published lessons.
+     * Mirrors {@code LessonMutationSupport.canView} exactly and must stay aligned with it: an
+     * admin sees all lessons in every publication state; a manage-holder additionally sees their
+     * own-authored lessons in every publication state; everyone else sees published (Public)
+     * lessons plus private (assigned-only) lessons they hold an existing enrollment for. Archived
+     * lessons match neither the published nor the enrolled-private branch, so they are excluded
+     * by construction rather than via an explicit {@code NOT archived} check.
      */
     Predicate visibilityPredicate(
+        CriteriaQuery<?> query,
         CriteriaBuilder cb,
         Root<Lesson> root,
         LessonVisibilityFilter visibility,
-        Long publishedStatusId
+        Long publishedStatusId,
+        Long privateStatusId
     ) {
         if (visibility.admin()) {
             return cb.conjunction();
         }
         Predicate published = cb.equal(root.get(Lesson_.publicationStatus).get(LessonPublicationStatus_.id), publishedStatusId);
+        Predicate privateAndEnrolled = cb.and(
+            cb.equal(root.get(Lesson_.publicationStatus).get(LessonPublicationStatus_.id), privateStatusId),
+            enrolledByViewer(query, cb, root, visibility.viewerUserId())
+        );
+        Predicate base = cb.or(published, privateAndEnrolled);
         if (!visibility.canManageOwnLessons()) {
-            return published;
+            return base;
         }
         Predicate ownedByViewer = cb.equal(root.get(Lesson_.createdByUser).get(User_.id), visibility.viewerUserId());
-        return cb.or(ownedByViewer, published);
+        return cb.or(ownedByViewer, base);
     }
 
     Predicate enrolledByViewer(CriteriaQuery<?> query, CriteriaBuilder cb, Root<Lesson> root, Long viewerId) {

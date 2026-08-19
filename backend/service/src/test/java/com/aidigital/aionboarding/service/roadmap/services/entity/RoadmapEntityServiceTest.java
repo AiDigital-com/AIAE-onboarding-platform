@@ -8,6 +8,7 @@ import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapListQuery;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapSortField;
+import com.aidigital.aionboarding.service.roadmap.models.RoadmapVisibilityFilter;
 import com.aidigital.aionboarding.service.roadmap.support.RoadmapSpecificationBuilder;
 import org.instancio.Instancio;
 import org.junit.jupiter.api.Test;
@@ -86,15 +87,16 @@ class RoadmapEntityServiceTest {
 		@SuppressWarnings("unchecked")
 		Specification<Roadmap> specification = (Specification<Roadmap>) org.mockito.Mockito.mock(Specification.class);
 		Page<Roadmap> page = new PageImpl<>(List.of(roadmap));
-		when(roadmapSpecificationBuilder.build(query, 7L)).thenReturn(specification);
+		RoadmapVisibilityFilter visibility = new RoadmapVisibilityFilter(false, false, false, 7L);
+		when(roadmapSpecificationBuilder.build(query, visibility)).thenReturn(specification);
 		when(roadmapRepository.findAll(eq(specification), any(Pageable.class))).thenReturn(page);
 
 		// When:
-		Page<Roadmap> result = roadmapEntityService.search(query, 7L, 0, 20);
+		Page<Roadmap> result = roadmapEntityService.search(query, visibility, 0, 20);
 
 		// Then:
 		assertThat(result.getContent()).containsExactly(roadmap);
-		verify(roadmapSpecificationBuilder).build(query, 7L);
+		verify(roadmapSpecificationBuilder).build(query, visibility);
 	}
 
 	@Test
@@ -105,15 +107,16 @@ class RoadmapEntityServiceTest {
 		);
 		@SuppressWarnings("unchecked")
 		Specification<Roadmap> specification = (Specification<Roadmap>) org.mockito.Mockito.mock(Specification.class);
-		when(roadmapSpecificationBuilder.build(query, 7L)).thenReturn(specification);
+		RoadmapVisibilityFilter visibility = new RoadmapVisibilityFilter(false, false, false, 7L);
+		when(roadmapSpecificationBuilder.build(query, visibility)).thenReturn(specification);
 		when(roadmapRepository.count(specification)).thenReturn(4L);
 
 		// When:
-		long result = roadmapEntityService.countRoadmaps(query, 7L);
+		long result = roadmapEntityService.countRoadmaps(query, visibility);
 
 		// Then:
 		assertThat(result).isEqualTo(4L);
-		verify(roadmapSpecificationBuilder).build(query, 7L);
+		verify(roadmapSpecificationBuilder).build(query, visibility);
 	}
 
 	@Test

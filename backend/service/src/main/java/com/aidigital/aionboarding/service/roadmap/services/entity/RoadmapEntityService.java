@@ -7,6 +7,7 @@ import com.aidigital.aionboarding.domain.roadmap.repositories.RoadmapRepository;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapListQuery;
+import com.aidigital.aionboarding.service.roadmap.models.RoadmapVisibilityFilter;
 import com.aidigital.aionboarding.service.roadmap.support.RoadmapSpecificationBuilder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -59,32 +60,33 @@ public class RoadmapEntityService {
     }
 
     /**
-     * Searches roadmaps with the given typed filters, returning a bounded, sorted page.
+     * Searches roadmaps with the given typed filters and visibility rule, returning a bounded,
+     * sorted page.
      *
-     * @param filter   typed filter and sort parameters
-     * @param viewerId the viewer's internal user id, used only when {@code filter.assignedToMe()} is true
-     * @param page     zero-based page index
-     * @param size     maximum number of roadmaps per page
-     * @return a page of {@link Roadmap} entities matching the filter
+     * @param filter     typed filter and sort parameters
+     * @param visibility security context resolved once per request
+     * @param page       zero-based page index
+     * @param size       maximum number of roadmaps per page
+     * @return a page of {@link Roadmap} entities matching the filter and visibility rule
      */
     @Transactional(readOnly = true)
-    public Page<Roadmap> search(RoadmapListQuery filter, Long viewerId, int page, int size) {
-        Specification<Roadmap> specification = roadmapSpecificationBuilder.build(filter, viewerId);
+    public Page<Roadmap> search(RoadmapListQuery filter, RoadmapVisibilityFilter visibility, int page, int size) {
+        Specification<Roadmap> specification = roadmapSpecificationBuilder.build(filter, visibility);
         Pageable pageable = PageRequest.of(page, size);
         return roadmapRepository.findAll(specification, pageable);
     }
 
     /**
-     * Counts roadmaps matching the given typed filters, without fetching or paginating any
-     * rows — for cheap tab-count display independent of the active Library tab.
+     * Counts roadmaps matching the given typed filters and visibility rule, without fetching or
+     * paginating any rows — for cheap tab-count display independent of the active Library tab.
      *
-     * @param filter   typed filter and sort parameters
-     * @param viewerId the viewer's internal user id, used only when {@code filter.assignedToMe()} is true
-     * @return the number of roadmaps matching the filter
+     * @param filter     typed filter and sort parameters
+     * @param visibility security context resolved once per request
+     * @return the number of roadmaps matching the filter and visibility rule
      */
     @Transactional(readOnly = true)
-    public long countRoadmaps(RoadmapListQuery filter, Long viewerId) {
-        Specification<Roadmap> specification = roadmapSpecificationBuilder.build(filter, viewerId);
+    public long countRoadmaps(RoadmapListQuery filter, RoadmapVisibilityFilter visibility) {
+        Specification<Roadmap> specification = roadmapSpecificationBuilder.build(filter, visibility);
         return roadmapRepository.count(specification);
     }
 

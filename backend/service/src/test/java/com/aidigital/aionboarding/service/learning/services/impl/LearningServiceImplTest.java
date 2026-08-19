@@ -102,8 +102,9 @@ class LearningServiceImplTest {
 			LocalDateTime enrolledAt = LocalDateTime.of(2026, 1, 1, 0, 0);
 			UserLesson enrollment = userLesson(20L, lessonId, user, enrolledAt, null);
 
-			when(learningEnrollmentService.requireEnrollableLesson(lessonId)).thenReturn(lesson);
+			when(learningEnrollmentService.requireLearnableLesson(lessonId)).thenReturn(lesson);
 			when(learningEnrollmentEntityService.findByLessonIdWithUser(lessonId)).thenReturn(List.of(enrollment));
+			when(learningAssignmentAccessPolicy.assignableUserIds(actor)).thenReturn(java.util.Set.of(20L));
 
 			// When:
 			List<LearningAssigneeRecord> result = service.listLessonAssignees(actor, lessonId);
@@ -126,8 +127,9 @@ class LearningServiceImplTest {
 			LocalDateTime completedAt = LocalDateTime.of(2026, 1, 2, 0, 0);
 			UserLesson enrollment = userLesson(20L, lessonId, user, enrolledAt, completedAt);
 
-			when(learningEnrollmentService.requireEnrollableLesson(lessonId)).thenReturn(lesson);
+			when(learningEnrollmentService.requireLearnableLesson(lessonId)).thenReturn(lesson);
 			when(learningEnrollmentEntityService.findByLessonIdWithUser(lessonId)).thenReturn(List.of(enrollment));
+			when(learningAssignmentAccessPolicy.assignableUserIds(actor)).thenReturn(java.util.Set.of(20L));
 
 			// When:
 			List<LearningAssigneeRecord> result = service.listLessonAssignees(actor, lessonId);
@@ -136,6 +138,51 @@ class LearningServiceImplTest {
 			assertThat(result).containsExactly(
 					new LearningAssigneeRecord(20L, user.getName(), user.getEmail(), enrolledAt, true)
 			);
+		}
+
+		@Test
+		void listLessonAssigneesShouldExcludeEnrolleesTheActorCannotManageTest() {
+			// Given: an enrollee outside the actor's manageable set (e.g. a team lead with no
+			// connection to this enrollee) must never appear in the roster.
+			AppUser actor = adminActor();
+			Long lessonId = 10L;
+			Lesson lesson = Instancio.create(Lesson.class);
+			User manageableUser = userWithRole(20L, UserRoleCode.MEMBER);
+			User unmanageableUser = userWithRole(21L, UserRoleCode.MEMBER);
+			LocalDateTime enrolledAt = LocalDateTime.of(2026, 1, 1, 0, 0);
+			UserLesson manageableEnrollment = userLesson(20L, lessonId, manageableUser, enrolledAt, null);
+			UserLesson unmanageableEnrollment = userLesson(21L, lessonId, unmanageableUser, enrolledAt, null);
+
+			when(learningEnrollmentService.requireLearnableLesson(lessonId)).thenReturn(lesson);
+			when(learningEnrollmentEntityService.findByLessonIdWithUser(lessonId))
+					.thenReturn(List.of(manageableEnrollment, unmanageableEnrollment));
+			when(learningAssignmentAccessPolicy.assignableUserIds(actor)).thenReturn(java.util.Set.of(20L));
+
+			// When:
+			List<LearningAssigneeRecord> result = service.listLessonAssignees(actor, lessonId);
+
+			// Then:
+			assertThat(result).extracting(LearningAssigneeRecord::userId).containsExactly(20L);
+		}
+
+		@Test
+		void listLessonAssigneesShouldReturnEmptyWhenActorMayManageNoOneTest() {
+			// Given:
+			AppUser actor = adminActor();
+			Long lessonId = 10L;
+			Lesson lesson = Instancio.create(Lesson.class);
+			UserLesson enrollment = userLesson(20L, lessonId, userWithRole(20L, UserRoleCode.MEMBER),
+					LocalDateTime.of(2026, 1, 1, 0, 0), null);
+
+			when(learningEnrollmentService.requireLearnableLesson(lessonId)).thenReturn(lesson);
+			when(learningEnrollmentEntityService.findByLessonIdWithUser(lessonId)).thenReturn(List.of(enrollment));
+			when(learningAssignmentAccessPolicy.assignableUserIds(actor)).thenReturn(java.util.Set.of());
+
+			// When:
+			List<LearningAssigneeRecord> result = service.listLessonAssignees(actor, lessonId);
+
+			// Then:
+			assertThat(result).isEmpty();
 		}
 	}
 
@@ -151,7 +198,7 @@ class LearningServiceImplTest {
 			Lesson lesson = Instancio.create(Lesson.class);
 
 			when(learningEnrollmentSupport.normalizeUserIds(userIds)).thenReturn(userIds);
-			when(learningEnrollmentService.requireEnrollableLesson(lessonId)).thenReturn(lesson);
+			when(learningEnrollmentService.requireLearnableLesson(lessonId)).thenReturn(lesson);
 
 			// When:
 			service.revokeLessonAssignments(actor, lessonId, userIds);
@@ -200,7 +247,7 @@ class LearningServiceImplTest {
 					Instancio.create(com.aidigital.aionboarding.service.learning.models.LessonAssignmentEnrollmentRecord.class);
 
 			when(learningEnrollmentSupport.normalizeUserIds(userIds)).thenReturn(userIds);
-			when(learningEnrollmentService.requireEnrollableLesson(lessonId)).thenReturn(lesson);
+			when(learningEnrollmentService.requireLearnableLesson(lessonId)).thenReturn(lesson);
 			when(learningEnrollmentService.enrollUsersInLesson(eq(userIds), eq(lesson), any(), eq(false)))
 					.thenReturn(List.of(firstRow, secondRow));
 			when(learningEnrollmentSupport.toLessonAssignmentEnrollment(firstRow, 20L)).thenReturn(firstRecord);
@@ -241,7 +288,7 @@ class LearningServiceImplTest {
 			UserLesson enrollment = Instancio.create(UserLesson.class);
 			com.aidigital.aionboarding.service.learning.models.LessonEnrollmentRecord enrollmentRecord =
 					Instancio.create(com.aidigital.aionboarding.service.learning.models.LessonEnrollmentRecord.class);
-			when(learningEnrollmentService.requireEnrollableLesson(lessonId)).thenReturn(lesson);
+			when(learningEnrollmentService.requireSelfEnrollableLesson(lessonId)).thenReturn(lesson);
 			when(learningEnrollmentService.enrollUserInLesson(eq(user.internalId()), eq(lesson), any(), eq(false)))
 					.thenReturn(enrollment);
 			when(learningEnrollmentSupport.toLessonEnrollment(enrollment)).thenReturn(enrollmentRecord);

@@ -3,9 +3,11 @@ package com.aidigital.aionboarding.service.roadmap.support;
 import com.aidigital.aionboarding.domain.learning.entities.UserRoadmap;
 import com.aidigital.aionboarding.domain.roadmap.entities.Roadmap;
 import com.aidigital.aionboarding.domain.roadmap.entities.Roadmap_;
+import com.aidigital.aionboarding.domain.team.entities.TeamMember;
 import com.aidigital.aionboarding.service.common.mapping.TagsFilterSupport;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapListQuery;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapSortField;
+import com.aidigital.aionboarding.service.roadmap.models.RoadmapVisibilityFilter;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
@@ -127,12 +129,17 @@ class RoadmapSpecificationBuilderTest {
 		when(cb.asc(sharedPath)).thenReturn(titleOrder);
 		when(query.getResultType()).thenReturn(Roadmap.class);
 
+		// The visibility predicate for a non-admin, non-manager viewer is the same
+		// enrolledByViewer EXISTS shape as the assignedToMe filter above, so it resolves through
+		// the identical stubbed subquery chain and produces the same enrollmentExists predicate.
+		RoadmapVisibilityFilter visibility = new RoadmapVisibilityFilter(false, false, false, viewerId);
+
 		Predicate finalAndPredicate = mock(Predicate.class);
-		when(cb.and(searchOrPredicate, jsonbContainsPredicate, createdByUserPredicate, enrollmentExists))
+		when(cb.and(searchOrPredicate, jsonbContainsPredicate, createdByUserPredicate, enrollmentExists, enrollmentExists))
 				.thenReturn(finalAndPredicate);
 
 		// When:
-		Specification<Roadmap> spec = builder.build(filter, viewerId);
+		Specification<Roadmap> spec = builder.build(filter, visibility);
 		Predicate result = spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -153,11 +160,15 @@ class RoadmapSpecificationBuilderTest {
 		Root<Roadmap> root = mock(Root.class);
 		when(query.getResultType()).thenReturn(Long.class);
 
+		// An admin visibility filter short-circuits to a single conjunction predicate.
+		RoadmapVisibilityFilter visibility = new RoadmapVisibilityFilter(true, false, false, 1L);
+		Predicate conjunction = mock(Predicate.class);
+		when(cb.conjunction()).thenReturn(conjunction);
 		Predicate finalPredicate = mock(Predicate.class);
-		when(cb.and()).thenReturn(finalPredicate);
+		when(cb.and(conjunction)).thenReturn(finalPredicate);
 
 		// When:
-		Specification<Roadmap> spec = builder.build(filter, 1L);
+		Specification<Roadmap> spec = builder.build(filter, visibility);
 		Predicate result = spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -180,11 +191,14 @@ class RoadmapSpecificationBuilderTest {
 		Order createdAtOrder = mock(Order.class);
 		when(cb.desc(createdAtPath)).thenReturn(createdAtOrder);
 		when(query.getResultType()).thenReturn(Roadmap.class);
+		RoadmapVisibilityFilter visibility = new RoadmapVisibilityFilter(true, false, false, 1L);
+		Predicate conjunction = mock(Predicate.class);
+		when(cb.conjunction()).thenReturn(conjunction);
 		Predicate finalPredicate = mock(Predicate.class);
-		when(cb.and()).thenReturn(finalPredicate);
+		when(cb.and(conjunction)).thenReturn(finalPredicate);
 
 		// When:
-		Specification<Roadmap> spec = builder.build(filter, 1L);
+		Specification<Roadmap> spec = builder.build(filter, visibility);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -207,14 +221,172 @@ class RoadmapSpecificationBuilderTest {
 		Order updatedAtOrder = mock(Order.class);
 		when(cb.asc(updatedAtPath)).thenReturn(updatedAtOrder);
 		when(query.getResultType()).thenReturn(Roadmap.class);
+		RoadmapVisibilityFilter visibility = new RoadmapVisibilityFilter(true, false, false, 1L);
+		Predicate conjunction = mock(Predicate.class);
+		when(cb.conjunction()).thenReturn(conjunction);
 		Predicate finalPredicate = mock(Predicate.class);
-		when(cb.and()).thenReturn(finalPredicate);
+		when(cb.and(conjunction)).thenReturn(finalPredicate);
 
 		// When:
-		Specification<Roadmap> spec = builder.build(filter, 1L);
+		Specification<Roadmap> spec = builder.build(filter, visibility);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
 		verify(query).orderBy(updatedAtOrder);
+	}
+
+	// ------------------------------------------------------------------
+	// visibilityPredicate()
+	// ------------------------------------------------------------------
+
+	@Test
+	void shouldReturnConjunctionWhenAdminTest() {
+		// Given:
+		RoadmapSpecificationBuilder builder = new RoadmapSpecificationBuilder(tagsFilterSupport);
+		CriteriaQuery query = mock(CriteriaQuery.class);
+		CriteriaBuilder cb = mock(CriteriaBuilder.class);
+		Root root = mock(Root.class);
+		Predicate conjunction = mock(Predicate.class);
+		RoadmapVisibilityFilter visibility = new RoadmapVisibilityFilter(true, false, false, 5L);
+
+		when(cb.conjunction()).thenReturn(conjunction);
+
+		// When:
+		Predicate result = builder.visibilityPredicate(query, cb, root, visibility);
+
+		// Then: an admin short-circuits before the enrolled-by-viewer subquery is ever built
+		assertThat(result).isSameAs(conjunction);
+		verify(query, org.mockito.Mockito.never()).subquery(Long.class);
+	}
+
+	@Test
+	void shouldReturnEnrolledOnlyPredicateWhenCannotManageRoadmapsTest() {
+		// Given: a plain viewer sees only roadmaps they hold an enrollment for
+		RoadmapSpecificationBuilder builder = new RoadmapSpecificationBuilder(tagsFilterSupport);
+		CriteriaQuery query = mock(CriteriaQuery.class);
+		CriteriaBuilder cb = mock(CriteriaBuilder.class);
+		Root root = mock(Root.class);
+		Subquery subquery = mock(Subquery.class);
+		Root correlatedRoadmap = mock(Root.class);
+		Root userRoadmapRoot = mock(Root.class);
+		Predicate enrolledExists = mock(Predicate.class);
+		RoadmapVisibilityFilter visibility = new RoadmapVisibilityFilter(false, false, false, 5L);
+
+		when(query.subquery(Long.class)).thenReturn(subquery);
+		when(subquery.correlate(root)).thenReturn(correlatedRoadmap);
+		when(subquery.from(UserRoadmap.class)).thenReturn(userRoadmapRoot);
+		when(userRoadmapRoot.get((SingularAttribute) null)).thenReturn(mock(Path.class));
+		when(cb.exists(subquery)).thenReturn(enrolledExists);
+
+		// When:
+		Predicate result = builder.visibilityPredicate(query, cb, root, visibility);
+
+		// Then:
+		assertThat(result).isSameAs(enrolledExists);
+		verify(subquery).correlate(root);
+	}
+
+	@Test
+	void shouldReturnOwnedOrEnrolledPredicateWhenCanManageRoadmapsButNotTeamLeadTest() {
+		// Given: a manage-holder additionally sees roadmaps they authored
+		RoadmapSpecificationBuilder builder = new RoadmapSpecificationBuilder(tagsFilterSupport);
+		CriteriaQuery query = mock(CriteriaQuery.class);
+		CriteriaBuilder cb = mock(CriteriaBuilder.class);
+		Root root = mock(Root.class);
+		Path sharedPath = mock(Path.class);
+		Subquery subquery = mock(Subquery.class);
+		Root correlatedRoadmap = mock(Root.class);
+		Root userRoadmapRoot = mock(Root.class);
+		Path userRoadmapSharedPath = mock(Path.class);
+		Predicate roadmapEqualPredicate = mock(Predicate.class);
+		Predicate enrolledExists = mock(Predicate.class);
+		Predicate notNullPredicate = mock(Predicate.class);
+		Predicate ownedEqualPredicate = mock(Predicate.class);
+		Predicate ownedPredicate = mock(Predicate.class);
+		Predicate orPredicate = mock(Predicate.class);
+		RoadmapVisibilityFilter visibility = new RoadmapVisibilityFilter(false, true, false, 7L);
+
+		when(root.get((SingularAttribute) null)).thenReturn(sharedPath);
+		when(query.subquery(Long.class)).thenReturn(subquery);
+		when(subquery.correlate(root)).thenReturn(correlatedRoadmap);
+		when(subquery.from(UserRoadmap.class)).thenReturn(userRoadmapRoot);
+		// userRoadmap.get(UserRoadmap_.roadmap) and userRoadmap.get(UserRoadmap_.user) are the
+		// same collapsed invocation on this mock and therefore share one stubbed Path; the
+		// roadmap-correlation equality is stubbed explicitly, and the second-level
+		// .get(User_.id) chain off that path is unstubbed and returns null.
+		when(userRoadmapRoot.get((SingularAttribute) null)).thenReturn(userRoadmapSharedPath);
+		when(cb.equal(userRoadmapSharedPath, correlatedRoadmap)).thenReturn(roadmapEqualPredicate);
+		when(cb.exists(subquery)).thenReturn(enrolledExists);
+		when(cb.isNotNull(sharedPath)).thenReturn(notNullPredicate);
+		when(cb.equal(null, 7L)).thenReturn(ownedEqualPredicate);
+		when(cb.and(notNullPredicate, ownedEqualPredicate)).thenReturn(ownedPredicate);
+		when(cb.or(enrolledExists, ownedPredicate)).thenReturn(orPredicate);
+
+		// When:
+		Predicate result = builder.visibilityPredicate(query, cb, root, visibility);
+
+		// Then:
+		assertThat(result).isSameAs(orPredicate);
+		verify(cb).or(enrolledExists, ownedPredicate);
+	}
+
+	@Test
+	void shouldReturnFullPredicateWhenTeamLeadAndCanManageRoadmapsTest() {
+		// Given: a team lead who may manage roadmaps additionally sees roadmaps authored by a
+		// member of their own team
+		RoadmapSpecificationBuilder builder = new RoadmapSpecificationBuilder(tagsFilterSupport);
+		CriteriaQuery query = mock(CriteriaQuery.class);
+		CriteriaBuilder cb = mock(CriteriaBuilder.class);
+		Root root = mock(Root.class);
+		Path sharedPath = mock(Path.class);
+		Subquery enrolledSubquery = mock(Subquery.class);
+		Root enrolledCorrelatedRoadmap = mock(Root.class);
+		Root userRoadmapRoot = mock(Root.class);
+		Path userRoadmapSharedPath = mock(Path.class);
+		Predicate enrolledExists = mock(Predicate.class);
+		Predicate notNullPredicate = mock(Predicate.class);
+		Predicate ownedEqualPredicate = mock(Predicate.class);
+		Predicate ownedPredicate = mock(Predicate.class);
+		Predicate withOwnedPredicate = mock(Predicate.class);
+		Subquery teamSubquery = mock(Subquery.class);
+		Root teamCorrelatedRoadmap = mock(Root.class);
+		Path teamCorrelatedAuthorPath = mock(Path.class);
+		Root teamMemberRoot = mock(Root.class);
+		Path teamMemberSharedPath = mock(Path.class);
+		Predicate teamExists = mock(Predicate.class);
+		Predicate finalOrPredicate = mock(Predicate.class);
+		RoadmapVisibilityFilter visibility = new RoadmapVisibilityFilter(false, true, true, 7L);
+
+		when(root.get((SingularAttribute) null)).thenReturn(sharedPath);
+		when(query.subquery(Long.class)).thenReturn(enrolledSubquery, teamSubquery);
+		when(enrolledSubquery.correlate(root)).thenReturn(enrolledCorrelatedRoadmap);
+		when(enrolledSubquery.from(UserRoadmap.class)).thenReturn(userRoadmapRoot);
+		// userRoadmap.get(UserRoadmap_.roadmap) and userRoadmap.get(UserRoadmap_.user) collapse to
+		// the same stubbed Path; the roadmap-correlation equality is stubbed explicitly below.
+		when(userRoadmapRoot.get((SingularAttribute) null)).thenReturn(userRoadmapSharedPath);
+		when(cb.equal(userRoadmapSharedPath, enrolledCorrelatedRoadmap)).thenReturn(mock(Predicate.class));
+		when(cb.exists(enrolledSubquery)).thenReturn(enrolledExists);
+		when(cb.isNotNull(sharedPath)).thenReturn(notNullPredicate);
+		when(cb.equal(null, 7L)).thenReturn(ownedEqualPredicate);
+		when(cb.and(notNullPredicate, ownedEqualPredicate)).thenReturn(ownedPredicate);
+		when(cb.or(enrolledExists, ownedPredicate)).thenReturn(withOwnedPredicate);
+
+		when(teamSubquery.correlate(root)).thenReturn(teamCorrelatedRoadmap);
+		when(teamSubquery.from(TeamMember.class)).thenReturn(teamMemberRoot);
+		// teamMember.get(leadUser) and teamMember.get(memberUser) collapse to the same stubbed
+		// Path; correlatedRoadmap.get(authorUser) must resolve to a non-null Path too, since the
+		// production code chains a further .get(User_.id) off it.
+		when(teamMemberRoot.get((SingularAttribute) null)).thenReturn(teamMemberSharedPath);
+		when(teamCorrelatedRoadmap.get((SingularAttribute) null)).thenReturn(teamCorrelatedAuthorPath);
+		when(cb.equal(null, null)).thenReturn(mock(Predicate.class));
+		when(cb.exists(teamSubquery)).thenReturn(teamExists);
+		when(cb.or(withOwnedPredicate, teamExists)).thenReturn(finalOrPredicate);
+
+		// When:
+		Predicate result = builder.visibilityPredicate(query, cb, root, visibility);
+
+		// Then:
+		assertThat(result).isSameAs(finalOrPredicate);
+		verify(cb).or(withOwnedPredicate, teamExists);
 	}
 }

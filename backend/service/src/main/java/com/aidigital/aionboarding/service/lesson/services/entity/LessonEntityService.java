@@ -406,9 +406,10 @@ public class LessonEntityService {
 				: requirePublicationStatus(query.publicationStatusCode()).getId();
 		Long readyStatusId = requireStatus(LessonStatusCode.READY).getId();
 		Long publishedStatusId = requirePublicationStatus(LessonPublicationStatusCode.PUBLISHED).getId();
+		Long privateStatusId = requirePublicationStatus(LessonPublicationStatusCode.PRIVATE).getId();
 
 		return lessonSpecificationBuilder.build(
-				query, visibility, statusId, publicationStatusId, readyStatusId, publishedStatusId
+				query, visibility, statusId, publicationStatusId, readyStatusId, publishedStatusId, privateStatusId
 		);
 	}
 

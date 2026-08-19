@@ -69,7 +69,7 @@ class LessonCompletionWorkflowTest {
 			CompletedRoadmapRecord completedRoadmap = Instancio.create(CompletedRoadmapRecord.class);
 
 			when(lessonEntityService.getReference(lessonId)).thenReturn(lesson);
-			when(learningEnrollmentService.isEnrollable(lesson)).thenReturn(true);
+			when(learningEnrollmentService.isLearnable(lesson)).thenReturn(true);
 			when(learningEnrollmentSupport.userLessonId(userId, lessonId)).thenReturn(id);
 			when(learningEnrollmentEntityService.findUserLessonById(id)).thenReturn(Optional.of(enrollment));
 			when(roadmapEnrollmentSyncService.getCompletedRoadmapsForUserLesson(userId, lessonId))
@@ -105,7 +105,7 @@ class LessonCompletionWorkflowTest {
 			LessonEnrollmentRecord enrollmentRecord = Instancio.create(LessonEnrollmentRecord.class);
 
 			when(lessonEntityService.getReference(lessonId)).thenReturn(lesson);
-			when(learningEnrollmentService.isEnrollable(lesson)).thenReturn(true);
+			when(learningEnrollmentService.isLearnable(lesson)).thenReturn(true);
 			when(learningEnrollmentSupport.userLessonId(userId, lessonId)).thenReturn(id);
 			when(learningEnrollmentEntityService.findUserLessonById(id)).thenReturn(Optional.of(enrollment));
 			when(learningEnrollmentSupport.toLessonEnrollment(enrollment)).thenReturn(enrollmentRecord);
@@ -131,7 +131,7 @@ class LessonCompletionWorkflowTest {
 			Long lessonId = 10L;
 			Lesson lesson = Instancio.create(Lesson.class);
 			when(lessonEntityService.getReference(lessonId)).thenReturn(lesson);
-			when(learningEnrollmentService.isEnrollable(lesson)).thenReturn(false);
+			when(learningEnrollmentService.isLearnable(lesson)).thenReturn(false);
 
 			// When-Then:
 			assertThatThrownBy(() -> workflow.setLessonCompletion(userId, lessonId, true))
@@ -147,7 +147,7 @@ class LessonCompletionWorkflowTest {
 			Lesson lesson = Instancio.create(Lesson.class);
 			UserLesson.UserLessonId id = new UserLesson.UserLessonId();
 			when(lessonEntityService.getReference(lessonId)).thenReturn(lesson);
-			when(learningEnrollmentService.isEnrollable(lesson)).thenReturn(true);
+			when(learningEnrollmentService.isLearnable(lesson)).thenReturn(true);
 			when(learningEnrollmentSupport.userLessonId(userId, lessonId)).thenReturn(id);
 			when(learningEnrollmentEntityService.findUserLessonById(id)).thenReturn(Optional.empty());
 

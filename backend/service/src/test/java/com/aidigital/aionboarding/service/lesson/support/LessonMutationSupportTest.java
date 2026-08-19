@@ -51,6 +51,8 @@ class LessonMutationSupportTest {
 	private LessonHtmlSanitizer lessonHtmlSanitizer;
 	@Mock
 	private RoadmapEntityService roadmapEntityService;
+	@Mock
+	private LessonVisibilityPolicy lessonVisibilityPolicy;
 
 	@InjectMocks
 	private LessonMutationSupport support;
@@ -77,11 +79,11 @@ class LessonMutationSupportTest {
 	class CanView {
 
 		@Test
-		void unenrolledLearnerOnPublishedLesson_returnsTrueWithoutThrowingTest() {
-			// Given
+		void delegatesToLessonVisibilityPolicyAndReturnsItsTrueResultTest() {
+			// Given: canView is a pure delegate to the single shared visibility rule
 			AppUser viewer = learnerViewer();
 			Lesson lesson = publishedLesson(1L);
-			when(permissionService.userHasPermission(viewer, PermissionKeys.LESSONS_MANAGE)).thenReturn(false);
+			when(lessonVisibilityPolicy.isVisible(viewer, lesson)).thenReturn(true);
 
 			// Execution
 			boolean result = support.canView(viewer, lesson);
@@ -89,6 +91,20 @@ class LessonMutationSupportTest {
 			// Verification - must return boolean, never throw
 			assertThat(result).isTrue();
 			verify(lessonActivityAccessPolicy, never()).requireEnrollment(any(), anyLong());
+		}
+
+		@Test
+		void delegatesToLessonVisibilityPolicyAndReturnsItsFalseResultTest() {
+			// Given:
+			AppUser viewer = learnerViewer();
+			Lesson lesson = publishedLesson(2L);
+			when(lessonVisibilityPolicy.isVisible(viewer, lesson)).thenReturn(false);
+
+			// Execution
+			boolean result = support.canView(viewer, lesson);
+
+			// Verification
+			assertThat(result).isFalse();
 		}
 	}
 

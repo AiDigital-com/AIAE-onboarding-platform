@@ -141,7 +141,12 @@ public class LessonServiceImpl implements LessonService {
         return lessonMapper.toDetailRecord(lessonEntityService.save(lesson));
     }
 
-    /** Publishes, archives, or restores a lesson after checking LESSONS_PUBLISH_ARCHIVE permission. */
+    /**
+     * Publishes (Public), unpublishes (Public back to Private), archives, or restores (archived
+     * back to Private) a lesson after checking LESSONS_PUBLISH_ARCHIVE permission. Unpublish and
+     * restore both write the Private publication status but leave {@code publishedAt} untouched,
+     * preserving the original publish timestamp across a Public&nbsp;&rarr;&nbsp;Private&nbsp;&rarr;&nbsp;Public cycle.
+     */
     @Override
     @Transactional
     public LessonDetailRecord changeLessonStatus(AppUser viewer, Long id, LessonStatusAction action) {
@@ -156,6 +161,7 @@ public class LessonServiceImpl implements LessonService {
                 lesson.setPublicationStatus(publication(LessonPublicationStatusCode.PUBLISHED));
                 lesson.setPublishedAt(currentTime.utcDateTime());
             }
+            case UNPUBLISH -> lesson.setPublicationStatus(publication(LessonPublicationStatusCode.PRIVATE));
             case ARCHIVE -> lesson.setPublicationStatus(publication(LessonPublicationStatusCode.ARCHIVED));
             case RESTORE -> lesson.setPublicationStatus(publication(LessonPublicationStatusCode.PRIVATE));
         }

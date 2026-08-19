@@ -23,6 +23,11 @@ const STATUS_PALETTE: Record<string, { fg: string }> = {
     private: { fg: "#80808e" },
 };
 
+/**
+ * Returns the publication badge label: 'archived' when hidden entirely, the lesson's generation
+ * status (draft/generating/failed) while it isn't ready yet, otherwise 'private' (assigned-only)
+ * or 'ready' (Public) based on {@code publicationStatus}.
+ */
 function getPublicationLabel(lesson: LibraryLesson) {
     if (lesson.isArchived || lesson.publicationStatus === "archived") {
         return "archived";
@@ -31,7 +36,7 @@ function getPublicationLabel(lesson: LibraryLesson) {
         return lesson.status;
     }
     if (!lesson.isPublished) {
-        return "draft";
+        return "private";
     }
     return lesson.status;
 }

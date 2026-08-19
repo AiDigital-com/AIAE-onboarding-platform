@@ -3,15 +3,22 @@ package com.aidigital.aionboarding.lesson;
 import com.aidigital.aionboarding.domain.common.dictionary.LessonContentFormatCode;
 import com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode;
 import com.aidigital.aionboarding.domain.common.dictionary.LessonStatusCode;
+import com.aidigital.aionboarding.domain.common.dictionary.UserRoleCode;
 import com.aidigital.aionboarding.domain.common.dictionary.entities.LessonContentFormat;
 import com.aidigital.aionboarding.domain.common.dictionary.entities.LessonPublicationStatus;
 import com.aidigital.aionboarding.domain.common.dictionary.entities.LessonStatus;
+import com.aidigital.aionboarding.domain.common.dictionary.entities.UserRole;
 import com.aidigital.aionboarding.domain.common.dictionary.repositories.LessonContentFormatRepository;
 import com.aidigital.aionboarding.domain.common.dictionary.repositories.LessonPublicationStatusRepository;
 import com.aidigital.aionboarding.domain.common.dictionary.repositories.LessonStatusRepository;
+import com.aidigital.aionboarding.domain.common.dictionary.repositories.UserRoleRepository;
+import com.aidigital.aionboarding.domain.learning.entities.UserLesson;
+import com.aidigital.aionboarding.domain.learning.repositories.UserLessonRepository;
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.domain.lesson.repositories.LessonRepository;
 import com.aidigital.aionboarding.domain.lesson.repositories.LessonSearchSummaryProjection;
+import com.aidigital.aionboarding.domain.user.entities.User;
+import com.aidigital.aionboarding.domain.user.repositories.UserRepository;
 import com.aidigital.aionboarding.service.common.mapping.TagsFilterSupport;
 import com.aidigital.aionboarding.service.lesson.models.LessonListQuery;
 import com.aidigital.aionboarding.service.lesson.models.LessonSortField;
@@ -65,6 +72,15 @@ class LessonSearchSummaryRepositoryIntegrationTest {
 	@Autowired
 	private LessonContentFormatRepository lessonContentFormatRepository;
 
+	@Autowired
+	private UserRepository userRepository;
+
+	@Autowired
+	private UserRoleRepository userRoleRepository;
+
+	@Autowired
+	private UserLessonRepository userLessonRepository;
+
 	private final LessonSpecificationBuilder specificationBuilder =
 			new LessonSpecificationBuilder(new TagsFilterSupport(new ObjectMapper()));
 
@@ -95,12 +111,13 @@ class LessonSearchSummaryRepositoryIntegrationTest {
 	}
 
 	@Test
-	void searchSummariesShouldExcludePrivateLessonsForANonManagingViewerTest() {
-		// Given: one published and one private lesson
+	void searchSummariesShouldExcludePrivateLessonsForANonEnrolledNonManagingViewerTest() {
+		// Given: one published and one private lesson, viewer holds no enrollment in either
 		lessonRepository.save(lesson("Published", LessonPublicationStatusCode.PUBLISHED, "<p>a</p>", "a", List.of()));
 		lessonRepository.save(lesson("Private", LessonPublicationStatusCode.PRIVATE, "<p>b</p>", "b", List.of()));
+		User viewer = userRepository.save(user("Viewer", "viewer@test.com"));
 		LessonListQuery query = anyoneVisibleQuery();
-		LessonVisibilityFilter nonManagingViewer = new LessonVisibilityFilter(false, false, 9L);
+		LessonVisibilityFilter nonManagingViewer = new LessonVisibilityFilter(false, false, viewer.getId());
 
 		// When:
 		Page<LessonSearchSummaryProjection> result = searchSummaries(query, nonManagingViewer, 0, 20);
@@ -108,6 +125,63 @@ class LessonSearchSummaryRepositoryIntegrationTest {
 		// Then:
 		assertThat(result.getContent()).extracting(LessonSearchSummaryProjection::title)
 				.containsExactly("Published");
+	}
+
+	@Test
+	void searchSummariesShouldIncludePrivateLessonWhenViewerIsEnrolledTest() {
+		// Given: a private lesson the viewer holds an enrollment (user_lessons row) for
+		Lesson privateLesson = lessonRepository.save(
+				lesson("Private Assigned", LessonPublicationStatusCode.PRIVATE, "<p>b</p>", "b", List.of()));
+		lessonRepository.save(lesson("Private Unassigned", LessonPublicationStatusCode.PRIVATE, "<p>c</p>", "c",
+				List.of()));
+		User viewer = userRepository.save(user("Assignee", "assignee@test.com"));
+		userLessonRepository.save(enrollment(viewer, privateLesson, LocalDateTime.of(2026, 1, 1, 0, 0)));
+		LessonListQuery query = anyoneVisibleQuery();
+		LessonVisibilityFilter nonManagingViewer = new LessonVisibilityFilter(false, false, viewer.getId());
+
+		// When:
+		Page<LessonSearchSummaryProjection> result = searchSummaries(query, nonManagingViewer, 0, 20);
+
+		// Then: only the private lesson the viewer is enrolled in is visible
+		assertThat(result.getContent()).extracting(LessonSearchSummaryProjection::title)
+				.containsExactly("Private Assigned");
+	}
+
+	@Test
+	void searchSummariesShouldExcludeArchivedLessonEvenWhenViewerIsEnrolledTest() {
+		// Given: an archived lesson the viewer remains enrolled in — archived is never a
+		// learner-visible state, even with an existing enrollment
+		Lesson archivedLesson = lessonRepository.save(
+				lesson("Archived Assigned", LessonPublicationStatusCode.ARCHIVED, "<p>b</p>", "b", List.of()));
+		User viewer = userRepository.save(user("Assignee2", "assignee2@test.com"));
+		userLessonRepository.save(enrollment(viewer, archivedLesson, LocalDateTime.of(2026, 1, 1, 0, 0)));
+		LessonListQuery query = anyoneVisibleQuery();
+		LessonVisibilityFilter nonManagingViewer = new LessonVisibilityFilter(false, false, viewer.getId());
+
+		// When:
+		Page<LessonSearchSummaryProjection> result = searchSummaries(query, nonManagingViewer, 0, 20);
+
+		// Then:
+		assertThat(result.getContent()).isEmpty();
+	}
+
+	@Test
+	void searchSummariesShouldIncludeOwnPrivateLessonForAManageHolderRegardlessOfEnrollmentTest() {
+		// Given: a manage-holder's own private lesson, with no enrollment for themselves
+		Lesson ownLesson = lessonRepository.save(
+				lesson("Own Draft", LessonPublicationStatusCode.PRIVATE, "<p>a</p>", "a", List.of()));
+		User manager = userRepository.save(user("Manager", "manager@test.com"));
+		ownLesson.setCreatedByUser(manager);
+		lessonRepository.save(ownLesson);
+		LessonListQuery query = anyoneVisibleQuery();
+		LessonVisibilityFilter manageHolder = new LessonVisibilityFilter(false, true, manager.getId());
+
+		// When:
+		Page<LessonSearchSummaryProjection> result = searchSummaries(query, manageHolder, 0, 20);
+
+		// Then:
+		assertThat(result.getContent()).extracting(LessonSearchSummaryProjection::title)
+				.containsExactly("Own Draft");
 	}
 
 	@Test
@@ -150,33 +224,71 @@ class LessonSearchSummaryRepositoryIntegrationTest {
 
 	@Test
 	void countShouldMatchTheNumberOfLessonsVisibleToTheViewerTest() {
-		// Given: one published, one private lesson
+		// Given: one published, one private (not enrolled), one private (enrolled) lesson
 		lessonRepository.save(lesson("Published", LessonPublicationStatusCode.PUBLISHED, "<p>a</p>", "a", List.of()));
 		lessonRepository.save(lesson("Private", LessonPublicationStatusCode.PRIVATE, "<p>b</p>", "b", List.of()));
+		Lesson assignedPrivateLesson = lessonRepository.save(
+				lesson("Private Assigned", LessonPublicationStatusCode.PRIVATE, "<p>c</p>", "c", List.of()));
+		User viewer = userRepository.save(user("CountViewer", "countviewer@test.com"));
+		userLessonRepository.save(enrollment(viewer, assignedPrivateLesson, LocalDateTime.of(2026, 1, 1, 0, 0)));
 		LessonListQuery query = anyoneVisibleQuery();
-		LessonVisibilityFilter nonManagingViewer = new LessonVisibilityFilter(false, false, 9L);
+		LessonVisibilityFilter nonManagingViewer = new LessonVisibilityFilter(false, false, viewer.getId());
 
-		// When: counting via the same reused specification as the summary search
-		Long readyStatusId = lessonStatusRepository.findByCode(LessonStatusCode.READY).orElseThrow().getId();
-		Long publishedStatusId =
-				lessonPublicationStatusRepository.findByCode(LessonPublicationStatusCode.PUBLISHED).orElseThrow().getId();
-		Specification<Lesson> specification =
-				specificationBuilder.build(query, nonManagingViewer, null, null, readyStatusId, publishedStatusId);
-		long total = lessonRepository.count(specification);
+		// When: counting and listing via the same reused specification, so a drift between the
+		// row query and the derived count query would fail this assertion
+		Page<LessonSearchSummaryProjection> page = searchSummaries(query, nonManagingViewer, 0, 20);
+		long total = countVisible(query, nonManagingViewer);
 
-		// Then: only the published lesson is visible and counted
-		assertThat(total).isEqualTo(1L);
+		// Then: the published lesson plus the enrolled private lesson are visible and counted;
+		// the unassigned private lesson is excluded from both
+		assertThat(page.getContent()).extracting(LessonSearchSummaryProjection::title)
+				.containsExactlyInAnyOrder("Published", "Private Assigned");
+		assertThat(total).isEqualTo(2L);
+		assertThat(page.getTotalElements()).isEqualTo(2L);
 	}
 
 	private Page<LessonSearchSummaryProjection> searchSummaries(
 			LessonListQuery query, LessonVisibilityFilter visibility, int page, int size
 	) {
+		Specification<Lesson> specification = buildSpecification(query, visibility);
+		return lessonRepository.searchSummaries(specification, PageRequest.of(page, size));
+	}
+
+	private long countVisible(LessonListQuery query, LessonVisibilityFilter visibility) {
+		return lessonRepository.count(buildSpecification(query, visibility));
+	}
+
+	private Specification<Lesson> buildSpecification(LessonListQuery query, LessonVisibilityFilter visibility) {
 		Long readyStatusId = lessonStatusRepository.findByCode(LessonStatusCode.READY).orElseThrow().getId();
 		Long publishedStatusId =
 				lessonPublicationStatusRepository.findByCode(LessonPublicationStatusCode.PUBLISHED).orElseThrow().getId();
-		Specification<Lesson> specification =
-				specificationBuilder.build(query, visibility, null, null, readyStatusId, publishedStatusId);
-		return lessonRepository.searchSummaries(specification, PageRequest.of(page, size));
+		Long privateStatusId =
+				lessonPublicationStatusRepository.findByCode(LessonPublicationStatusCode.PRIVATE).orElseThrow().getId();
+		return specificationBuilder.build(query, visibility, null, null, readyStatusId, publishedStatusId, privateStatusId);
+	}
+
+	private User user(String name, String email) {
+		UserRole role = userRoleRepository.findByCode(UserRoleCode.MEMBER).orElseThrow();
+		User user = new User();
+		user.setName(name);
+		user.setEmail(email);
+		user.setRole(role);
+		LocalDateTime now = LocalDateTime.of(2026, 1, 1, 0, 0);
+		user.setCreatedAt(now);
+		user.setUpdatedAt(now);
+		return user;
+	}
+
+	private UserLesson enrollment(User user, Lesson lesson, LocalDateTime enrolledAt) {
+		UserLesson userLesson = new UserLesson();
+		UserLesson.UserLessonId id = new UserLesson.UserLessonId();
+		id.setUserId(user.getId());
+		id.setLessonId(lesson.getId());
+		userLesson.setId(id);
+		userLesson.setUser(user);
+		userLesson.setLesson(lesson);
+		userLesson.setEnrolledAt(enrolledAt);
+		return userLesson;
 	}
 
 	private LessonListQuery anyoneVisibleQuery() {

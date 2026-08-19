@@ -20,6 +20,7 @@ import com.aidigital.aionboarding.service.roadmap.models.CreateRoadmapInput;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapListQuery;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapRecord;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapSortField;
+import com.aidigital.aionboarding.service.roadmap.models.RoadmapVisibilityFilter;
 import com.aidigital.aionboarding.service.roadmap.models.UpdateRoadmapInput;
 import com.aidigital.aionboarding.service.roadmap.services.entity.RoadmapEntityService;
 import com.aidigital.aionboarding.service.roadmap.support.RoadmapAccessPolicy;
@@ -89,6 +90,20 @@ class RoadmapServiceImplTest {
 		return new AppUser(2L, "clerk-member", "member@test.com", "Member", "member", "Member", null, null, null);
 	}
 
+	/**
+	 * Builds the visibility filter {@code RoadmapServiceImpl} resolves internally, mirroring its
+	 * {@code permissionService.userHasPermission(viewer, ROADMAPS_MANAGE)} lookup, which resolves
+	 * to {@code false} on an unstubbed mock unless a test explicitly stubs it otherwise.
+	 */
+	private RoadmapVisibilityFilter visibilityFilter(AppUser viewer) {
+		return new RoadmapVisibilityFilter(
+				viewer.isAdmin(),
+				permissionService.userHasPermission(viewer, PermissionKeys.ROADMAPS_MANAGE),
+				viewer.isTeamLead(),
+				viewer.internalId()
+		);
+	}
+
 	private RoadmapRecord baseRecord(Long id, String title) {
 		return new RoadmapRecord(id, title, "desc", List.of(), List.of(), List.of(), null, null, null,
 				"creator", LocalDateTime.now(), LocalDateTime.now());
@@ -124,7 +139,7 @@ class RoadmapServiceImplTest {
 		void shouldReturnEmptyPageWithoutFurtherQueriesWhenNoRoadmapsExistTest() {
 			// Given:
 			AppUser viewer = adminViewer();
-			when(roadmapEntityService.search(defaultQuery, viewer.internalId(), 0, 20))
+			when(roadmapEntityService.search(defaultQuery, visibilityFilter(viewer), 0, 20))
 					.thenReturn(new PageImpl<>(List.of()));
 
 			// When:
@@ -144,7 +159,7 @@ class RoadmapServiceImplTest {
 					.set(field(Roadmap::getId), 10L)
 					.set(field(Roadmap::getAuthorUser), null)
 					.create();
-			when(roadmapEntityService.search(defaultQuery, viewer.internalId(), 0, 20))
+			when(roadmapEntityService.search(defaultQuery, visibilityFilter(viewer), 0, 20))
 					.thenReturn(new PageImpl<>(List.of(roadmap)));
 			when(roadmapAccessPolicy.getManageableRoadmapIds(viewer, List.of(roadmap))).thenReturn(null);
 			when(roadmapEnrollmentFanOutSupport.getViewerEnrollmentsByRoadmapId(viewer, List.of(roadmap)))
@@ -176,7 +191,7 @@ class RoadmapServiceImplTest {
 					.set(field(Roadmap::getId), 21L)
 					.set(field(Roadmap::getAuthorUser), null)
 					.create();
-			when(roadmapEntityService.search(defaultQuery, viewer.internalId(), 0, 20))
+			when(roadmapEntityService.search(defaultQuery, visibilityFilter(viewer), 0, 20))
 					.thenReturn(new PageImpl<>(List.of(manageable, notManageable)));
 			when(roadmapAccessPolicy.getManageableRoadmapIds(viewer, List.of(manageable, notManageable)))
 					.thenReturn(Set.of(20L));
@@ -221,7 +236,7 @@ class RoadmapServiceImplTest {
 					.set(field(UserRoadmap::getId), enrollmentId)
 					.set(field(UserRoadmap::getEnrolledAt), enrolledAt)
 					.create();
-			when(roadmapEntityService.search(defaultQuery, viewer.internalId(), 0, 20))
+			when(roadmapEntityService.search(defaultQuery, visibilityFilter(viewer), 0, 20))
 					.thenReturn(new PageImpl<>(List.of(roadmap)));
 			when(roadmapAccessPolicy.getManageableRoadmapIds(viewer, List.of(roadmap))).thenReturn(null);
 			when(roadmapEnrollmentFanOutSupport.getViewerEnrollmentsByRoadmapId(viewer, List.of(roadmap)))
@@ -278,7 +293,7 @@ class RoadmapServiceImplTest {
 					.set(field(RoadmapLesson::getSortOrder), 0)
 					.create();
 
-			when(roadmapEntityService.search(defaultQuery, viewer.internalId(), 0, 20))
+			when(roadmapEntityService.search(defaultQuery, visibilityFilter(viewer), 0, 20))
 					.thenReturn(new PageImpl<>(List.of(roadmapOne, roadmapTwo)));
 			when(roadmapAccessPolicy.getManageableRoadmapIds(viewer, List.of(roadmapOne, roadmapTwo))).thenReturn(null);
 			when(roadmapEnrollmentFanOutSupport.getViewerEnrollmentsByRoadmapId(viewer, List.of(roadmapOne, roadmapTwo)))
@@ -327,7 +342,7 @@ class RoadmapServiceImplTest {
 					.set(field(RoadmapLesson::getSortOrder), 0)
 					.create();
 
-			when(roadmapEntityService.search(defaultQuery, viewer.internalId(), 0, 20))
+			when(roadmapEntityService.search(defaultQuery, visibilityFilter(viewer), 0, 20))
 					.thenReturn(new PageImpl<>(List.of(roadmap)));
 			when(roadmapAccessPolicy.getManageableRoadmapIds(viewer, List.of(roadmap))).thenReturn(null);
 			when(roadmapEnrollmentFanOutSupport.getViewerEnrollmentsByRoadmapId(viewer, List.of(roadmap)))
@@ -357,14 +372,14 @@ class RoadmapServiceImplTest {
 			RoadmapListQuery query = new RoadmapListQuery(
 					null, null, null, null, RoadmapSortField.CREATED_AT, Sort.Direction.DESC
 			);
-			when(roadmapEntityService.countRoadmaps(query, viewer.internalId())).thenReturn(9L);
+			when(roadmapEntityService.countRoadmaps(query, visibilityFilter(viewer))).thenReturn(9L);
 
 			// When:
 			long result = service.countRoadmaps(viewer, query);
 
 			// Then:
 			assertThat(result).isEqualTo(9L);
-			verify(roadmapEntityService).countRoadmaps(query, viewer.internalId());
+			verify(roadmapEntityService).countRoadmaps(query, visibilityFilter(viewer));
 		}
 	}
 
@@ -394,7 +409,7 @@ class RoadmapServiceImplTest {
 			// When-Then:
 			assertThatThrownBy(() -> service.createRoadmap(viewer, input))
 					.isInstanceOf(AppException.class);
-			verify(roadmapLessonValidator, never()).validateReadyPublishedLessons(List.of(1L));
+			verify(roadmapLessonValidator, never()).validateReadyPublishedLessons(viewer, List.of(1L));
 		}
 
 		@Test
@@ -406,7 +421,7 @@ class RoadmapServiceImplTest {
 			// When-Then:
 			assertThatThrownBy(() -> service.createRoadmap(viewer, input))
 					.isInstanceOf(AppException.class);
-			verify(roadmapLessonValidator, never()).validateReadyPublishedLessons(List.of(1L));
+			verify(roadmapLessonValidator, never()).validateReadyPublishedLessons(viewer, List.of(1L));
 		}
 
 		@Test
@@ -431,7 +446,7 @@ class RoadmapServiceImplTest {
 					.set(field(Lesson::getTags), List.of())
 					.create();
 			when(roadmapLessonValidator.normalizeLessonIds(List.of(1L, 1L, 2L))).thenReturn(List.of(1L, 2L));
-			when(roadmapLessonValidator.validateReadyPublishedLessons(List.of(1L, 2L))).thenReturn(List.of(lessonOne,
+			when(roadmapLessonValidator.validateReadyPublishedLessons(viewer, List.of(1L, 2L))).thenReturn(List.of(lessonOne,
 					lessonTwo));
 			when(roadmapLessonValidator.mergeTags(List.of(), List.of(lessonOne, lessonTwo))).thenReturn(List.of());
 			User author = Instancio.of(User.class).set(field(User::getId), viewer.internalId()).create();
@@ -447,7 +462,7 @@ class RoadmapServiceImplTest {
 			service.createRoadmap(viewer, input);
 
 			// Then:
-			verify(roadmapLessonValidator).validateReadyPublishedLessons(List.of(1L, 2L));
+			verify(roadmapLessonValidator).validateReadyPublishedLessons(viewer, List.of(1L, 2L));
 		}
 
 		@Test
@@ -456,7 +471,7 @@ class RoadmapServiceImplTest {
 			AppUser viewer = adminViewer();
 			CreateRoadmapInput input = new CreateRoadmapInput("Title", "desc", List.of(), List.of());
 			when(roadmapLessonValidator.normalizeLessonIds(List.of())).thenReturn(List.of());
-			when(roadmapLessonValidator.validateReadyPublishedLessons(List.of()))
+			when(roadmapLessonValidator.validateReadyPublishedLessons(viewer, List.of()))
 					.thenThrow(new AppException(ErrorReason.C002, "Select at least one lesson for the roadmap."));
 
 			// When-Then:
@@ -471,7 +486,7 @@ class RoadmapServiceImplTest {
 			AppUser viewer = adminViewer();
 			CreateRoadmapInput input = new CreateRoadmapInput("Title", "desc", List.of(1L, 2L), List.of());
 			when(roadmapLessonValidator.normalizeLessonIds(List.of(1L, 2L))).thenReturn(List.of(1L, 2L));
-			when(roadmapLessonValidator.validateReadyPublishedLessons(List.of(1L, 2L)))
+			when(roadmapLessonValidator.validateReadyPublishedLessons(viewer, List.of(1L, 2L)))
 					.thenThrow(new AppException(ErrorReason.C002, "Roadmaps can include only existing published ready " +
 							"lessons."));
 
@@ -487,7 +502,7 @@ class RoadmapServiceImplTest {
 			AppUser viewer = adminViewer();
 			CreateRoadmapInput input = new CreateRoadmapInput("Title", "desc", List.of(1L), List.of());
 			when(roadmapLessonValidator.normalizeLessonIds(List.of(1L))).thenReturn(List.of(1L));
-			when(roadmapLessonValidator.validateReadyPublishedLessons(List.of(1L)))
+			when(roadmapLessonValidator.validateReadyPublishedLessons(viewer, List.of(1L)))
 					.thenThrow(new AppException(ErrorReason.C002, "Roadmaps can include only existing published ready " +
 							"lessons."));
 
@@ -519,7 +534,7 @@ class RoadmapServiceImplTest {
 					.set(field(Lesson::getTags), List.of("lesson-two-tag"))
 					.create();
 			when(roadmapLessonValidator.normalizeLessonIds(List.of(1L, 2L))).thenReturn(List.of(1L, 2L));
-			when(roadmapLessonValidator.validateReadyPublishedLessons(List.of(1L, 2L))).thenReturn(List.of(lessonOne,
+			when(roadmapLessonValidator.validateReadyPublishedLessons(viewer, List.of(1L, 2L))).thenReturn(List.of(lessonOne,
 					lessonTwo));
 			when(roadmapLessonValidator.mergeTags(List.of("input-tag"), List.of(lessonOne, lessonTwo)))
 					.thenReturn(List.of("input-tag", "lesson-one-tag", "lesson-two-tag"));
@@ -560,7 +575,7 @@ class RoadmapServiceImplTest {
 					.set(field(Lesson::getId), 3L).set(field(Lesson::getStatus), readyStatus)
 					.set(field(Lesson::getPublicationStatus), publishedStatus).set(field(Lesson::getTags), List.of()).create();
 			when(roadmapLessonValidator.normalizeLessonIds(List.of(1L, 2L, 3L))).thenReturn(List.of(1L, 2L, 3L));
-			when(roadmapLessonValidator.validateReadyPublishedLessons(List.of(1L, 2L, 3L)))
+			when(roadmapLessonValidator.validateReadyPublishedLessons(viewer, List.of(1L, 2L, 3L)))
 					.thenReturn(List.of(lessonOne, lessonTwo, lessonThree));
 			when(roadmapLessonValidator.mergeTags(List.of(), List.of(lessonOne, lessonTwo, lessonThree))).thenReturn(List.of());
 			User author = Instancio.of(User.class).set(field(User::getId), viewer.internalId()).create();
@@ -676,7 +691,7 @@ class RoadmapServiceImplTest {
 					Optional.of(List.of(5L)), Optional.of(List.of("new-tag")));
 			when(roadmapAccessPolicy.requireManageable(viewer, id)).thenReturn(roadmap);
 			when(roadmapLessonValidator.normalizeLessonIds(List.of(5L))).thenReturn(List.of(5L));
-			when(roadmapLessonValidator.validateReadyPublishedLessons(List.of(5L))).thenReturn(List.of(lesson));
+			when(roadmapLessonValidator.validateReadyPublishedLessons(viewer, List.of(5L))).thenReturn(List.of(lesson));
 			when(roadmapLessonValidator.mergeTags(List.of("new-tag"), List.of(lesson))).thenReturn(List.of("new-tag",
 					"lesson-tag"));
 			when(roadmapEntityService.save(roadmap)).thenReturn(roadmap);
@@ -723,7 +738,7 @@ class RoadmapServiceImplTest {
 			// asserted by verifying mergeTags received ONLY the input tag and an empty lesson list,
 			// and that no lesson validation happened for this branch.
 			assertThat(roadmap.getTags()).isEqualTo(List.of("only-tag"));
-			verify(roadmapLessonValidator, never()).validateReadyPublishedLessons(List.of(5L));
+			verify(roadmapLessonValidator, never()).validateReadyPublishedLessons(viewer, List.of(5L));
 			verify(roadmapEntityService, never()).deleteByIdRoadmapId(id);
 		}
 	}

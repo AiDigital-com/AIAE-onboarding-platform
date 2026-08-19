@@ -9,8 +9,8 @@ import java.util.List;
 
 /**
  * Orchestrates lesson enrollment, assignment, and completion for learners. Roadmap enrollment
- * and assignment (individual and standing team assignment) live in
- * {@link RoadmapAssignmentService}.
+ * and individual assignment live in {@link RoadmapAssignmentService}; standing team assignment
+ * lives in {@link RoadmapTeamAssignmentService}.
  */
 public interface LearningService {
 

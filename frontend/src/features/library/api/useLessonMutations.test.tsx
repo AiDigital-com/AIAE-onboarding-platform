@@ -3,7 +3,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiClient } from "@/shared/api/client";
-import { useUploadLessonFileMutation, useUploadLessonVideoMutation } from "./useLessonMutations";
+import { useChangeLessonStatusMutation, useUploadLessonFileMutation, useUploadLessonVideoMutation } from "./useLessonMutations";
 
 vi.mock("@/shared/lib/videoFileValidation", () => ({
     assertBrowserPlayableVideo: vi.fn().mockResolvedValue(undefined),
@@ -16,6 +16,15 @@ function createWrapper() {
         return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
     }
     return { Wrapper };
+}
+
+/** Same as createWrapper, but also exposes the QueryClient so a test can spy on it directly. */
+function createTrackedWrapper() {
+    const queryClient = new QueryClient();
+    function Wrapper({ children }: { children: ReactNode }) {
+        return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+    }
+    return { Wrapper, queryClient };
 }
 
 describe("useUploadLessonFileMutation", () => {
@@ -81,5 +90,39 @@ describe("useUploadLessonVideoMutation", () => {
             expect.objectContaining({ body: { fileName: "clip.mp4", contentType: "video/mp4", size: file.size } }),
         );
         expect(result.current.data).toMatchObject({ storageKey: "uploads/abc/clip.mp4" });
+    });
+});
+
+describe("useChangeLessonStatusMutation", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it("should PATCH the unpublish action and invalidate the lessons list, count, and lesson detail test", async () => {
+        // Given: unpublish returns a Public lesson to Private (assigned-only)
+        const patchSpy = vi.spyOn(apiClient, "PATCH").mockResolvedValue({
+            data: { lesson: { id: 7, publicationStatus: "private" } },
+            error: undefined,
+        } as never);
+        const { Wrapper, queryClient } = createTrackedWrapper();
+        const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+        // When:
+        const { result } = renderHook(() => useChangeLessonStatusMutation(), { wrapper: Wrapper });
+        result.current.mutate({ id: 7, payload: { action: "unpublish" } });
+        await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+        // Then:
+        expect(patchSpy).toHaveBeenCalledWith(
+            "/api/v1/lessons/{id}/status",
+            expect.objectContaining({
+                params: { path: { id: 7 } },
+                body: { action: "unpublish" },
+            }),
+        );
+        // The lessons-list invalidation key ["library", "lessons"] also matches the count query
+        // key ["library", "lessons", "count", params] by TanStack Query's default prefix match.
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["library", "lessons"] });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["lessons", "detail", "7"] });
     });
 });

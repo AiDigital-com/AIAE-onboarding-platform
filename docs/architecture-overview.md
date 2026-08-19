@@ -240,6 +240,100 @@ read.
   into frontend assets or committed (`VITE_*` values are the only ones the
   browser receives).
 
+## Lesson and roadmap visibility model
+
+- Evidence: `backend/service/src/main/java/com/aidigital/aionboarding/service/lesson/support/LessonSpecificationBuilder.java`,
+  `backend/service/src/main/java/com/aidigital/aionboarding/service/roadmap/support/RoadmapSpecificationBuilder.java`,
+  `backend/service/src/main/java/com/aidigital/aionboarding/service/lesson/support/LessonVisibilityPolicy.java`,
+  `backend/service/src/main/java/com/aidigital/aionboarding/service/lesson/support/LessonMutationSupport.java`,
+  `backend/service/src/main/java/com/aidigital/aionboarding/service/lessonactivity/services/impl/LessonActivityServiceImpl.java`,
+  `backend/service/src/main/java/com/aidigital/aionboarding/service/roadmap/support/RoadmapLessonValidator.java`
+
+Lessons reuse the existing `lesson_publication_status` dictionary (no schema
+change): `published` = **Public**, always visible in the Library; `private` =
+**Private**, visible in the Library only to the author/manage-holders and to
+viewers holding an existing `user_lessons` enrollment; `archived` = hidden
+from the Library for learners even if still enrolled. The rule has exactly
+TWO implementations by design, and both must be kept in lockstep with each
+other: a SQL predicate in `LessonSpecificationBuilder.visibilityPredicate`
+(list/count queries — it must stay a JPA Criteria predicate so it reaches the
+derived `COUNT` query and pagination stays correct), and a single Java
+implementation in `LessonVisibilityPolicy.isVisible`/`visibleLessonIds`. That
+policy — not a per-call-site copy — is consumed by `LessonMutationSupport.canView`
+(direct-by-ID access via `LessonServiceImpl.getLesson`),
+`LessonActivityServiceImpl.canViewLesson` (gates `getLessonActivities`/
+`getLessonActivity`, called independently by `LessonsController.getLesson`
+alongside `LessonService.getLesson`), and `RoadmapLessonValidator` (rejecting
+a roadmap-lesson selection the actor cannot see — see below). Before the rule
+was collapsed into one policy, `LessonMutationSupport.canView` and
+`LessonActivityServiceImpl.canViewLesson` were two hand-maintained copies of
+the same rule, and a drift between them previously shipped as a live bug
+(`canViewLesson` was missing the `private && enrolled` branch). The policy
+and its two Java call sites are now tested from one shared JUnit
+`@MethodSource` matrix
+(`LessonVisibilityPolicyTest#visibilityMatrix`) so they cannot drift apart
+again. Any future change to the rule touches `LessonVisibilityPolicy` and,
+separately, `LessonSpecificationBuilder.visibilityPredicate` — the two
+JavaDocs cross-reference each other for exactly this reason.
+
+`LessonVisibilityPolicy.visibleLessonIds(viewer, lessons)` is batch-capable:
+it resolves the viewer's private-lesson enrollments in at most one query
+regardless of how many lessons are checked, never once per lesson. This
+matters because `RoadmapLessonValidator.validateReadyPublishedLessons` calls
+it once for the whole roadmap-lesson selection on every create/update, not in
+a per-lesson loop.
+
+Enrollability is a second, separate axis, extracted into its own stateless
+policy, `LessonLearnabilityPolicy` (`ready && (published || private)`),
+reused by `LearningEnrollmentService.isLearnable`,
+`RoadmapLessonValidator`, `LessonActivityAccessPolicy`, and
+`LessonAssistantAnswerWorkflow`. `LearningEnrollmentService` additionally
+exposes `isSelfEnrollable` (`ready && published`, the Library self-service
+"Add to My Lessons" path only). This split is what lets a Team Lead/Admin
+assign a Private lesson (and use its activities/assistant once enrolled)
+while a Member cannot self-enroll in one — a single shared predicate
+previously made every Private lesson unassignable. Learnability and
+visibility are independent axes: a lesson can be learnable but not visible to
+a given actor (see the roadmap leak below), or visible but not learnable
+(e.g. archived, visible to an admin).
+
+**Closed leak — roadmap-lesson selection bypassing visibility.**
+`RoadmapLessonValidator.validateReadyPublishedLessons` originally checked
+only "exists and is learnable," with no actor parameter. Once Private
+lessons became a learnable (assignable) state, that made it possible for any
+`ROADMAPS_CREATE`/`ROADMAPS_MANAGE` holder to POST an arbitrary lesson ID —
+including another author's Private lesson, which they cannot see in their
+own Library — add it to a roadmap, and fan it out to every assignee via the
+roadmap's own enrollment sync. `validateReadyPublishedLessons` now takes the
+acting `AppUser` and additionally requires
+`LessonVisibilityPolicy.visibleLessonIds(actor, lessons)` to include the
+lesson, rejecting an invisible lesson with the exact same message a
+non-existent ID gets (`C002`, "Roadmaps can include only existing, learnable
+lessons.") so the response never confirms the lesson's existence.
+
+Roadmaps are private by default: `RoadmapSpecificationBuilder.visibilityPredicate`
+restricts the list/count query to roadmaps the viewer holds a `UserRoadmap`
+enrollment for (direct or group-fanned-out, both land as the same row type via
+`RoadmapGroupAssignmentSyncServiceImpl`), plus, for a roadmap-manage holder,
+roadmaps they authored, plus, for a Team Lead, roadmaps authored by one of
+their own team's members. There is no standalone "get roadmap by id" endpoint
+in this API — a roadmap's data is only ever obtained via the visibility-scoped
+list/search endpoint, so there is no separate detail-path leak to guard.
+
+On the Library page, a Member sees only the always-visible Lessons tab;
+Materials (`materials.create/edit/delete`) and Roadmaps
+(`roadmaps.create`/`roadmaps.manage`) tabs render only for a permission holder,
+and their list **and** count queries are gated on that same permission check
+(not just on which tab is active) so a Member's Library page never issues a
+materials/roadmaps request even during the brief window before the
+permission snapshot resolves.
+
+When a Public lesson is set back to Private, existing self-enrolled learners
+are grandfathered (their `user_lessons` row is untouched) rather than revoked
+— `user_lessons` does not currently record enrollment source
+(self vs. assigned), so a revoke-on-unpublish policy would need a schema
+change first.
+
 ## Data ownership and migrations
 
 - Evidence: `backend/migrations/src/main/resources/db/changelog/db.changelog-master.xml`

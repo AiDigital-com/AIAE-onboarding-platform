@@ -11,7 +11,7 @@ import com.aidigital.aionboarding.support.ApiResponses;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
-import com.aidigital.aionboarding.service.learning.services.RoadmapAssignmentService;
+import com.aidigital.aionboarding.service.learning.services.RoadmapTeamAssignmentService;
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import com.aidigital.aionboarding.service.team.services.TeamService;
@@ -29,7 +29,7 @@ public class TeamsController implements TeamsApi {
 
     private final CurrentUserSupport currentUser;
     private final TeamService teamService;
-    private final RoadmapAssignmentService roadmapAssignmentService;
+    private final RoadmapTeamAssignmentService roadmapTeamAssignmentService;
     private final PermissionService permissionService;
     private final PaginationSupport paginationSupport;
     private final TeamApiMapper teamApiMapper;
@@ -62,7 +62,7 @@ public class TeamsController implements TeamsApi {
         teamService.getUserById(leadId).orElseThrow(() -> new AppException(ErrorReason.C001, leadId));
         UserRecord member = teamService.addTeamMember(leadId, request.getMemberId(),
                 teamApiMapper.resolveMemberRef(request));
-        roadmapAssignmentService.syncNewTeamMemberEnrollments(leadId, member.id());
+        roadmapTeamAssignmentService.syncNewTeamMemberEnrollments(leadId, member.id());
         return ResponseEntity.ok(teamApiMapper.toAddTeamMemberResponseV1(member));
     }
 

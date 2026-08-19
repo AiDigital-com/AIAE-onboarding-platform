@@ -52,21 +52,47 @@ public interface LearningEnrollmentService {
     Optional<LessonEnrollmentRecord> findLessonEnrollment(AppUser viewer, Long lessonId);
 
     /**
-     * Loads a lesson that is ready and published for enrollment.
+     * Loads a lesson that is ready and published (Public) for self-service enrollment. Use this
+     * only for the learner-initiated self-enroll path; a Team Lead/Admin assigning, listing, or
+     * revoking assignees, a roadmap's lesson fan-out, and completion must use
+     * {@link #requireLearnableLesson(Long)} instead so private (assigned-only) lessons remain
+     * usable on those paths.
      *
      * @param lessonId lesson identifier
-     * @return enrollable lesson entity
-     * @throws com.aidigital.aionboarding.service.common.error.AppException when the lesson is missing or not enrollable
+     * @return self-enrollable lesson entity
+     * @throws com.aidigital.aionboarding.service.common.error.AppException when the lesson is missing or not self-enrollable
      */
-    Lesson requireEnrollableLesson(Long lessonId);
+    Lesson requireSelfEnrollableLesson(Long lessonId);
 
     /**
-     * Checks whether a lesson is ready and published.
+     * Loads a lesson that is ready and either published (Public) or private (assigned-only), for
+     * assignment, revoke, assignee listing, roadmap fan-out, and completion.
+     *
+     * @param lessonId lesson identifier
+     * @return learnable lesson entity
+     * @throws com.aidigital.aionboarding.service.common.error.AppException when the lesson is missing or not learnable
+     */
+    Lesson requireLearnableLesson(Long lessonId);
+
+    /**
+     * Checks whether a lesson is ready and published (Public) — the Library self-service
+     * enrollment path only. A private lesson is never self-enrollable, even though it remains
+     * assignable; see {@link #isLearnable(Lesson)}.
      *
      * @param lesson lesson entity
-     * @return {@code true} when the lesson can be enrolled
+     * @return {@code true} when the lesson can be self-enrolled
      */
-    boolean isEnrollable(Lesson lesson);
+    boolean isSelfEnrollable(Lesson lesson);
+
+    /**
+     * Checks whether a lesson is ready and either published (Public) or private (assigned-only).
+     * Used by assignment, revoke, assignee listing, roadmap fan-out, and completion, so a Team
+     * Lead/Admin can still assign and a learner can still complete a private lesson.
+     *
+     * @param lesson lesson entity
+     * @return {@code true} when the lesson is learnable
+     */
+    boolean isLearnable(Lesson lesson);
 
     /**
      * Enrolls a user in a lesson, optionally updating an existing enrollment timestamp.

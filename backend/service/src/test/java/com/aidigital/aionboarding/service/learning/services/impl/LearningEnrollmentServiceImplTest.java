@@ -14,6 +14,7 @@ import com.aidigital.aionboarding.service.learning.models.LessonEnrollmentRecord
 import com.aidigital.aionboarding.service.learning.services.entity.LearningEnrollmentEntityService;
 import com.aidigital.aionboarding.service.learning.support.LearningEnrollmentSupport;
 import com.aidigital.aionboarding.service.lesson.services.entity.LessonEntityService;
+import com.aidigital.aionboarding.service.lesson.support.LessonLearnabilityPolicy;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityCountsRecord;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityAssemblyService;
 import com.aidigital.aionboarding.service.user.services.entity.UserEntityService;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -53,6 +55,8 @@ class LearningEnrollmentServiceImplTest {
 	private LearningEnrollmentSupport enrollmentSupport;
 	@Mock
 	private LessonActivityAssemblyService lessonActivityAssemblyService;
+	@Spy
+	private LessonLearnabilityPolicy lessonLearnabilityPolicy = new LessonLearnabilityPolicy();
 
 	@InjectMocks
 	private LearningEnrollmentServiceImpl service;
@@ -212,7 +216,7 @@ class LearningEnrollmentServiceImplTest {
 	}
 
 	@Nested
-	class RequireEnrollableLesson {
+	class RequireSelfEnrollableLesson {
 
 		@Test
 		void shouldReturnLessonWhenReadyAndPublishedTest() {
@@ -223,7 +227,7 @@ class LearningEnrollmentServiceImplTest {
 			when(lessonEntityService.getReference(lessonId)).thenReturn(lesson);
 
 			// When:
-			Lesson result = service.requireEnrollableLesson(lessonId);
+			Lesson result = service.requireSelfEnrollableLesson(lessonId);
 
 			// Then:
 			assertThat(result).isSameAs(lesson);
@@ -238,28 +242,90 @@ class LearningEnrollmentServiceImplTest {
 			when(lessonEntityService.getReference(lessonId)).thenReturn(lesson);
 
 			// When-Then:
-			assertThatThrownBy(() -> service.requireEnrollableLesson(lessonId))
+			assertThatThrownBy(() -> service.requireSelfEnrollableLesson(lessonId))
 					.isInstanceOf(AppException.class)
 					.hasMessageContaining("not ready");
 		}
 
 		@Test
-		void shouldThrowWhenLessonNotPublishedTest() {
-			// Given:
+		void shouldThrowWhenLessonPrivateTest() {
+			// Given: a private lesson is assignable but never self-enrollable
 			Long lessonId = 1L;
 			Lesson lesson = lessonWithStatus(LessonStatusCode.READY, LessonPublicationStatusCode.PRIVATE);
 			lesson.setId(lessonId);
 			when(lessonEntityService.getReference(lessonId)).thenReturn(lesson);
 
 			// When-Then:
-			assertThatThrownBy(() -> service.requireEnrollableLesson(lessonId))
+			assertThatThrownBy(() -> service.requireSelfEnrollableLesson(lessonId))
 					.isInstanceOf(AppException.class)
 					.hasMessageContaining("not ready");
 		}
 	}
 
 	@Nested
-	class IsEnrollable {
+	class RequireLearnableLesson {
+
+		@Test
+		void shouldReturnLessonWhenReadyAndPublishedTest() {
+			// Given:
+			Long lessonId = 1L;
+			Lesson lesson = lessonWithStatus(LessonStatusCode.READY, LessonPublicationStatusCode.PUBLISHED);
+			lesson.setId(lessonId);
+			when(lessonEntityService.getReference(lessonId)).thenReturn(lesson);
+
+			// When:
+			Lesson result = service.requireLearnableLesson(lessonId);
+
+			// Then:
+			assertThat(result).isSameAs(lesson);
+		}
+
+		@Test
+		void shouldReturnLessonWhenReadyAndPrivateTest() {
+			// Given: a private lesson remains learnable so a Team Lead/Admin can still assign it
+			Long lessonId = 1L;
+			Lesson lesson = lessonWithStatus(LessonStatusCode.READY, LessonPublicationStatusCode.PRIVATE);
+			lesson.setId(lessonId);
+			when(lessonEntityService.getReference(lessonId)).thenReturn(lesson);
+
+			// When:
+			Lesson result = service.requireLearnableLesson(lessonId);
+
+			// Then:
+			assertThat(result).isSameAs(lesson);
+		}
+
+		@Test
+		void shouldThrowWhenLessonNotReadyTest() {
+			// Given:
+			Long lessonId = 1L;
+			Lesson lesson = lessonWithStatus(LessonStatusCode.DRAFT, LessonPublicationStatusCode.PUBLISHED);
+			lesson.setId(lessonId);
+			when(lessonEntityService.getReference(lessonId)).thenReturn(lesson);
+
+			// When-Then:
+			assertThatThrownBy(() -> service.requireLearnableLesson(lessonId))
+					.isInstanceOf(AppException.class)
+					.hasMessageContaining("not ready");
+		}
+
+		@Test
+		void shouldThrowWhenLessonArchivedTest() {
+			// Given:
+			Long lessonId = 1L;
+			Lesson lesson = lessonWithStatus(LessonStatusCode.READY, LessonPublicationStatusCode.ARCHIVED);
+			lesson.setId(lessonId);
+			when(lessonEntityService.getReference(lessonId)).thenReturn(lesson);
+
+			// When-Then:
+			assertThatThrownBy(() -> service.requireLearnableLesson(lessonId))
+					.isInstanceOf(AppException.class)
+					.hasMessageContaining("not ready");
+		}
+	}
+
+	@Nested
+	class IsSelfEnrollable {
 
 		@Test
 		void shouldReturnTrueForReadyAndPublishedLessonTest() {
@@ -267,7 +333,7 @@ class LearningEnrollmentServiceImplTest {
 			Lesson lesson = lessonWithStatus(LessonStatusCode.READY, LessonPublicationStatusCode.PUBLISHED);
 
 			// When:
-			boolean result = service.isEnrollable(lesson);
+			boolean result = service.isSelfEnrollable(lesson);
 
 			// Then:
 			assertThat(result).isTrue();
@@ -279,19 +345,71 @@ class LearningEnrollmentServiceImplTest {
 			Lesson lesson = lessonWithStatus(LessonStatusCode.DRAFT, LessonPublicationStatusCode.PUBLISHED);
 
 			// When:
-			boolean result = service.isEnrollable(lesson);
+			boolean result = service.isSelfEnrollable(lesson);
 
 			// Then:
 			assertThat(result).isFalse();
 		}
 
 		@Test
-		void shouldReturnFalseForNonPublishedLessonTest() {
-			// Given:
+		void shouldReturnFalseForPrivateLessonTest() {
+			// Given: private lessons are never self-enrollable, even though they are learnable
 			Lesson lesson = lessonWithStatus(LessonStatusCode.READY, LessonPublicationStatusCode.PRIVATE);
 
 			// When:
-			boolean result = service.isEnrollable(lesson);
+			boolean result = service.isSelfEnrollable(lesson);
+
+			// Then:
+			assertThat(result).isFalse();
+		}
+	}
+
+	@Nested
+	class IsLearnable {
+
+		@Test
+		void shouldReturnTrueForReadyAndPublishedLessonTest() {
+			// Given:
+			Lesson lesson = lessonWithStatus(LessonStatusCode.READY, LessonPublicationStatusCode.PUBLISHED);
+
+			// When:
+			boolean result = service.isLearnable(lesson);
+
+			// Then:
+			assertThat(result).isTrue();
+		}
+
+		@Test
+		void shouldReturnTrueForReadyAndPrivateLessonTest() {
+			// Given: private lessons remain learnable so assignment/completion still work
+			Lesson lesson = lessonWithStatus(LessonStatusCode.READY, LessonPublicationStatusCode.PRIVATE);
+
+			// When:
+			boolean result = service.isLearnable(lesson);
+
+			// Then:
+			assertThat(result).isTrue();
+		}
+
+		@Test
+		void shouldReturnFalseForNonReadyLessonTest() {
+			// Given:
+			Lesson lesson = lessonWithStatus(LessonStatusCode.GENERATING, LessonPublicationStatusCode.PUBLISHED);
+
+			// When:
+			boolean result = service.isLearnable(lesson);
+
+			// Then:
+			assertThat(result).isFalse();
+		}
+
+		@Test
+		void shouldReturnFalseForArchivedLessonTest() {
+			// Given:
+			Lesson lesson = lessonWithStatus(LessonStatusCode.READY, LessonPublicationStatusCode.ARCHIVED);
+
+			// When:
+			boolean result = service.isLearnable(lesson);
 
 			// Then:
 			assertThat(result).isFalse();

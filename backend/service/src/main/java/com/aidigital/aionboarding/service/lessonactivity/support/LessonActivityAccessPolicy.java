@@ -1,8 +1,6 @@
 package com.aidigital.aionboarding.service.lessonactivity.support;
 
 import com.aidigital.aionboarding.domain.common.dictionary.ActivityTypeCode;
-import com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode;
-import com.aidigital.aionboarding.domain.common.dictionary.LessonStatusCode;
 import com.aidigital.aionboarding.domain.common.dictionary.entities.ActivityProgressStatus;
 import com.aidigital.aionboarding.domain.common.dictionary.entities.ActivityType;
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
@@ -12,6 +10,7 @@ import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.learning.services.entity.LearningEnrollmentEntityService;
 import com.aidigital.aionboarding.service.lesson.services.entity.LessonEntityService;
+import com.aidigital.aionboarding.service.lesson.support.LessonLearnabilityPolicy;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import java.util.LinkedHashMap;
@@ -29,6 +28,7 @@ public class LessonActivityAccessPolicy {
     private final DictionaryLookupService dictionaryLookupService;
     private final PermissionService permissionService;
     private final LessonActivityPayloadAssembler payloadAssembler;
+    private final LessonLearnabilityPolicy lessonLearnabilityPolicy;
 
     /**
      * Loads the lesson eagerly initialising {@code status}/{@code publicationStatus}/
@@ -45,10 +45,20 @@ public class LessonActivityAccessPolicy {
         return lessonEntityService.findByIdWithFetches(lessonId);
     }
 
-    public Lesson requirePublishedReadyLesson(Long lessonId) {
+    /**
+     * Loads the lesson and verifies it is learnable — {@code READY} and either
+     * {@code PUBLISHED} (Public) or {@code PRIVATE} (assigned-only). Callers
+     * ({@code submitActivityProgress}, {@code resetActivityProgress}) already call
+     * {@link #requireEnrollment(AppUser, Long)} immediately before this, so enrollment is already
+     * verified; this only rules out a still-generating or archived lesson.
+     *
+     * @param lessonId the lesson primary key
+     * @return the learnable lesson
+     * @throws AppException C001 if the lesson is missing or not learnable
+     */
+    public Lesson requireLearnableLesson(Long lessonId) {
         Lesson lesson = requireLesson(lessonId);
-        if (!LessonStatusCode.READY.equals(lesson.getStatus().getCode())
-            || !LessonPublicationStatusCode.PUBLISHED.equals(lesson.getPublicationStatus().getCode())) {
+        if (!lessonLearnabilityPolicy.isLearnable(lesson)) {
             throw new AppException(ErrorReason.C001, "Lesson not found.");
         }
         return lesson;

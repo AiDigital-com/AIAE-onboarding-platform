@@ -4,14 +4,13 @@ import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.learning.models.LearningAssigneeRecord;
 import com.aidigital.aionboarding.service.learning.models.RoadmapAssignmentResultRecord;
 import com.aidigital.aionboarding.service.learning.models.RoadmapEnrollmentResultRecord;
-import com.aidigital.aionboarding.service.learning.models.RoadmapTeamAssignmentRecord;
-import com.aidigital.aionboarding.service.learning.models.RoadmapTeamAssignmentResultRecord;
 
 import java.util.List;
 
 /**
- * Orchestrates roadmap enrollment, individual assignment, and standing team assignment for
- * learners.
+ * Orchestrates roadmap enrollment and individual assignment for learners. Standing team
+ * assignment (assigning a roadmap to a whole team and keeping new members enrolled) lives in
+ * {@link RoadmapTeamAssignmentService} — a separate responsibility with its own collaborators.
  */
 public interface RoadmapAssignmentService {
 
@@ -60,44 +59,4 @@ public interface RoadmapAssignmentService {
      * @param roadmapId roadmap identifier
      */
     void unenrollRoadmap(AppUser user, Long roadmapId);
-
-    /**
-     * Assigns a roadmap to a team, identified by its lead's user id, and enrolls every current
-     * team member. Calling this again for the same roadmap and team re-syncs enrollment for any
-     * members added since the last call without creating a duplicate assignment record.
-     *
-     * @param actor user performing the assignment
-     * @param roadmapId roadmap identifier
-     * @param leadUserId team lead identifier that identifies the target team
-     * @return the standing assignment record and enrollment details for each enrolled member
-     */
-    RoadmapTeamAssignmentResultRecord assignRoadmapToGroup(AppUser actor, Long roadmapId, Long leadUserId);
-
-    /**
-     * Removes a roadmap's standing assignment to a team. Existing member enrollments and their
-     * progress are left untouched; only future automatic enrollment for that team is stopped.
-     *
-     * @param actor user performing the unassignment
-     * @param roadmapId roadmap identifier
-     * @param leadUserId team lead identifier that identifies the target team
-     */
-    void unassignRoadmapFromGroup(AppUser actor, Long roadmapId, Long leadUserId);
-
-    /**
-     * Lists a roadmap's standing team assignments visible to the viewer (all teams for an admin,
-     * only the viewer's own team otherwise).
-     *
-     * @param viewer authenticated viewer
-     * @param roadmapId roadmap identifier
-     * @return visible team assignments for the roadmap
-     */
-    List<RoadmapTeamAssignmentRecord> getRoadmapTeamAssignments(AppUser viewer, Long roadmapId);
-
-    /**
-     * Enrolls a newly added team member into every roadmap already standing-assigned to that team.
-     *
-     * @param leadUserId team lead identifier that identifies the team the member joined
-     * @param memberUserId newly added member identifier
-     */
-    void syncNewTeamMemberEnrollments(Long leadUserId, Long memberUserId);
 }

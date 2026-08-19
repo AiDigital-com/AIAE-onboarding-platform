@@ -63,3 +63,9 @@ export interface RoadmapLessonSummary extends RoadmapLessonV1 {
 export interface LibraryRoadmap extends RoadmapV1 {
     lessons?: RoadmapLessonSummary[];
 }
+
+/** One Library page tab, already filtered to the tabs the current viewer may see. */
+export interface LibraryTabDefinition {
+    value: "materials" | "lessons" | "roadmaps";
+    label: string;
+}
