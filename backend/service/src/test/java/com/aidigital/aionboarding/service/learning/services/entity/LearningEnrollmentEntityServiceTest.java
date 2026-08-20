@@ -108,13 +108,17 @@ class LearningEnrollmentEntityServiceTest {
 				);
 		org.springframework.data.domain.Page<com.aidigital.aionboarding.domain.learning.repositories.MyLessonSummaryProjection> page =
 				new org.springframework.data.domain.PageImpl<>(List.of(summary), pageable, 1);
-		when(userLessonRepository.findMyLessonsPage(userId, pageable)).thenReturn(page);
+		when(userLessonRepository.findMyLessonsPage(
+				userId, com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode.ARCHIVED, pageable))
+				.thenReturn(page);
 
 		// When:
 		var result = learningEnrollmentEntityService.findMyLessonsPage(userId, pageable);
 
-		// Then:
+		// Then: excludes only archived, resolved from the dictionary constant, never a re-typed literal
 		assertThat(result.getContent()).containsExactly(summary);
+		verify(userLessonRepository).findMyLessonsPage(
+				userId, com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode.ARCHIVED, pageable);
 	}
 
 	@Test

@@ -62,10 +62,16 @@
     display: block;
 }
 
-.lessons-grid__status {
+.lessons-grid__badges {
     position: absolute;
-    top: 12px;
-    right: 12px;
+    top: 0.75rem;
+    right: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.lessons-grid__status {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -85,6 +91,24 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
+}
+
+.lessons-grid__visibility {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border: 1px solid hsl(var(--foreground) / 6%);
+    border-radius: var(--radius-full);
+    background: hsl(var(--background) / 95%);
+    color: var(--text-muted);
+    box-shadow: 0 2px 8px rgba(11, 11, 11, 0.08);
+    backdrop-filter: blur(8px);
+}
+
+.lessons-grid__visibility svg {
+    font-size: 1rem;
 }
 
 .lessons-grid__title {

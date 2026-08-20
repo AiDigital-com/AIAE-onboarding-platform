@@ -110,6 +110,98 @@ class UserRoadmapRepositoryImplIntegrationTest {
 	}
 
 	@Test
+	void shouldReturnCompletedRoadmapWhenItAlsoContainsAnArchivedLessonTest() {
+		// Given: roadmap has L1 (ready+published, completed) and L2 (ready+archived, never
+		// fanned-out/enrolled — an admin archived it after assignment)
+		UserRole role = userRoleRepository.save(userRole());
+		LessonStatus readyStatus = lessonStatusRepository.save(lessonStatus());
+		LessonPublicationStatus publishedStatus = lessonPublicationStatusRepository.save(publicationStatus());
+		LessonPublicationStatus archivedStatus = lessonPublicationStatusRepository.save(archivedPublicationStatus());
+		LessonContentFormat contentFormat = lessonContentFormatRepository.save(contentFormat());
+
+		User learner = userRepository.save(user("ArchivedCaseLearner", "archived-case@test.com", role));
+		Lesson lessonOne = lessonRepository.save(lesson("L1", readyStatus, publishedStatus, contentFormat));
+		Lesson archivedLesson = lessonRepository.save(lesson("L2 archived", readyStatus, archivedStatus, contentFormat));
+
+		Roadmap roadmap = roadmapRepository.save(roadmap("Roadmap With Archived Lesson"));
+		roadmapLessonRepository.save(roadmapLesson(roadmap, lessonOne, 0));
+		roadmapLessonRepository.save(roadmapLesson(roadmap, archivedLesson, 1));
+
+		userRoadmapRepository.save(userRoadmap(learner, roadmap));
+		// No UserLesson row for archivedLesson at all — it was never fanned out, matching real
+		// fan-out behavior for a non-learnable roadmap lesson.
+		userLessonRepository.save(completedUserLesson(learner, lessonOne));
+
+		// When: the one learnable lesson (L1) is completed
+		List<CompletedRoadmapProjection> result =
+				userRoadmapRepository.findCompletedRoadmapsForUserLesson(learner.getId(), lessonOne.getId());
+
+		// Then: the roadmap is reported completed — the archived lesson does not block completion
+		assertThat(result).extracting(CompletedRoadmapProjection::getId).containsExactly(roadmap.getId());
+	}
+
+	@Test
+	void shouldReturnCompletedRoadmapWhenItAlsoContainsAStillGeneratingLessonTest() {
+		// Given: roadmap has L1 (ready+published, completed) and L2 (generating+private, an AI
+		// revision reset it after the roadmap was assigned, so it was never fanned out)
+		UserRole role = userRoleRepository.save(userRole());
+		LessonStatus readyStatus = lessonStatusRepository.save(lessonStatus());
+		LessonStatus generatingStatus = lessonStatusRepository.save(generatingLessonStatus());
+		LessonPublicationStatus publishedStatus = lessonPublicationStatusRepository.save(publicationStatus());
+		LessonPublicationStatus privateStatus = lessonPublicationStatusRepository.save(privatePublicationStatus());
+		LessonContentFormat contentFormat = lessonContentFormatRepository.save(contentFormat());
+
+		User learner = userRepository.save(user("GeneratingCaseLearner", "generating-case@test.com", role));
+		Lesson lessonOne = lessonRepository.save(lesson("L1", readyStatus, publishedStatus, contentFormat));
+		Lesson generatingLesson =
+				lessonRepository.save(lesson("L2 generating", generatingStatus, privateStatus, contentFormat));
+
+		Roadmap roadmap = roadmapRepository.save(roadmap("Roadmap With Generating Lesson"));
+		roadmapLessonRepository.save(roadmapLesson(roadmap, lessonOne, 0));
+		roadmapLessonRepository.save(roadmapLesson(roadmap, generatingLesson, 1));
+
+		userRoadmapRepository.save(userRoadmap(learner, roadmap));
+		userLessonRepository.save(completedUserLesson(learner, lessonOne));
+
+		// When: the one learnable lesson (L1) is completed
+		List<CompletedRoadmapProjection> result =
+				userRoadmapRepository.findCompletedRoadmapsForUserLesson(learner.getId(), lessonOne.getId());
+
+		// Then: the roadmap is reported completed — the still-generating lesson does not block completion
+		assertThat(result).extracting(CompletedRoadmapProjection::getId).containsExactly(roadmap.getId());
+	}
+
+	@Test
+	void shouldNotReturnRoadmapWhenALearnablePrivateLessonIsStillIncompleteTest() {
+		// Given: roadmap has L1 (ready+published, completed) and L2 (ready+private, fanned out
+		// and enrolled, but not yet completed) — a genuine false-positive guard
+		UserRole role = userRoleRepository.save(userRole());
+		LessonStatus readyStatus = lessonStatusRepository.save(lessonStatus());
+		LessonPublicationStatus publishedStatus = lessonPublicationStatusRepository.save(publicationStatus());
+		LessonPublicationStatus privateStatus = lessonPublicationStatusRepository.save(privatePublicationStatus());
+		LessonContentFormat contentFormat = lessonContentFormatRepository.save(contentFormat());
+
+		User learner = userRepository.save(user("StillOpenCaseLearner", "still-open-case@test.com", role));
+		Lesson lessonOne = lessonRepository.save(lesson("L1", readyStatus, publishedStatus, contentFormat));
+		Lesson privateLesson = lessonRepository.save(lesson("L2 private", readyStatus, privateStatus, contentFormat));
+
+		Roadmap roadmap = roadmapRepository.save(roadmap("Roadmap With Incomplete Private Lesson"));
+		roadmapLessonRepository.save(roadmapLesson(roadmap, lessonOne, 0));
+		roadmapLessonRepository.save(roadmapLesson(roadmap, privateLesson, 1));
+
+		userRoadmapRepository.save(userRoadmap(learner, roadmap));
+		userLessonRepository.save(completedUserLesson(learner, lessonOne));
+		userLessonRepository.save(incompleteUserLesson(learner, privateLesson));
+
+		// When: only the published lesson (L1) is completed; the private lesson is still open
+		List<CompletedRoadmapProjection> result =
+				userRoadmapRepository.findCompletedRoadmapsForUserLesson(learner.getId(), lessonOne.getId());
+
+		// Then: the roadmap is NOT reported completed — no false positive
+		assertThat(result).isEmpty();
+	}
+
+	@Test
 	void shouldReturnEmptyWhenLessonNotInAnyEnrolledRoadmapTest() {
 		// Given: learner enrolled in a roadmap that does not contain the changed lesson
 		UserRole role = userRoleRepository.save(userRole());
@@ -157,6 +249,33 @@ class UserRoadmapRepositoryImplIntegrationTest {
 		status.setCode(LessonPublicationStatusCode.PUBLISHED);
 		status.setName("Published");
 		status.setDisplayOrder(1);
+		status.setIsActive(true);
+		return status;
+	}
+
+	private LessonPublicationStatus privatePublicationStatus() {
+		LessonPublicationStatus status = new LessonPublicationStatus();
+		status.setCode(LessonPublicationStatusCode.PRIVATE);
+		status.setName("Private");
+		status.setDisplayOrder(2);
+		status.setIsActive(true);
+		return status;
+	}
+
+	private LessonPublicationStatus archivedPublicationStatus() {
+		LessonPublicationStatus status = new LessonPublicationStatus();
+		status.setCode(LessonPublicationStatusCode.ARCHIVED);
+		status.setName("Archived");
+		status.setDisplayOrder(3);
+		status.setIsActive(true);
+		return status;
+	}
+
+	private LessonStatus generatingLessonStatus() {
+		LessonStatus status = new LessonStatus();
+		status.setCode(LessonStatusCode.GENERATING);
+		status.setName("Generating");
+		status.setDisplayOrder(2);
 		status.setIsActive(true);
 		return status;
 	}

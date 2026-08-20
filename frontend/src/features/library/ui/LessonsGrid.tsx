@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
 import ArrowDropDownOutlinedIcon from "@mui/icons-material/ArrowDropDownOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import OndemandVideoOutlinedIcon from "@mui/icons-material/OndemandVideoOutlined";
 import PlaylistAddOutlinedIcon from "@mui/icons-material/PlaylistAddOutlined";
+import PublicOutlinedIcon from "@mui/icons-material/PublicOutlined";
 import QuizOutlinedIcon from "@mui/icons-material/QuizOutlined";
 import StyleOutlinedIcon from "@mui/icons-material/StyleOutlined";
 import { Button } from "@/shared/ui/Button";
@@ -20,13 +22,12 @@ const STATUS_PALETTE: Record<string, { fg: string }> = {
     generating: { fg: "#ff642d" },
     failed: { fg: "#d92d20" },
     archived: { fg: "#80808e" },
-    private: { fg: "#80808e" },
 };
 
 /**
- * Returns the publication badge label: 'archived' when hidden entirely, the lesson's generation
- * status (draft/generating/failed) while it isn't ready yet, otherwise 'private' (assigned-only)
- * or 'ready' (Public) based on {@code publicationStatus}.
+ * Returns the readiness badge label: 'archived' when hidden entirely, the lesson's generation
+ * status (draft/generating/failed) while it isn't ready yet, otherwise 'ready'. Publication
+ * (public/private) is a separate axis, shown by {@link getVisibilityLabel} instead.
  */
 function getPublicationLabel(lesson: LibraryLesson) {
     if (lesson.isArchived || lesson.publicationStatus === "archived") {
@@ -35,10 +36,20 @@ function getPublicationLabel(lesson: LibraryLesson) {
     if (lesson.status !== "ready") {
         return lesson.status;
     }
-    if (!lesson.isPublished) {
-        return "private";
+    return "ready";
+}
+
+/**
+ * Returns the accessible label for the visibility icon shown beside a ready lesson's readiness
+ * chip, or {@code null} when visibility is not meaningful yet (not ready, or archived).
+ */
+function getVisibilityLabel(lesson: LibraryLesson, publicationLabel: string) {
+    if (publicationLabel !== "ready") {
+        return null;
     }
-    return lesson.status;
+    return lesson.isPublished
+        ? "Public — visible to everyone in the Library"
+        : "Private — visible in the Library only to assigned users";
 }
 
 function getEnrollmentActionLabel(lesson: LibraryLesson, enrolledLabel: string, defaultLabel: string) {
@@ -169,7 +180,8 @@ export function LessonsGrid({
                     const activityCounts = getActivityCounts(activities);
                     const tags = Array.isArray(lesson.tags) ? lesson.tags : [];
                     const publicationLabel = getPublicationLabel(lesson);
-                    const statusPalette = STATUS_PALETTE[publicationLabel] || STATUS_PALETTE.private;
+                    const statusPalette = STATUS_PALETTE[publicationLabel] || STATUS_PALETTE.archived;
+                    const visibilityLabel = getVisibilityLabel(lesson, publicationLabel);
                     const hasCoverImage = Boolean(lesson.coverImageStorageKey);
                     const hasActivities = activityCounts.flashcards > 0 || activityCounts.quizzes > 0;
                     const hasTeacherVideo = Boolean(
@@ -203,12 +215,23 @@ export function LessonsGrid({
                                         />
                                     )}
                                 </div>
-                                <span
-                                    className="library-status-chip library-card__status"
-                                    style={{ color: statusPalette.fg }}
-                                >
-                                    {publicationLabel}
-                                </span>
+                                <div className="library-card__badges">
+                                    {visibilityLabel && (
+                                        <span
+                                            className="library-card__visibility"
+                                            title={visibilityLabel}
+                                            aria-label={visibilityLabel}
+                                        >
+                                            {lesson.isPublished ? <PublicOutlinedIcon /> : <LockOutlinedIcon />}
+                                        </span>
+                                    )}
+                                    <span
+                                        className="library-status-chip library-card__status"
+                                        style={{ color: statusPalette.fg }}
+                                    >
+                                        {publicationLabel}
+                                    </span>
+                                </div>
                             </div>
 
                             <h3 className="library-card__title">{lesson.title}</h3>

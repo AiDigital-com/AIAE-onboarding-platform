@@ -1,5 +1,7 @@
 package com.aidigital.aionboarding.service.teamdashboard.services.entity;
 
+import com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode;
+import com.aidigital.aionboarding.domain.common.dictionary.LessonStatusCode;
 import com.aidigital.aionboarding.domain.teamdashboard.repositories.IndividualRoadmapLessonProjection;
 import com.aidigital.aionboarding.domain.teamdashboard.repositories.LowConfidenceLessonProjection;
 import com.aidigital.aionboarding.domain.teamdashboard.repositories.MemberStatsProjection;
@@ -31,24 +33,37 @@ public class TeamDashboardQueryEntityService {
 
 	/**
 	 * Loads per-member roadmap/lesson/quiz statistics for the given members.
+	 * <p>
+	 * Roadmap lesson counts are restricted to <b>learnable</b> lessons ({@code ready} and either
+	 * {@code published} or {@code private}) — the same set
+	 * {@code RoadmapEnrollmentServiceImpl.fanOutRoadmapLessons} grants {@code user_lessons} rows
+	 * for — so an archived or still-generating roadmap lesson never drags a member's roadmap
+	 * progress below 100%.
 	 *
 	 * @param memberIds internal user ids to aggregate statistics for
 	 * @return one {@link MemberStatsProjection} row per member
 	 */
 	@Transactional(readOnly = true)
 	public List<MemberStatsProjection> findMemberStats(List<Long> memberIds) {
-		return teamDashboardRepository.findMemberStats(memberIds);
+		return teamDashboardRepository.findMemberStats(
+				memberIds, LessonStatusCode.READY, LessonPublicationStatusCode.PUBLISHED, LessonPublicationStatusCode.PRIVATE
+		);
 	}
 
 	/**
 	 * Loads roadmap-level enrollment and progress statistics across the given members.
+	 * <p>
+	 * Roadmap lesson counts are restricted to <b>learnable</b> lessons, for the same reason as
+	 * {@link #findMemberStats} above.
 	 *
 	 * @param memberIds internal user ids to aggregate statistics for
 	 * @return up to the top 6 {@link RoadmapStatsProjection} rows ranked by learner count
 	 */
 	@Transactional(readOnly = true)
 	public List<RoadmapStatsProjection> findRoadmapStats(List<Long> memberIds) {
-		return teamDashboardRepository.findRoadmapStats(memberIds);
+		return teamDashboardRepository.findRoadmapStats(
+				memberIds, LessonStatusCode.READY, LessonPublicationStatusCode.PUBLISHED, LessonPublicationStatusCode.PRIVATE
+		);
 	}
 
 	/**

@@ -26,6 +26,17 @@ import java.util.List;
  * hard blockers individually, but they're part of this same consolidated single-pass reporting
  * family (avoiding N+1 dashboard fan-out) and stay native for consistency with the rest of this
  * family.
+ * <p>
+ * {@code findMemberStats} and {@code findRoadmapStats} count a roadmap's lessons against the
+ * same "learnable" rule ({@code ready} and either {@code published} or {@code private}) that
+ * gates {@code RoadmapEnrollmentServiceImpl.fanOutRoadmapLessons} and
+ * {@code UserRoadmapRepositoryImpl.findCompletedRoadmapsForUserLesson} — an archived or
+ * still-generating roadmap lesson never receives a {@code user_lessons} row, so counting it in
+ * the denominator would make a roadmap's progress permanently short of 100% even once every
+ * lesson the learner was actually given is complete. The status/publication codes are passed as
+ * bind parameters (never a re-typed literal) so callers must go through
+ * {@code LessonStatusCode}/{@code LessonPublicationStatusCode}, matching every other
+ * publication-status filter in this codebase.
  */
 public interface TeamDashboardRepository extends JpaRepository<User, Long> {
 
@@ -50,6 +61,11 @@ public interface TeamDashboardRepository extends JpaRepository<User, Long> {
             SELECT DISTINCT user_roadmaps.user_id, roadmap_lessons.lesson_id
             FROM user_roadmaps
             JOIN roadmap_lessons ON roadmap_lessons.roadmap_id = user_roadmaps.roadmap_id
+            JOIN lessons ON lessons.id = roadmap_lessons.lesson_id
+            JOIN lesson_status ON lesson_status.id = lessons.status_id
+              AND lesson_status.code = :readyCode
+            JOIN lesson_publication_status ON lesson_publication_status.id = lessons.publication_status_id
+              AND lesson_publication_status.code IN (:publishedCode, :privateCode)
             WHERE user_roadmaps.user_id IN (:memberIds)
           ) roadmap_lessons_for_user
           LEFT JOIN user_lessons
@@ -127,13 +143,23 @@ public interface TeamDashboardRepository extends JpaRepository<User, Long> {
         WHERE users.id IN (:memberIds)
         ORDER BY users.name ASC
         """, nativeQuery = true)
-    List<MemberStatsProjection> findMemberStats(@Param("memberIds") List<Long> memberIds);
+    List<MemberStatsProjection> findMemberStats(
+        @Param("memberIds") List<Long> memberIds,
+        @Param("readyCode") String readyCode,
+        @Param("publishedCode") String publishedCode,
+        @Param("privateCode") String privateCode
+    );
 
     @Query(value = """
         WITH roadmap_totals AS (
-          SELECT roadmap_id, COUNT(*)::int AS lesson_count
+          SELECT roadmap_lessons.roadmap_id, COUNT(*)::int AS lesson_count
           FROM roadmap_lessons
-          GROUP BY roadmap_id
+          JOIN lessons ON lessons.id = roadmap_lessons.lesson_id
+          JOIN lesson_status ON lesson_status.id = lessons.status_id
+            AND lesson_status.code = :readyCode
+          JOIN lesson_publication_status ON lesson_publication_status.id = lessons.publication_status_id
+            AND lesson_publication_status.code IN (:publishedCode, :privateCode)
+          GROUP BY roadmap_lessons.roadmap_id
         ),
         enrolled AS (
           SELECT
@@ -177,7 +203,12 @@ public interface TeamDashboardRepository extends JpaRepository<User, Long> {
         ORDER BY learners DESC, roadmaps.title ASC
         LIMIT 6
         """, nativeQuery = true)
-    List<RoadmapStatsProjection> findRoadmapStats(@Param("memberIds") List<Long> memberIds);
+    List<RoadmapStatsProjection> findRoadmapStats(
+        @Param("memberIds") List<Long> memberIds,
+        @Param("readyCode") String readyCode,
+        @Param("publishedCode") String publishedCode,
+        @Param("privateCode") String privateCode
+    );
 
     @Query(value = """
         WITH weeks AS (

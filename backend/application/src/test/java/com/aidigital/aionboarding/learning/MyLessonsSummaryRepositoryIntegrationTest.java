@@ -45,11 +45,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Verifies the bounded "My Lessons" summary queries against real
  * PostgreSQL: {@link UserLessonRepository#findMyLessonsPage} must return a lean projection
- * (content truncated to a short preview, never the full body), filtered to published lessons,
- * ordered incomplete-first then newest-enrolled-first, and paged; {@link
- * LessonRepository#findIdsWithTeacherVideoIn} must resolve the {@code jsonb_extract_path_text}
- * teacher-video flag; {@link LessonActivityRepository#countByLessonIdsGroupedByType} must count
- * activities per lesson/type without loading their JSONB payload.
+ * (content truncated to a short preview, never the full body), including both published and
+ * private enrolled lessons but excluding archived ones even when an enrollment row exists,
+ * ordered incomplete-first then newest-enrolled-first, and paged, with the count query agreeing
+ * with the page content; {@link LessonRepository#findIdsWithTeacherVideoIn} must resolve the
+ * {@code jsonb_extract_path_text} teacher-video flag; {@link
+ * LessonActivityRepository#countByLessonIdsGroupedByType} must count activities per lesson/type
+ * without loading their JSONB payload.
  */
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -88,34 +90,38 @@ class MyLessonsSummaryRepositoryIntegrationTest {
 	private ActivityTypeRepository activityTypeRepository;
 
 	@Test
-	void findMyLessonsPageShouldReturnOnlyPublishedLessonsAsTruncatedIncompleteFirstOrderedSummariesTest() {
-		// Given: learner enrolled in a published lesson with long content, an incomplete
-		// published lesson enrolled earlier, and a lesson that is not published
+	void findMyLessonsPageShouldIncludePublishedAndPrivateLessonsAsTruncatedIncompleteFirstOrderedSummariesTest() {
+		// Given: learner enrolled in a completed published lesson with long content, an
+		// incomplete published lesson enrolled most recently, and an incomplete PRIVATE lesson
+		// enrolled slightly earlier — an assigned private lesson must appear in My Lessons exactly
+		// like a published one, since the UserLesson join already means the learner is enrolled.
 		UserRole role = userRoleRepository.findByCode(UserRoleCode.MEMBER).orElseThrow();
 		User learner = userRepository.save(user(role, "Learner", "learner@test.com"));
 		String longHtml = "<p>" + "x".repeat(600) + "</p>";
 		String longMarkdown = "m".repeat(600);
 		Lesson completedLesson = lessonRepository.save(
 				lesson("Completed Lesson", LessonPublicationStatusCode.PUBLISHED, longHtml, longMarkdown));
-		Lesson incompleteLesson = lessonRepository.save(
-				lesson("Incomplete Lesson", LessonPublicationStatusCode.PUBLISHED, "<p>short</p>", "short"));
-		Lesson privateLesson = lessonRepository.save(
-				lesson("Private Lesson", LessonPublicationStatusCode.PRIVATE, "<p>hidden</p>", "hidden"));
+		Lesson incompletePublishedLesson = lessonRepository.save(
+				lesson("Incomplete Published Lesson", LessonPublicationStatusCode.PUBLISHED, "<p>short</p>", "short"));
+		Lesson incompletePrivateLesson = lessonRepository.save(
+				lesson("Incomplete Private Lesson", LessonPublicationStatusCode.PRIVATE, "<p>hidden</p>", "hidden"));
 
 		LocalDateTime older = LocalDateTime.of(2026, 1, 1, 0, 0);
 		LocalDateTime newer = LocalDateTime.of(2026, 1, 5, 0, 0);
 		userLessonRepository.save(completedUserLesson(learner, completedLesson, older, older.plusDays(1)));
-		userLessonRepository.save(incompleteUserLesson(learner, incompleteLesson, newer));
-		userLessonRepository.save(incompleteUserLesson(learner, privateLesson, newer));
+		userLessonRepository.save(incompleteUserLesson(learner, incompletePrivateLesson, newer.minusDays(1)));
+		userLessonRepository.save(incompleteUserLesson(learner, incompletePublishedLesson, newer));
 
 		// When:
-		Page<MyLessonSummaryProjection> result =
-				userLessonRepository.findMyLessonsPage(learner.getId(), PageRequest.of(0, 20));
+		Page<MyLessonSummaryProjection> result = userLessonRepository.findMyLessonsPage(
+				learner.getId(), LessonPublicationStatusCode.ARCHIVED, PageRequest.of(0, 20));
 
-		// Then: private lesson excluded; incomplete lesson (any enrolledAt) sorts before completed
+		// Then: both published and private enrollments are included; incomplete lessons sort
+		// before the completed one, newest-enrolled-first within the incomplete group; the count
+		// query agrees with the page content.
 		assertThat(result.getContent()).extracting(MyLessonSummaryProjection::lessonId)
-				.containsExactly(incompleteLesson.getId(), completedLesson.getId());
-		assertThat(result.getTotalElements()).isEqualTo(2);
+				.containsExactly(incompletePublishedLesson.getId(), incompletePrivateLesson.getId(), completedLesson.getId());
+		assertThat(result.getTotalElements()).isEqualTo(3);
 
 		MyLessonSummaryProjection completedSummary = result.getContent().stream()
 				.filter(s -> s.lessonId().equals(completedLesson.getId()))
@@ -123,6 +129,37 @@ class MyLessonsSummaryRepositoryIntegrationTest {
 		assertThat(completedSummary.contentHtmlPreview()).hasSize(500);
 		assertThat(completedSummary.contentMarkdownPreview()).hasSize(500);
 		assertThat(completedSummary.completedAt()).isEqualTo(older.plusDays(1));
+
+		MyLessonSummaryProjection privateSummary = result.getContent().stream()
+				.filter(s -> s.lessonId().equals(incompletePrivateLesson.getId()))
+				.findFirst().orElseThrow();
+		assertThat(privateSummary.publicationStatusCode()).isEqualTo(LessonPublicationStatusCode.PRIVATE);
+	}
+
+	@Test
+	void findMyLessonsPageShouldExcludeArchivedLessonEvenWhenAnEnrollmentRowExistsTest() {
+		// Given: the learner holds a genuine enrollment row for an archived lesson (e.g. it was
+		// published or private when they enrolled and has since been archived) alongside an
+		// enrollment in a published lesson — archived must never resurface in My Lessons, and the
+		// count query must agree: exactly one visible lesson, not two.
+		UserRole role = userRoleRepository.findByCode(UserRoleCode.MEMBER).orElseThrow();
+		User learner = userRepository.save(user(role, "Learner3", "learner3@test.com"));
+		Lesson archivedLesson = lessonRepository.save(
+				lesson("Archived Lesson", LessonPublicationStatusCode.ARCHIVED, "<p>gone</p>", "gone"));
+		Lesson publishedLesson = lessonRepository.save(
+				lesson("Published Lesson", LessonPublicationStatusCode.PUBLISHED, "<p>visible</p>", "visible"));
+		LocalDateTime enrolledAt = LocalDateTime.of(2026, 1, 1, 0, 0);
+		userLessonRepository.save(incompleteUserLesson(learner, archivedLesson, enrolledAt));
+		userLessonRepository.save(incompleteUserLesson(learner, publishedLesson, enrolledAt));
+
+		// When:
+		Page<MyLessonSummaryProjection> result = userLessonRepository.findMyLessonsPage(
+				learner.getId(), LessonPublicationStatusCode.ARCHIVED, PageRequest.of(0, 20));
+
+		// Then:
+		assertThat(result.getContent()).extracting(MyLessonSummaryProjection::lessonId)
+				.containsExactly(publishedLesson.getId());
+		assertThat(result.getTotalElements()).isEqualTo(1);
 	}
 
 	@Test
@@ -137,8 +174,8 @@ class MyLessonsSummaryRepositoryIntegrationTest {
 		}
 
 		// When: requesting a page of size 2
-		Page<MyLessonSummaryProjection> firstPage =
-				userLessonRepository.findMyLessonsPage(learner.getId(), PageRequest.of(0, 2));
+		Page<MyLessonSummaryProjection> firstPage = userLessonRepository.findMyLessonsPage(
+				learner.getId(), LessonPublicationStatusCode.ARCHIVED, PageRequest.of(0, 2));
 
 		// Then:
 		assertThat(firstPage.getContent()).hasSize(2);
