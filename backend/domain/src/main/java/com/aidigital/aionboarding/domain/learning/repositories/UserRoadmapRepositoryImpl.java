@@ -1,9 +1,15 @@
 package com.aidigital.aionboarding.domain.learning.repositories;
 
+import com.aidigital.aionboarding.domain.common.dictionary.DictionaryEntity_;
+import com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode;
+import com.aidigital.aionboarding.domain.common.dictionary.LessonStatusCode;
+import com.aidigital.aionboarding.domain.common.dictionary.entities.LessonPublicationStatus;
+import com.aidigital.aionboarding.domain.common.dictionary.entities.LessonStatus;
 import com.aidigital.aionboarding.domain.learning.entities.UserLesson;
 import com.aidigital.aionboarding.domain.learning.entities.UserLesson_;
 import com.aidigital.aionboarding.domain.learning.entities.UserRoadmap;
 import com.aidigital.aionboarding.domain.learning.entities.UserRoadmap_;
+import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson_;
 import com.aidigital.aionboarding.domain.roadmap.entities.Roadmap;
 import com.aidigital.aionboarding.domain.roadmap.entities.Roadmap_;
@@ -33,11 +39,21 @@ public class UserRoadmapRepositoryImpl implements UserRoadmapRepositoryCustom {
     /**
      * Finds fully-completed roadmaps containing a given lesson for a user.
      * <p>
-     * "Fully completed" is expressed as {@code NOT EXISTS (a lesson in the roadmap that has no
-     * completed UserLesson row for this user)} — a double negative that maps directly onto two
-     * nested Criteria subqueries, equivalent to the more common {@code LEFT JOIN ... WHERE x IS
-     * NULL} anti-join idiom but without needing an unmapped (theta) join between
-     * {@code RoadmapLesson} and {@code UserLesson}, which have no direct entity association.
+     * "Fully completed" is expressed as {@code NOT EXISTS (a learnable lesson in the roadmap
+     * that has no completed UserLesson row for this user)} — a double negative that maps
+     * directly onto two nested Criteria subqueries, equivalent to the more common
+     * {@code LEFT JOIN ... WHERE x IS NULL} anti-join idiom but without needing an unmapped
+     * (theta) join between {@code RoadmapLesson} and {@code UserLesson}, which have no direct
+     * entity association.
+     * <p>
+     * Only <b>learnable</b> lessons ({@code ready} and either {@code published} or
+     * {@code private} — the same rule as
+     * {@code LessonLearnabilityPolicy.isLearnable}/{@code LearningEnrollmentService.isLearnable}
+     * in the {@code service} module) count toward completion. This deliberately mirrors
+     * {@code RoadmapEnrollmentServiceImpl.fanOutRoadmapLessons}, which only ever grants a
+     * {@code UserLesson} row for a learnable lesson: an archived or still-generating
+     * {@code RoadmapLesson} never receives a {@code UserLesson} row for anyone, so requiring one
+     * here would make the roadmap permanently uncompletable. See {@link #incompleteLessonSubquery}.
      *
      * @param userId   the user primary key
      * @param lessonId the lesson primary key that just changed completion state
@@ -82,9 +98,17 @@ public class UserRoadmapRepositoryImpl implements UserRoadmapRepositoryCustom {
     }
 
     /**
-     * Builds an EXISTS subquery matching any {@link RoadmapLesson} in the outer roadmap for
-     * which no completed {@link UserLesson} row exists for the given user — i.e. the roadmap is
-     * not yet fully completed.
+     * Builds an EXISTS subquery matching any <b>learnable</b> {@link RoadmapLesson} in the
+     * outer roadmap for which no completed {@link UserLesson} row exists for the given user —
+     * i.e. the roadmap is not yet fully completed.
+     * <p>
+     * The learnable filter ({@link #learnableLessonPredicate}) is what keeps this in sync with
+     * {@code RoadmapEnrollmentServiceImpl.fanOutRoadmapLessons}: fan-out only ever creates a
+     * {@code UserLesson} row for a learnable lesson, so an archived or still-generating
+     * {@code RoadmapLesson} row is excluded here rather than demanded — otherwise a roadmap
+     * lesson archived (or reset to generating by an AI revision) after assignment would leave
+     * this EXISTS permanently {@code true} and the roadmap permanently incomplete, even once
+     * every lesson the learner was actually given has been completed.
      */
     Subquery<Long> incompleteLessonSubquery(
         CriteriaBuilder cb, CriteriaQuery<?> query, Join<UserRoadmap, Roadmap> roadmapJoin, Long userId
@@ -95,9 +119,36 @@ public class UserRoadmapRepositoryImpl implements UserRoadmapRepositoryCustom {
         subquery.select(cb.literal(1L));
         subquery.where(
             cb.equal(roadmapLesson.get(RoadmapLesson_.roadmap), correlatedRoadmap),
+            learnableLessonPredicate(cb, roadmapLesson),
             cb.not(cb.exists(lessonCompletedSubquery(cb, subquery, roadmapLesson, userId)))
         );
         return subquery;
+    }
+
+    /**
+     * Builds the predicate matching a {@link RoadmapLesson} whose {@link Lesson} is learnable —
+     * {@code ready} and either {@code published} (Public) or {@code private} (assigned-only).
+     * <p>
+     * This is the Criteria-API/SQL equivalent of
+     * {@code LessonLearnabilityPolicy.isLearnable}/{@code LearningEnrollmentService.isLearnable}
+     * in the {@code service} module, expressed here instead of delegated to that collaborator
+     * because this class must stay pure JPA Criteria SQL (per
+     * {@code .claude/rules/12-database.md}/{@code 14-performance.md} — no in-memory filtering of
+     * a growing {@code RoadmapLesson} set) and {@code domain} cannot depend on {@code service}.
+     * The two implementations must stay semantically aligned; a change to one rule is not
+     * complete without the matching change here.
+     */
+    Predicate learnableLessonPredicate(CriteriaBuilder cb, Root<RoadmapLesson> roadmapLesson) {
+        Join<RoadmapLesson, Lesson> lesson = roadmapLesson.join(RoadmapLesson_.lesson);
+        Join<Lesson, LessonStatus> status = lesson.join(Lesson_.status);
+        Join<Lesson, LessonPublicationStatus> publicationStatus = lesson.join(Lesson_.publicationStatus);
+        return cb.and(
+            cb.equal(status.get(DictionaryEntity_.code), LessonStatusCode.READY),
+            cb.or(
+                cb.equal(publicationStatus.get(DictionaryEntity_.code), LessonPublicationStatusCode.PUBLISHED),
+                cb.equal(publicationStatus.get(DictionaryEntity_.code), LessonPublicationStatusCode.PRIVATE)
+            )
+        );
     }
 
     /**

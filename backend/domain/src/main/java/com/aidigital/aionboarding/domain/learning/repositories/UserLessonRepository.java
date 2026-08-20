@@ -45,12 +45,15 @@ public interface UserLessonRepository
     );
 
     /**
-     * Returns a bounded page of one user's published-lesson enrollments as a lean summary
+     * Returns a bounded page of one user's enrolled-lesson summaries as a lean summary
      * projection — never the full {@link com.aidigital.aionboarding.domain.lesson.entities.Lesson}
      * entity — ordered incomplete-first then by newest enrollment date. Content fields are
      * truncated to a short preview rather than carrying the full lesson body.
      *
-     * <p>Filter: {@code publicationStatus.code = 'published'} excludes private and archived lessons.
+     * <p>Filter: excludes only {@code archived} lessons. Published and private lessons are both
+     * included — the {@code UserLesson} join already means the viewer holds an enrollment, so
+     * publication state beyond "not archived" plays no further role here, mirroring the same
+     * published-or-private-and-enrolled visibility rule enforced elsewhere for the Library.
      * <p>Order: incomplete enrollments ({@code completedAt IS NULL}) first, then newest {@code enrolledAt} first.
      */
     @Query(
@@ -66,7 +69,7 @@ public interface UserLessonRepository
             JOIN ul.lesson l
             JOIN l.publicationStatus ps
             WHERE ul.id.userId = :userId
-              AND ps.code = 'published'
+              AND ps.code <> :archivedCode
             ORDER BY
               CASE WHEN ul.completedAt IS NULL THEN 0 ELSE 1 END ASC,
               ul.enrolledAt DESC
@@ -77,10 +80,11 @@ public interface UserLessonRepository
             JOIN ul.lesson l
             JOIN l.publicationStatus ps
             WHERE ul.id.userId = :userId
-              AND ps.code = 'published'
+              AND ps.code <> :archivedCode
             """
     )
-    Page<MyLessonSummaryProjection> findMyLessonsPage(@Param("userId") Long userId, Pageable pageable);
+    Page<MyLessonSummaryProjection> findMyLessonsPage(
+        @Param("userId") Long userId, @Param("archivedCode") String archivedCode, Pageable pageable);
 
     /**
      * Bulk-deletes a lesson enrollment row for a set of users. One set-based statement

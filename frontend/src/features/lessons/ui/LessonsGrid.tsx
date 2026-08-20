@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import OndemandVideoOutlinedIcon from "@mui/icons-material/OndemandVideoOutlined";
+import PublicOutlinedIcon from "@mui/icons-material/PublicOutlined";
 import QuizOutlinedIcon from "@mui/icons-material/QuizOutlined";
 import RemoveCircleOutlineOutlinedIcon from "@mui/icons-material/RemoveCircleOutlineOutlined";
 import StyleOutlinedIcon from "@mui/icons-material/StyleOutlined";
@@ -28,9 +30,13 @@ const STATUS_PALETTE: Record<string, { fg: string; bg: string; dot: string }> = 
     generating: { fg: CARD.orange, bg: "rgba(255,100,45,0.10)", dot: CARD.orange },
     failed: { fg: "#D92D20", bg: "rgba(217,45,32,0.10)", dot: "#D92D20" },
     archived: { fg: CARD.mute, bg: "rgba(128,128,142,0.12)", dot: CARD.mute },
-    private: { fg: CARD.mute, bg: "rgba(128,128,142,0.12)", dot: CARD.mute },
 };
 
+/**
+ * Returns the readiness badge label: 'archived' when hidden entirely, the lesson's generation
+ * status (draft/generating/failed) while it isn't ready yet, otherwise 'ready'. Publication
+ * (public/private) is a separate axis, shown by {@link getVisibilityLabel} instead.
+ */
 function getPublicationLabel(lesson: EnrolledLessonCard): string {
     if (lesson.isArchived || lesson.publicationStatus === "archived") {
         return "archived";
@@ -38,10 +44,20 @@ function getPublicationLabel(lesson: EnrolledLessonCard): string {
     if (lesson.status !== "ready") {
         return lesson.status;
     }
-    if (!lesson.isPublished) {
-        return "draft";
+    return "ready";
+}
+
+/**
+ * Returns the accessible label for the visibility icon shown beside a ready lesson's readiness
+ * chip, or {@code null} when visibility is not meaningful yet (not ready, or archived).
+ */
+function getVisibilityLabel(lesson: EnrolledLessonCard, publicationLabel: string): string | null {
+    if (publicationLabel !== "ready") {
+        return null;
     }
-    return lesson.status;
+    return lesson.isPublished
+        ? "Public — visible to everyone in the Library"
+        : "Private — visible in the Library only to assigned users";
 }
 
 /**
@@ -81,7 +97,8 @@ export function LessonsGrid({
                 const quizCount = lesson.quizCount ?? 0;
                 const tags = Array.isArray(lesson.tags) ? lesson.tags : [];
                 const publicationLabel = getPublicationLabel(lesson);
-                const statusPalette = STATUS_PALETTE[publicationLabel] || STATUS_PALETTE.private;
+                const statusPalette = STATUS_PALETTE[publicationLabel] || STATUS_PALETTE.archived;
+                const visibilityLabel = getVisibilityLabel(lesson, publicationLabel);
                 const hasActivities = flashcardCount > 0 || quizCount > 0;
                 const hasTeacherVideo = Boolean(lesson.hasTeacherVideo);
                 const hasCoverImage = Boolean(lesson.coverImageStorageKey);
@@ -99,16 +116,27 @@ export function LessonsGrid({
                             {hasCoverImage && (
                                 <LessonCover previewUrl={previewUrlByStorageKey?.[lesson.coverImageStorageKey!]} />
                             )}
-                            <span
-                                className="lessons-grid__status"
-                                style={{ color: statusPalette.fg, backgroundColor: "rgba(255,255,255,0.95)" }}
-                            >
+                            <div className="lessons-grid__badges">
+                                {visibilityLabel && (
+                                    <span
+                                        className="lessons-grid__visibility"
+                                        title={visibilityLabel}
+                                        aria-label={visibilityLabel}
+                                    >
+                                        {lesson.isPublished ? <PublicOutlinedIcon /> : <LockOutlinedIcon />}
+                                    </span>
+                                )}
                                 <span
-                                    className="lessons-grid__status-dot"
-                                    style={{ backgroundColor: statusPalette.dot }}
-                                />
-                                {publicationLabel}
-                            </span>
+                                    className="lessons-grid__status"
+                                    style={{ color: statusPalette.fg, backgroundColor: "rgba(255,255,255,0.95)" }}
+                                >
+                                    <span
+                                        className="lessons-grid__status-dot"
+                                        style={{ backgroundColor: statusPalette.dot }}
+                                    />
+                                    {publicationLabel}
+                                </span>
+                            </div>
                         </div>
 
                         <h3 className="lessons-grid__title">{lesson.title}</h3>

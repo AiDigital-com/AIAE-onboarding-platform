@@ -1,5 +1,6 @@
 package com.aidigital.aionboarding.service.learning.services.entity;
 
+import com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode;
 import com.aidigital.aionboarding.domain.learning.entities.UserLesson;
 import com.aidigital.aionboarding.domain.learning.entities.UserRoadmap;
 import com.aidigital.aionboarding.domain.learning.repositories.CompletedRoadmapProjection;
@@ -131,17 +132,17 @@ public class LearningEnrollmentEntityService {
 	}
 
 	/**
-	 * Loads a bounded page of published-lesson enrollment summaries for "My Lessons",
-	 * incomplete-first then newest-enrolled-first. Returns a lean projection, never the full
-	 * {@code Lesson} entity.
+	 * Loads a bounded page of one user's enrolled-lesson summaries for "My Lessons" —
+	 * published and private lessons both included, archived excluded — incomplete-first then
+	 * newest-enrolled-first. Returns a lean projection, never the full {@code Lesson} entity.
 	 *
 	 * @param userId   the user primary key
 	 * @param pageable page and size request
-	 * @return the user's published-lesson summary page, ordered incomplete-first then newest-enrolled-first
+	 * @return the user's enrolled-lesson summary page, ordered incomplete-first then newest-enrolled-first
 	 */
 	@Transactional(readOnly = true)
 	public Page<MyLessonSummaryProjection> findMyLessonsPage(Long userId, Pageable pageable) {
-		return userLessonRepository.findMyLessonsPage(userId, pageable);
+		return userLessonRepository.findMyLessonsPage(userId, LessonPublicationStatusCode.ARCHIVED, pageable);
 	}
 
 	/**
