@@ -1936,6 +1936,10 @@ components:
           description: Restricts results to lessons that have (true) or do not have (false) any activities.
           type: boolean
           x-unconstrained-reason: Boolean type already constrains the value domain to true/false; no additional bound applies.
+        learnableOnly:
+          description: When true, restricts results to lessons that are ready and either published or private - i.e. eligible for roadmap inclusion and assignment. This is a narrowing filter applied in addition to the viewer's existing visibility restrictions; it can never widen what the viewer is authorized to see, and it is independent of publicationStatus (both apply together when both are supplied). Absent or false leaves behavior unchanged.
+          type: boolean
+          x-unconstrained-reason: Boolean type already constrains the value domain to true/false; no additional bound applies.
     SearchRoadmapsV1:
       description: Roadmap search, filter, sort, and pagination criteria. Roadmaps are private by default - results are always restricted to roadmaps assigned to the viewer (directly or via their group), plus, for a viewer who may manage roadmaps, roadmaps they authored or (for a Team Lead) roadmaps authored by a member of their team. An Admin sees every roadmap.
       type: object

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -124,5 +124,30 @@ describe("LibraryPage", () => {
         expect(postSpy).not.toHaveBeenCalledWith("/api/v1/materials/count", expect.anything());
         expect(postSpy).not.toHaveBeenCalledWith("/api/v1/roadmaps/search", expect.anything());
         expect(postSpy).not.toHaveBeenCalledWith("/api/v1/roadmaps/count", expect.anything());
+    });
+
+    it("should request learnableOnly lessons, not publicationStatus=published, for the roadmap lesson picker test", async () => {
+        // Given: a Team Lead opens the Roadmaps tab and the create-roadmap dialog
+        const { postSpy } = renderLibraryPage("teamlead");
+        await waitFor(() => expect(screen.getByText("Roadmaps")).toBeTruthy());
+        fireEvent.click(screen.getByText("Roadmaps"));
+        await waitFor(() => expect(screen.getByText("Create Roadmap")).toBeTruthy());
+
+        // When:
+        fireEvent.click(screen.getByText("Create Roadmap"));
+
+        // Then: the picker query narrows via learnableOnly, never via publicationStatus=published,
+        // so a private lesson is not excluded from the roadmap picker.
+        await waitFor(() =>
+            expect(postSpy).toHaveBeenCalledWith(
+                "/api/v1/lessons/search",
+                expect.objectContaining({
+                    body: expect.objectContaining({ readyOnly: true, learnableOnly: true }),
+                }),
+            ),
+        );
+        const calls = postSpy.mock.calls as unknown as [string, { body?: Record<string, unknown> }][];
+        const lessonsSearchCall = calls.find(([path]) => path === "/api/v1/lessons/search");
+        expect(lessonsSearchCall?.[1]?.body).not.toHaveProperty("publicationStatus");
     });
 });

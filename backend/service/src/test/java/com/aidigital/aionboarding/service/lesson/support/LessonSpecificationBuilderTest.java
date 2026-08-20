@@ -60,7 +60,7 @@ class LessonSpecificationBuilderTest {
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		LessonListQuery filter = new LessonListQuery(
-				"Abc", null, null, null, null, null, null, null, null,
+				"Abc", null, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
@@ -110,7 +110,7 @@ class LessonSpecificationBuilderTest {
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
 
 		LessonListQuery blankFilter = new LessonListQuery(
-				"   ", null, null, null, null, null, null, null, null,
+				"   ", null, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		Root blankRoot = mock(Root.class);
@@ -134,7 +134,7 @@ class LessonSpecificationBuilderTest {
 
 		// Given: null search text
 		LessonListQuery nullFilter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		Root nullRoot = mock(Root.class);
@@ -167,7 +167,7 @@ class LessonSpecificationBuilderTest {
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		List<String> tags = List.of("design", "ux");
 		LessonListQuery filter = new LessonListQuery(
-				null, tags, null, null, null, null, null, null, null,
+				null, tags, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
@@ -213,7 +213,7 @@ class LessonSpecificationBuilderTest {
 
 		// Given: null tags
 		LessonListQuery nullTagsFilter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		Root root1 = mock(Root.class);
@@ -236,7 +236,7 @@ class LessonSpecificationBuilderTest {
 
 		// Given: empty tags
 		LessonListQuery emptyTagsFilter = new LessonListQuery(
-				null, List.of(), null, null, null, null, null, null, null,
+				null, List.of(), null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		Root root2 = mock(Root.class);
@@ -269,7 +269,7 @@ class LessonSpecificationBuilderTest {
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
@@ -304,7 +304,7 @@ class LessonSpecificationBuilderTest {
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
@@ -340,7 +340,7 @@ class LessonSpecificationBuilderTest {
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
@@ -375,7 +375,7 @@ class LessonSpecificationBuilderTest {
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
@@ -410,7 +410,7 @@ class LessonSpecificationBuilderTest {
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, 300L, null, null, null, null,
+				null, null, null, null, 300L, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
@@ -445,7 +445,7 @@ class LessonSpecificationBuilderTest {
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
@@ -480,7 +480,7 @@ class LessonSpecificationBuilderTest {
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, null, true, null, null,
+				null, null, null, null, null, null, true, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
@@ -517,7 +517,7 @@ class LessonSpecificationBuilderTest {
 
 		// Given: readyOnly = false
 		LessonListQuery falseFilter = new LessonListQuery(
-				null, null, null, null, null, null, false, null, null,
+				null, null, null, null, null, null, false, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		Root root1 = mock(Root.class);
@@ -540,7 +540,7 @@ class LessonSpecificationBuilderTest {
 
 		// Given: readyOnly = null
 		LessonListQuery nullFilter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		Root root2 = mock(Root.class);
@@ -572,7 +572,7 @@ class LessonSpecificationBuilderTest {
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, true, null, null, null,
+				null, null, null, null, null, true, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, 55L);
@@ -615,7 +615,7 @@ class LessonSpecificationBuilderTest {
 
 		// Given: assignedToMe = false
 		LessonListQuery falseFilter = new LessonListQuery(
-				null, null, null, null, null, false, null, null, null,
+				null, null, null, null, null, false, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		Root root1 = mock(Root.class);
@@ -639,7 +639,7 @@ class LessonSpecificationBuilderTest {
 
 		// Given: assignedToMe = null
 		LessonListQuery nullFilter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		Root root2 = mock(Root.class);
@@ -672,7 +672,7 @@ class LessonSpecificationBuilderTest {
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, null, null, "QUIZ", null,
+				null, null, null, null, null, null, null, "QUIZ", null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
@@ -712,7 +712,7 @@ class LessonSpecificationBuilderTest {
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
@@ -748,7 +748,7 @@ class LessonSpecificationBuilderTest {
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, true,
+				null, null, null, null, null, null, null, null, true, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
@@ -785,7 +785,7 @@ class LessonSpecificationBuilderTest {
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
@@ -812,6 +812,165 @@ class LessonSpecificationBuilderTest {
 	}
 
 	// ------------------------------------------------------------------
+	// build() - learnableOnly
+	// ------------------------------------------------------------------
+
+	@Test
+	void shouldAddLearnablePredicateWhenLearnableOnlyTrueTest() {
+		// Given:
+		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
+		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
+		LessonListQuery filter = new LessonListQuery(
+				null, null, null, null, null, null, null, null, null, true,
+				LessonSortField.CREATED_AT, Sort.Direction.DESC
+		);
+		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
+
+		Root root = mock(Root.class);
+		CriteriaQuery query = mock(CriteriaQuery.class);
+		CriteriaBuilder cb = mock(CriteriaBuilder.class);
+		Path sharedPath = mock(Path.class);
+		Predicate readyPredicate = mock(Predicate.class);
+		Predicate publishedPredicate = mock(Predicate.class);
+		Predicate privatePredicate = mock(Predicate.class);
+		Predicate publishedOrPrivate = mock(Predicate.class);
+		Predicate learnablePredicate = mock(Predicate.class);
+		Predicate visibilityConjunction = mock(Predicate.class);
+		Predicate andPredicate = mock(Predicate.class);
+
+		when(query.getResultType()).thenReturn(Long.class);
+		when(root.get((SingularAttribute) null)).thenReturn(sharedPath);
+		when(cb.equal(null, 400L)).thenReturn(readyPredicate);
+		when(cb.equal(null, 900L)).thenReturn(publishedPredicate);
+		when(cb.equal(null, 950L)).thenReturn(privatePredicate);
+		when(cb.or(publishedPredicate, privatePredicate)).thenReturn(publishedOrPrivate);
+		when(cb.and(readyPredicate, publishedOrPrivate)).thenReturn(learnablePredicate);
+		when(cb.conjunction()).thenReturn(visibilityConjunction);
+		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
+
+		// When:
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, 400L, 900L, 950L);
+		spec.toPredicate(root, query, cb);
+
+		// Then:
+		ArgumentCaptor<Predicate[]> captor = ArgumentCaptor.forClass(Predicate[].class);
+		verify(cb).and(captor.capture());
+		assertThat(captor.getValue()).containsExactly(learnablePredicate, visibilityConjunction);
+	}
+
+	@Test
+	void shouldSkipLearnablePredicateWhenLearnableOnlyFalseOrNullTest() {
+		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
+		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
+		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
+
+		// Given: learnableOnly = false
+		LessonListQuery falseFilter = new LessonListQuery(
+				null, null, null, null, null, null, null, null, null, false,
+				LessonSortField.CREATED_AT, Sort.Direction.DESC
+		);
+		Root root1 = mock(Root.class);
+		CriteriaQuery query1 = mock(CriteriaQuery.class);
+		CriteriaBuilder cb1 = mock(CriteriaBuilder.class);
+		Predicate conjunction1 = mock(Predicate.class);
+		Predicate and1 = mock(Predicate.class);
+		when(query1.getResultType()).thenReturn(Long.class);
+		when(cb1.conjunction()).thenReturn(conjunction1);
+		when(cb1.and(any(Predicate[].class))).thenReturn(and1);
+
+		// When:
+		Specification<Lesson> spec1 = builder.build(falseFilter, visibility, null, null, 400L, 900L, 950L);
+		spec1.toPredicate(root1, query1, cb1);
+
+		// Then:
+		ArgumentCaptor<Predicate[]> captor1 = ArgumentCaptor.forClass(Predicate[].class);
+		verify(cb1).and(captor1.capture());
+		assertThat(captor1.getValue()).containsExactly(conjunction1);
+		verify(root1, never()).get((SingularAttribute) null);
+
+		// Given: learnableOnly = null
+		LessonListQuery nullFilter = new LessonListQuery(
+				null, null, null, null, null, null, null, null, null, null,
+				LessonSortField.CREATED_AT, Sort.Direction.DESC
+		);
+		Root root2 = mock(Root.class);
+		CriteriaQuery query2 = mock(CriteriaQuery.class);
+		CriteriaBuilder cb2 = mock(CriteriaBuilder.class);
+		Predicate conjunction2 = mock(Predicate.class);
+		Predicate and2 = mock(Predicate.class);
+		when(query2.getResultType()).thenReturn(Long.class);
+		when(cb2.conjunction()).thenReturn(conjunction2);
+		when(cb2.and(any(Predicate[].class))).thenReturn(and2);
+
+		// When:
+		Specification<Lesson> spec2 = builder.build(nullFilter, visibility, null, null, 400L, 900L, 950L);
+		spec2.toPredicate(root2, query2, cb2);
+
+		// Then:
+		ArgumentCaptor<Predicate[]> captor2 = ArgumentCaptor.forClass(Predicate[].class);
+		verify(cb2).and(captor2.capture());
+		assertThat(captor2.getValue()).containsExactly(conjunction2);
+	}
+
+	@Test
+	void shouldCombineLearnableOnlyWithVisibilityPredicateGrantingNothingExtraToAPlainMemberTest() {
+		// Given: learnableOnly narrows in addition to, not instead of, the visibility predicate -
+		// both predicates are added independently to the same AND list, so a plain member's
+		// visibility restriction still applies unchanged alongside the learnable narrowing.
+		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
+		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
+		LessonListQuery filter = new LessonListQuery(
+				null, null, null, null, null, null, null, null, null, true,
+				LessonSortField.CREATED_AT, Sort.Direction.DESC
+		);
+		LessonVisibilityFilter visibility = new LessonVisibilityFilter(false, false, 5L);
+
+		Root root = mock(Root.class);
+		CriteriaQuery query = mock(CriteriaQuery.class);
+		CriteriaBuilder cb = mock(CriteriaBuilder.class);
+		Path sharedPath = mock(Path.class);
+		Predicate readyPredicate = mock(Predicate.class);
+		Predicate publishedPredicate = mock(Predicate.class);
+		Predicate privatePredicate = mock(Predicate.class);
+		Predicate publishedOrPrivate = mock(Predicate.class);
+		Predicate learnablePredicate = mock(Predicate.class);
+		Subquery subquery = mock(Subquery.class);
+		Root correlatedLesson = mock(Root.class);
+		Root userLessonRoot = mock(Root.class);
+		Predicate enrolledExists = mock(Predicate.class);
+		Predicate privateAndEnrolledPredicate = mock(Predicate.class);
+		Predicate visibilityBasePredicate = mock(Predicate.class);
+		Predicate andPredicate = mock(Predicate.class);
+
+		when(query.getResultType()).thenReturn(Long.class);
+		when(root.get((SingularAttribute) null)).thenReturn(sharedPath);
+		when(cb.equal(null, 400L)).thenReturn(readyPredicate);
+		when(cb.equal(null, 900L)).thenReturn(publishedPredicate);
+		when(cb.equal(null, 950L)).thenReturn(privatePredicate);
+		when(cb.or(publishedPredicate, privatePredicate)).thenReturn(publishedOrPrivate);
+		when(cb.and(readyPredicate, publishedOrPrivate)).thenReturn(learnablePredicate);
+		when(query.subquery(Long.class)).thenReturn(subquery);
+		when(subquery.correlate(root)).thenReturn(correlatedLesson);
+		when(subquery.from(UserLesson.class)).thenReturn(userLessonRoot);
+		when(userLessonRoot.get((SingularAttribute) null)).thenReturn(mock(Path.class));
+		when(cb.exists(subquery)).thenReturn(enrolledExists);
+		when(cb.and(privatePredicate, enrolledExists)).thenReturn(privateAndEnrolledPredicate);
+		when(cb.or(publishedPredicate, privateAndEnrolledPredicate)).thenReturn(visibilityBasePredicate);
+		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
+
+		// When:
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, 400L, 900L, 950L);
+		spec.toPredicate(root, query, cb);
+
+		// Then: both the learnable-narrowing predicate and the plain member's own visibility
+		// predicate (published OR private-and-enrolled, no owned-by-viewer branch) are present -
+		// the member gains nothing extra from learnableOnly.
+		ArgumentCaptor<Predicate[]> captor = ArgumentCaptor.forClass(Predicate[].class);
+		verify(cb).and(captor.capture());
+		assertThat(captor.getValue()).containsExactly(learnablePredicate, visibilityBasePredicate);
+	}
+
+	// ------------------------------------------------------------------
 	// build() - fetch (Lesson.class result type)
 	// ------------------------------------------------------------------
 
@@ -821,7 +980,7 @@ class LessonSpecificationBuilderTest {
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
@@ -856,7 +1015,7 @@ class LessonSpecificationBuilderTest {
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
@@ -890,7 +1049,7 @@ class LessonSpecificationBuilderTest {
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.TITLE, Sort.Direction.ASC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
@@ -926,7 +1085,7 @@ class LessonSpecificationBuilderTest {
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, null);
@@ -961,7 +1120,7 @@ class LessonSpecificationBuilderTest {
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
 		List<String> tags = List.of("design");
 		LessonListQuery filter = new LessonListQuery(
-				"abc", tags, "STATUS_CODE", "PUB_CODE", 300L, true, true, "QUIZ", true,
+				"abc", tags, "STATUS_CODE", "PUB_CODE", 300L, true, true, "QUIZ", true, null,
 				LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, 999L);
@@ -1076,7 +1235,7 @@ class LessonSpecificationBuilderTest {
 		Path createdAtPath = mock(Path.class);
 		Order ascOrder = mock(Order.class);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.CREATED_AT, Sort.Direction.ASC
 		);
 
@@ -1101,7 +1260,7 @@ class LessonSpecificationBuilderTest {
 		Path updatedAtPath = mock(Path.class);
 		Order descOrder = mock(Order.class);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.UPDATED_AT, Sort.Direction.DESC
 		);
 
@@ -1126,7 +1285,7 @@ class LessonSpecificationBuilderTest {
 		Path titlePath = mock(Path.class);
 		Order ascOrder = mock(Order.class);
 		LessonListQuery filter = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null,
+				null, null, null, null, null, null, null, null, null, null,
 				LessonSortField.TITLE, Sort.Direction.ASC
 		);
 

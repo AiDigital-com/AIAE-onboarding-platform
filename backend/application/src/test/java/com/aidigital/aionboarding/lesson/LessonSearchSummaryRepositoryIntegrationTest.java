@@ -191,7 +191,7 @@ class LessonSearchSummaryRepositoryIntegrationTest {
 		lessonRepository.save(lesson("Alpha", LessonPublicationStatusCode.PUBLISHED, "<p>a</p>", "a", List.of()));
 		lessonRepository.save(lesson("Bravo", LessonPublicationStatusCode.PUBLISHED, "<p>b</p>", "b", List.of()));
 		LessonListQuery query = new LessonListQuery(
-				null, null, null, null, null, null, null, null, null, LessonSortField.TITLE, Sort.Direction.ASC
+				null, null, null, null, null, null, null, null, null, null, LessonSortField.TITLE, Sort.Direction.ASC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, 1L);
 
@@ -293,7 +293,7 @@ class LessonSearchSummaryRepositoryIntegrationTest {
 
 	private LessonListQuery anyoneVisibleQuery() {
 		return new LessonListQuery(
-				null, null, null, null, null, null, null, null, null, LessonSortField.CREATED_AT, Sort.Direction.DESC
+				null, null, null, null, null, null, null, null, null, null, LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 	}
 

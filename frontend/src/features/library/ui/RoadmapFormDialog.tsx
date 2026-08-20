@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import ArrowDownwardOutlinedIcon from "@mui/icons-material/ArrowDownwardOutlined";
 import ArrowUpwardOutlinedIcon from "@mui/icons-material/ArrowUpwardOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import PublicOutlinedIcon from "@mui/icons-material/PublicOutlined";
 import { Autocomplete, TextField } from "@mui/material";
 import { Dialog } from "@/shared/ui/Dialog";
 import { Button } from "@/shared/ui/Button";
@@ -12,13 +14,30 @@ import {
     suggestedLessonTags,
 } from "@/shared/lib/lessonTags";
 import type { LibraryLesson, LibraryRoadmap } from "../api/types";
+import type { RoadmapFormLesson } from "../model/roadmapFormLesson";
 import { DiscardChangesDialog } from "./DiscardChangesDialog";
 
 interface RoadmapFormState {
     title: string;
     description: string;
     tags: string[];
-    selectedLessons: LibraryLesson[];
+    selectedLessons: RoadmapFormLesson[];
+}
+
+/**
+ * Accessible visibility indicator for a selected roadmap lesson - "Public"/"Private" when the
+ * lesson's real publication state is known, or nothing when it genuinely isn't (a lesson resolved
+ * only from the roadmap's own payload before the lesson catalog has loaded never carries this
+ * field, and the dialog must not assert a state the server never reported).
+ */
+function selectedLessonVisibilityLabel(lesson: RoadmapFormLesson): string | null {
+    if (lesson.publicationStatus === "published") {
+        return "Public — visible to everyone in the Library";
+    }
+    if (lesson.publicationStatus === "private") {
+        return "Private — visible in the Library only to assigned users";
+    }
+    return null;
 }
 
 /** Ordered lesson ids from the roadmap card payload (lessonIds preferred, lessons as fallback). */
@@ -40,7 +59,7 @@ function getRoadmapLessonIds(roadmap: LibraryRoadmap | null | undefined): number
 function resolveSelectedLessons(
     initialRoadmap: LibraryRoadmap | null,
     lessons: LibraryLesson[],
-): LibraryLesson[] {
+): RoadmapFormLesson[] {
     if (!initialRoadmap) {
         return [];
     }
@@ -50,15 +69,16 @@ function resolveSelectedLessons(
         return [];
     }
 
+    // The catalog is already scoped server-side to ready, learnable (published or private)
+    // lessons - see useLessonsQuery's learnableOnly filter - so no client-side publication check
+    // is needed here to exclude an archived lesson; it simply will not be present.
     const catalogById = new Map(
-        lessons
-            .filter((lesson) => lesson.status === "ready" && (lesson.isPublished || lesson.publicationStatus === "published"))
-            .map((lesson) => [lesson.id, lesson]),
+        lessons.filter((lesson) => lesson.status === "ready").map((lesson) => [lesson.id, lesson]),
     );
     const roadmapLessonById = new Map((initialRoadmap.lessons || []).map((lesson) => [lesson.id, lesson]));
 
     return lessonIds
-        .map((lessonId) => {
+        .map((lessonId): RoadmapFormLesson | null => {
             const fromCatalog = catalogById.get(lessonId);
             if (fromCatalog) {
                 return fromCatalog;
@@ -67,23 +87,23 @@ function resolveSelectedLessons(
             if (!fromRoadmap) {
                 return null;
             }
+            // RoadmapLessonV1 (the roadmap's own lesson payload) carries no publication state at
+            // all - publicationStatus/isPublished/isArchived are intentionally left unset here
+            // rather than defaulted to Public, since the server never reported that state.
             return {
                 id: fromRoadmap.id,
                 title: fromRoadmap.title || `Lesson ${fromRoadmap.id}`,
                 description: fromRoadmap.description || "",
                 status: fromRoadmap.status || "ready",
-                publicationStatus: "published",
                 contentMarkdownPreview: "",
                 contentHtmlPreview: "",
-                isPublished: true,
-                isArchived: false,
                 tags: [],
                 createdBy: "",
                 createdAt: fromRoadmap.createdAt || "",
                 updatedAt: fromRoadmap.createdAt || "",
-            } as LibraryLesson;
+            } satisfies RoadmapFormLesson;
         })
-        .filter(Boolean) as LibraryLesson[];
+        .filter((lesson): lesson is RoadmapFormLesson => lesson !== null);
 }
 
 function buildInitialForm(initialRoadmap: LibraryRoadmap | null, lessons: LibraryLesson[]): RoadmapFormState {
@@ -203,8 +223,10 @@ export function RoadmapFormDialog({
         onClose();
     };
 
+    // The catalog (allLessonsQuery in LibraryPage) is already scoped server-side to ready,
+    // learnable (published or private) lessons, so no publication check is needed here.
     const readyLessons = useMemo(
-        () => lessons.filter((lesson) => lesson.status === "ready" && lesson.isPublished),
+        () => lessons.filter((lesson) => lesson.status === "ready"),
         [lessons],
     );
     const availableLessons = useMemo(() => {
@@ -375,7 +397,23 @@ export function RoadmapFormDialog({
                                 }}
                             >
                                 <span className="library-chip library-chip--accent library-chip--index">{index + 1}</span>
-                                <strong>{lesson.title}</strong>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                                    <strong style={{ overflowWrap: "anywhere" }}>{lesson.title}</strong>
+                                    {selectedLessonVisibilityLabel(lesson) &&
+                                        (lesson.publicationStatus === "private" ? (
+                                            <LockOutlinedIcon
+                                                fontSize="small"
+                                                titleAccess={selectedLessonVisibilityLabel(lesson) ?? undefined}
+                                                aria-label={selectedLessonVisibilityLabel(lesson) ?? undefined}
+                                            />
+                                        ) : (
+                                            <PublicOutlinedIcon
+                                                fontSize="small"
+                                                titleAccess={selectedLessonVisibilityLabel(lesson) ?? undefined}
+                                                aria-label={selectedLessonVisibilityLabel(lesson) ?? undefined}
+                                            />
+                                        ))}
+                                </div>
                                 <div style={{ display: "flex", gap: 4 }}>
                                     <Button
                                         size="sm"
