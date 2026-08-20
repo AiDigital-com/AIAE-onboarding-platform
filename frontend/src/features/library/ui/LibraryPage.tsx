@@ -364,7 +364,7 @@ export function LibraryPage() {
         { enabled: isLessonDialogOpen },
     );
     const allLessonsQuery = useLessonsQuery(
-        { size: PICKER_PAGE_SIZE, readyOnly: true, publicationStatus: "published" },
+        { size: PICKER_PAGE_SIZE, readyOnly: true, learnableOnly: true },
         { enabled: isRoadmapDialogOpen },
     );
 

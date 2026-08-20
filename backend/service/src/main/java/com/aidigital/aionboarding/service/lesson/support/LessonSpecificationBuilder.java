@@ -117,6 +117,9 @@ public class LessonSpecificationBuilder {
             if (filter.hasActivities() != null) {
                 predicates.add(hasAnyActivity(query, cb, root, filter.hasActivities()));
             }
+            if (Boolean.TRUE.equals(filter.learnableOnly())) {
+                predicates.add(learnablePredicate(cb, root, readyStatusId, publishedStatusId, privateStatusId));
+            }
 
             predicates.add(visibilityPredicate(query, cb, root, visibility, publishedStatusId, privateStatusId));
 
@@ -169,6 +172,23 @@ public class LessonSpecificationBuilder {
         }
         Predicate ownedByViewer = cb.equal(root.get(Lesson_.createdByUser).get(User_.id), visibility.viewerUserId());
         return cb.or(ownedByViewer, base);
+    }
+
+    /**
+     * Narrows results to lessons eligible for roadmap inclusion and assignment: ready status and
+     * either the published (Public) or private publication status. This is applied in addition to
+     * {@link #visibilityPredicate}, never as a substitute for it, so it can only narrow — never
+     * widen — what the viewer is otherwise authorized to see. Mirrors
+     * {@code LessonLearnabilityPolicy.isLearnable(Lesson)} as a Criteria predicate; archived lessons
+     * match neither publication-status branch and are excluded by construction.
+     */
+    Predicate learnablePredicate(CriteriaBuilder cb, Root<Lesson> root, Long readyStatusId, Long publishedStatusId, Long privateStatusId) {
+        Predicate ready = cb.equal(root.get(Lesson_.status).get(LessonStatus_.id), readyStatusId);
+        Predicate publishedOrPrivate = cb.or(
+            cb.equal(root.get(Lesson_.publicationStatus).get(LessonPublicationStatus_.id), publishedStatusId),
+            cb.equal(root.get(Lesson_.publicationStatus).get(LessonPublicationStatus_.id), privateStatusId)
+        );
+        return cb.and(ready, publishedOrPrivate);
     }
 
     Predicate enrolledByViewer(CriteriaQuery<?> query, CriteriaBuilder cb, Root<Lesson> root, Long viewerId) {

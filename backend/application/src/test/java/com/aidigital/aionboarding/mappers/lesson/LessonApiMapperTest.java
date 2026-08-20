@@ -114,6 +114,7 @@ class LessonApiMapperTest {
 					.assignedToMe(true)
 					.readyOnly(true)
 					.hasActivities(true)
+					.learnableOnly(true)
 					.sort(LessonSortFieldV1.UPDATED_AT)
 					.direction(SortDirectionV1.ASC);
 
@@ -126,8 +127,21 @@ class LessonApiMapperTest {
 			assertThat(query.assignedToMe()).isTrue();
 			assertThat(query.readyOnly()).isTrue();
 			assertThat(query.hasActivities()).isTrue();
+			assertThat(query.learnableOnly()).isTrue();
 			assertThat(query.sortField()).isEqualTo(LessonSortField.UPDATED_AT);
 			assertThat(query.direction()).isEqualTo(Sort.Direction.ASC);
+		}
+
+		@Test
+		void shouldReturnNullLearnableOnlyWhenRequestOmitsItTest() {
+			// Given:
+			SearchLessonsV1 request = new SearchLessonsV1().query("intro");
+
+			// When:
+			LessonListQuery query = mapper.toLessonListQuery(request);
+
+			// Then:
+			assertThat(query.learnableOnly()).isNull();
 		}
 	}
 

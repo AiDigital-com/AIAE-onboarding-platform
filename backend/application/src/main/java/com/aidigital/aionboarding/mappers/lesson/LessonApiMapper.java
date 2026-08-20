@@ -188,6 +188,7 @@ public interface LessonApiMapper extends PageInfoApiMapper {
             request == null ? null : request.getReadyOnly(),
             request == null || request.getActivityType() == null ? null : request.getActivityType().getValue(),
             request == null ? null : request.getHasActivities(),
+            request == null ? null : request.getLearnableOnly(),
             lessonSortField(request),
             sortDirection(request)
         );

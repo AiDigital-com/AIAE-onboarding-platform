@@ -84,7 +84,7 @@ class LessonServiceImplTest {
 			// Given:
 			AppUser viewer = adminViewer();
 			LessonListQuery query = new LessonListQuery(
-					null, null, null, null, null, null, null, null, null, LessonSortField.CREATED_AT,
+					null, null, null, null, null, null, null, null, null, null, LessonSortField.CREATED_AT,
 					Sort.Direction.DESC
 			);
 			LessonVisibilityFilter expectedFilter = new LessonVisibilityFilter(true, false, 2L);
@@ -113,7 +113,7 @@ class LessonServiceImplTest {
 			// Given:
 			AppUser viewer = adminViewer();
 			LessonListQuery query = new LessonListQuery(
-					null, null, null, null, null, null, null, null, null, LessonSortField.CREATED_AT,
+					null, null, null, null, null, null, null, null, null, null, LessonSortField.CREATED_AT,
 					Sort.Direction.DESC
 			);
 			LessonVisibilityFilter expectedFilter = new LessonVisibilityFilter(true, false, 2L);

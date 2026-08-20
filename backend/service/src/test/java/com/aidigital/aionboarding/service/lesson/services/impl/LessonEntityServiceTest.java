@@ -339,7 +339,7 @@ class LessonEntityServiceTest {
 		privateStatus.setId(3L);
 		LessonListQuery query = new LessonListQuery(
 				"term", List.of("design"), null, null, null, null, null,
-				"quiz", true, LessonSortField.CREATED_AT, Sort.Direction.DESC
+				"quiz", true, null, LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, 5L);
 		LessonSearchSummaryProjection projection = Instancio.create(LessonSearchSummaryProjection.class);
@@ -381,7 +381,7 @@ class LessonEntityServiceTest {
 		privateStatus.setId(3L);
 		LessonListQuery query = new LessonListQuery(
 				"term", List.of("design"), null, null, null, null, null,
-				"quiz", true, LessonSortField.CREATED_AT, Sort.Direction.DESC
+				"quiz", true, null, LessonSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(true, false, 5L);
 		@SuppressWarnings("unchecked")

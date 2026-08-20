@@ -18,6 +18,10 @@ import java.util.List;
  * @param activityTypeCode restricts results to lessons with at least one activity of this
  *                         {@code activity_type.code}; {@code null} to skip
  * @param hasActivities restricts results by presence of any activity; {@code null} to skip
+ * @param learnableOnly when {@code true}, restricts results to lessons that are ready and either
+ *                      published or private - i.e. eligible for roadmap inclusion and assignment.
+ *                      This narrows the caller's existing visibility restrictions further; it never
+ *                      widens them, and it applies independently of {@code publicationStatusCode}
  * @param sortField whitelisted field to sort by
  * @param direction sort direction
  */
@@ -31,6 +35,7 @@ public record LessonListQuery(
     Boolean readyOnly,
     String activityTypeCode,
     Boolean hasActivities,
+    Boolean learnableOnly,
     LessonSortField sortField,
     Sort.Direction direction
 ) {
