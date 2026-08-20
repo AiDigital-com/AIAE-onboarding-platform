@@ -129,7 +129,7 @@ class RoadmapEnrollmentServiceImplTest {
 			RoadmapLesson roadmapLesson = roadmapLesson(roadmapId, draftLesson, 1);
 			when(roadmapEntityService.findByIdRoadmapIdOrderBySortOrderAsc(roadmapId))
 					.thenReturn(List.of(roadmapLesson));
-			when(learningEnrollmentService.isEnrollable(draftLesson)).thenReturn(false);
+			when(learningEnrollmentService.isLearnable(draftLesson)).thenReturn(false);
 
 			// When:
 			service.fanOutRoadmapLessons(List.of(userId), roadmapId, true);
@@ -155,7 +155,7 @@ class RoadmapEnrollmentServiceImplTest {
 			id.setLessonId(lessonId);
 			when(roadmapEntityService.findByIdRoadmapIdOrderBySortOrderAsc(roadmapId))
 					.thenReturn(List.of(roadmapLesson));
-			when(learningEnrollmentService.isEnrollable(lesson)).thenReturn(true);
+			when(learningEnrollmentService.isLearnable(lesson)).thenReturn(true);
 			when(learningEnrollmentEntityService.findUserLessonsByUserIdsAndLessonIds(List.of(userId), List.of(lessonId)))
 					.thenReturn(List.of());
 			when(currentTime.utcDateTime()).thenReturn(base);
@@ -188,7 +188,7 @@ class RoadmapEnrollmentServiceImplTest {
 			existing.setEnrolledAt(LocalDateTime.of(2020, 1, 1, 0, 0));
 			when(roadmapEntityService.findByIdRoadmapIdOrderBySortOrderAsc(roadmapId))
 					.thenReturn(List.of(roadmapLesson));
-			when(learningEnrollmentService.isEnrollable(lesson)).thenReturn(true);
+			when(learningEnrollmentService.isLearnable(lesson)).thenReturn(true);
 			when(learningEnrollmentEntityService.findUserLessonsByUserIdsAndLessonIds(List.of(userId), List.of(lessonId)))
 					.thenReturn(List.of(existing));
 			when(currentTime.utcDateTime()).thenReturn(base);
@@ -216,7 +216,7 @@ class RoadmapEnrollmentServiceImplTest {
 			existing.setLesson(lesson);
 			when(roadmapEntityService.findByIdRoadmapIdOrderBySortOrderAsc(roadmapId))
 					.thenReturn(List.of(roadmapLesson));
-			when(learningEnrollmentService.isEnrollable(lesson)).thenReturn(true);
+			when(learningEnrollmentService.isLearnable(lesson)).thenReturn(true);
 			when(learningEnrollmentEntityService.findUserLessonsByUserIdsAndLessonIds(List.of(userId), List.of(lessonId)))
 					.thenReturn(List.of(existing));
 			when(currentTime.utcDateTime()).thenReturn(base);

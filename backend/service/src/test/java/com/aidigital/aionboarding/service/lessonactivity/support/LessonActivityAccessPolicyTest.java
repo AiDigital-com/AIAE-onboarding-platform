@@ -1,10 +1,17 @@
 package com.aidigital.aionboarding.service.lessonactivity.support;
 
 import com.aidigital.aionboarding.domain.common.dictionary.ActivityTypeCode;
+import com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode;
+import com.aidigital.aionboarding.domain.common.dictionary.LessonStatusCode;
+import com.aidigital.aionboarding.domain.common.dictionary.entities.LessonPublicationStatus;
+import com.aidigital.aionboarding.domain.common.dictionary.entities.LessonStatus;
+import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.service.common.dictionary.DictionaryLookupService;
+import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.learning.services.entity.LearningEnrollmentEntityService;
 import com.aidigital.aionboarding.service.lesson.services.entity.LessonEntityService;
+import com.aidigital.aionboarding.service.lesson.support.LessonLearnabilityPolicy;
 import com.aidigital.aionboarding.service.lessonactivity.enums.QuizQuestionTypeResolver;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
@@ -18,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +42,7 @@ class LessonActivityAccessPolicyTest {
 
 	private final LessonActivityPayloadAssembler payloadAssembler =
 			new LessonActivityPayloadAssembler(new QuizQuestionTypeResolver());
+	private final LessonLearnabilityPolicy lessonLearnabilityPolicy = new LessonLearnabilityPolicy();
 
 	private LessonActivityAccessPolicy accessPolicy() {
 		return new LessonActivityAccessPolicy(
@@ -41,8 +50,77 @@ class LessonActivityAccessPolicyTest {
 				learningEnrollmentEntityService,
 				dictionaryLookupService,
 				permissionService,
-				payloadAssembler
+				payloadAssembler,
+				lessonLearnabilityPolicy
 		);
+	}
+
+	@Nested
+	class requireLearnableLesson {
+
+		@Test
+		void returnsLessonWhenReadyAndPublishedTest() {
+			// Given:
+			Long lessonId = 1L;
+			Lesson lesson = lessonWithStatus(LessonStatusCode.READY, LessonPublicationStatusCode.PUBLISHED);
+			when(lessonEntityService.findByIdWithFetches(lessonId)).thenReturn(lesson);
+
+			// Execution
+			Lesson result = accessPolicy().requireLearnableLesson(lessonId);
+
+			// Verification
+			assertThat(result).isSameAs(lesson);
+		}
+
+		@Test
+		void returnsLessonWhenReadyAndPrivateTest() {
+			// Given: a private (assigned-only) lesson remains usable for activity
+			// submission/reset once enrollment has already been verified by the caller
+			Long lessonId = 2L;
+			Lesson lesson = lessonWithStatus(LessonStatusCode.READY, LessonPublicationStatusCode.PRIVATE);
+			when(lessonEntityService.findByIdWithFetches(lessonId)).thenReturn(lesson);
+
+			// Execution
+			Lesson result = accessPolicy().requireLearnableLesson(lessonId);
+
+			// Verification
+			assertThat(result).isSameAs(lesson);
+		}
+
+		@Test
+		void throwsWhenLessonNotReadyTest() {
+			// Given:
+			Long lessonId = 3L;
+			Lesson lesson = lessonWithStatus(LessonStatusCode.GENERATING, LessonPublicationStatusCode.PUBLISHED);
+			when(lessonEntityService.findByIdWithFetches(lessonId)).thenReturn(lesson);
+
+			// When-Then:
+			assertThatThrownBy(() -> accessPolicy().requireLearnableLesson(lessonId))
+					.isInstanceOf(AppException.class);
+		}
+
+		@Test
+		void throwsWhenLessonArchivedTest() {
+			// Given:
+			Long lessonId = 4L;
+			Lesson lesson = lessonWithStatus(LessonStatusCode.READY, LessonPublicationStatusCode.ARCHIVED);
+			when(lessonEntityService.findByIdWithFetches(lessonId)).thenReturn(lesson);
+
+			// When-Then:
+			assertThatThrownBy(() -> accessPolicy().requireLearnableLesson(lessonId))
+					.isInstanceOf(AppException.class);
+		}
+
+		private Lesson lessonWithStatus(String statusCode, String publicationStatusCode) {
+			Lesson lesson = new Lesson();
+			LessonStatus status = new LessonStatus();
+			status.setCode(statusCode);
+			LessonPublicationStatus publicationStatus = new LessonPublicationStatus();
+			publicationStatus.setCode(publicationStatusCode);
+			lesson.setStatus(status);
+			lesson.setPublicationStatus(publicationStatus);
+			return lesson;
+		}
 	}
 
 	@Nested

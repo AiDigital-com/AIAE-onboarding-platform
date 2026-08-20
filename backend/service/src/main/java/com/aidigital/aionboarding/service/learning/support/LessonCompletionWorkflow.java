@@ -44,7 +44,7 @@ public class LessonCompletionWorkflow {
      */
     public LessonEnrollmentResultRecord setLessonCompletion(Long userId, Long lessonId, boolean completed) {
         Lesson lesson = lessonEntityService.getReference(lessonId);
-        if (!learningEnrollmentService.isEnrollable(lesson)) {
+        if (!learningEnrollmentService.isLearnable(lesson)) {
             throw new AppException(ErrorReason.C001, lessonId);
         }
 

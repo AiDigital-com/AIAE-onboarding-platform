@@ -1,6 +1,5 @@
 package com.aidigital.aionboarding.service.lesson.support;
 
-import com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode;
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.domain.roadmap.entities.RoadmapLesson;
 import com.aidigital.aionboarding.service.common.error.AppException;
@@ -36,24 +35,23 @@ public class LessonMutationSupport {
     private final StorageService storageService;
     private final LessonHtmlSanitizer lessonHtmlSanitizer;
     private final RoadmapEntityService roadmapEntityService;
+    private final LessonVisibilityPolicy lessonVisibilityPolicy;
 
     /**
      * Returns true if the viewer is allowed to see the lesson.
+     * <p>
+     * Delegates to {@link LessonVisibilityPolicy}, the single implementation of the viewer
+     * visibility rule, shared with {@code LessonActivityServiceImpl.canViewLesson} and
+     * {@code RoadmapLessonValidator}. It mirrors, and must stay aligned with,
+     * {@code LessonSpecificationBuilder.visibilityPredicate}, which expresses the same rule in
+     * SQL for the list/count query.
      *
      * @param viewer authenticated viewer
      * @param lesson lesson entity to check
      * @return {@code true} when the lesson is visible to the viewer
      */
     public boolean canView(AppUser viewer, Lesson lesson) {
-        if (viewer.isAdmin()) {
-            return true;
-        }
-        if (permissionService.userHasPermission(viewer, PermissionKeys.LESSONS_MANAGE)
-            && permissionService.canManageExistingLesson(viewer,
-            lesson.getCreatedByUser() == null ? null : lesson.getCreatedByUser().getId())) {
-            return true;
-        }
-        return LessonPublicationStatusCode.PUBLISHED.equals(lesson.getPublicationStatus().getCode());
+        return lessonVisibilityPolicy.isVisible(viewer, lesson);
     }
 
     /**

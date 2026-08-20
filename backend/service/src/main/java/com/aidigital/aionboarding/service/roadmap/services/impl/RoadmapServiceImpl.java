@@ -13,6 +13,7 @@ import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import com.aidigital.aionboarding.service.roadmap.models.CreateRoadmapInput;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapListQuery;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapRecord;
+import com.aidigital.aionboarding.service.roadmap.models.RoadmapVisibilityFilter;
 import com.aidigital.aionboarding.service.roadmap.models.UpdateRoadmapInput;
 import com.aidigital.aionboarding.service.roadmap.services.RoadmapService;
 import com.aidigital.aionboarding.service.roadmap.services.entity.RoadmapEntityService;
@@ -56,7 +57,7 @@ public class RoadmapServiceImpl implements RoadmapService {
 	@Override
 	@Transactional(readOnly = true)
 	public Page<RoadmapRecord> getAllRoadmaps(AppUser viewer, RoadmapListQuery query, int page, int size) {
-		Page<Roadmap> roadmapsPage = roadmapEntityService.search(query, viewer.internalId(), page, size);
+		Page<Roadmap> roadmapsPage = roadmapEntityService.search(query, visibilityFilter(viewer), page, size);
 		List<Roadmap> roadmaps = roadmapsPage.getContent();
 		if (roadmaps.isEmpty()) {
 			return new PageImpl<>(List.of(), roadmapsPage.getPageable(), roadmapsPage.getTotalElements());
@@ -92,7 +93,23 @@ public class RoadmapServiceImpl implements RoadmapService {
 	@Override
 	@Transactional(readOnly = true)
 	public long countRoadmaps(AppUser viewer, RoadmapListQuery query) {
-		return roadmapEntityService.countRoadmaps(query, viewer.internalId());
+		return roadmapEntityService.countRoadmaps(query, visibilityFilter(viewer));
+	}
+
+	/**
+	 * Builds the roadmap visibility security context for the viewer, resolving the
+	 * roadmaps-manage permission once per request.
+	 *
+	 * @param viewer authenticated user requesting a roadmap list or count
+	 * @return the resolved {@link RoadmapVisibilityFilter}
+	 */
+	RoadmapVisibilityFilter visibilityFilter(AppUser viewer) {
+		return new RoadmapVisibilityFilter(
+				viewer.isAdmin(),
+				permissionService.userHasPermission(viewer, PermissionKeys.ROADMAPS_MANAGE),
+				viewer.isTeamLead(),
+				viewer.internalId()
+		);
 	}
 
 	/**
@@ -107,7 +124,7 @@ public class RoadmapServiceImpl implements RoadmapService {
 			throw new AppException(ErrorReason.C002, "Title is required.");
 		}
 		List<Long> lessonIds = roadmapLessonValidator.normalizeLessonIds(input.lessonIds());
-		List<Lesson> lessons = roadmapLessonValidator.validateReadyPublishedLessons(lessonIds);
+		List<Lesson> lessons = roadmapLessonValidator.validateReadyPublishedLessons(viewer, lessonIds);
 		List<String> tags = roadmapLessonValidator.mergeTags(input.tags(), lessons);
 
 		Roadmap roadmap = new Roadmap();
@@ -141,7 +158,7 @@ public class RoadmapServiceImpl implements RoadmapService {
 		}
 		if (input.lessonIds().isPresent()) {
 			List<Long> lessonIds = roadmapLessonValidator.normalizeLessonIds(input.lessonIds().get());
-			List<Lesson> lessons = roadmapLessonValidator.validateReadyPublishedLessons(lessonIds);
+			List<Lesson> lessons = roadmapLessonValidator.validateReadyPublishedLessons(viewer, lessonIds);
 			List<String> tags = roadmapLessonValidator.mergeTags(input.tags().orElse(List.of()), lessons);
 			roadmap.setTags(tags);
 			roadmapEntityService.deleteByIdRoadmapId(id);

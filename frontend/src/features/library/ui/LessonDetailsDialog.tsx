@@ -35,6 +35,7 @@ import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ImageOutlinedIcon from "@mui/icons-material/ImageOutlined";
 import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import OndemandVideoOutlinedIcon from "@mui/icons-material/OndemandVideoOutlined";
 import QuizOutlinedIcon from "@mui/icons-material/QuizOutlined";
 import RocketLaunchOutlinedIcon from "@mui/icons-material/RocketLaunchOutlined";
@@ -1318,6 +1319,7 @@ export function LessonDetailsDialog({
     const isSaving = updateLessonM.isPending;
     const statusAction = changeStatusM.variables?.payload?.action;
     const isPublishing = changeStatusM.isPending && (statusAction === "publish" || statusAction === "restore");
+    const isUnpublishing = changeStatusM.isPending && statusAction === "unpublish";
     const isArchiving = changeStatusM.isPending && statusAction === "archive";
     const isDeleting = deleteLessonM.isPending;
     const isDeletingAsset = deleteAssetM.isPending;
@@ -1550,6 +1552,12 @@ export function LessonDetailsDialog({
         !lesson.isPublished &&
         !isLessonArchived &&
         (canPublish || canManageCurrentLesson);
+    /** Returns a Public lesson to Private (Library visible only to assigned users). */
+    const canUnpublishLesson =
+        lesson.status === "ready" &&
+        Boolean(lesson.isPublished) &&
+        !isLessonArchived &&
+        (canPublish || canManageCurrentLesson);
     const lastEditedAt = lessonExtra?.updatedAt || lessonExtra?.createdAt;
     const lastEditedLabel = lastEditedAt ? `Edited ${formatDateTime(lastEditedAt)}` : "Edited date unknown";
     const visibleTags = isEditing ? draftTags : normalizeLessonTagInput(lesson.tags || []);
@@ -1614,6 +1622,18 @@ export function LessonDetailsDialog({
         }
     };
 
+    const handleUnpublish = async () => {
+        try {
+            const data = await changeStatusM.mutateAsync({ id: lesson.id, payload: { action: "unpublish" } });
+            if (data?.lesson) {
+                await onLessonUpdated?.(data.lesson as unknown as LibraryLesson);
+            }
+        } catch (error) {
+            console.error("Failed to make lesson private:", error);
+            onValidationError?.(error instanceof Error ? error.message : "Failed to make lesson private.");
+        }
+    };
+
     const handleArchive = async () => {
         try {
             setArchiveError("");
@@ -1673,7 +1693,7 @@ export function LessonDetailsDialog({
     };
 
     const requestClose = () => {
-        if (isSaving || isPublishing || isArchiving || isDeleting || isRevising || isGeneratingActivity || isSavingActivity || isUploadingCover) {
+        if (isSaving || isPublishing || isUnpublishing || isArchiving || isDeleting || isRevising || isGeneratingActivity || isSavingActivity || isUploadingCover) {
             return;
         }
         if (isDirty) {
@@ -2580,7 +2600,7 @@ export function LessonDetailsDialog({
                                         onClick={requestClose}
                                         disabled={
                                             isSaving ||
-                                            isPublishing ||
+                                            isPublishing || isUnpublishing ||
                                             isArchiving ||
                                             isDeleting ||
                                             isRevising ||
@@ -3501,7 +3521,7 @@ export function LessonDetailsDialog({
                                             disabled={
                                                 isDeleting ||
                                                 isSaving ||
-                                                isPublishing ||
+                                                isPublishing || isUnpublishing ||
                                                 isArchiving ||
                                                 isRevising ||
                                                 isGeneratingActivity
@@ -3564,7 +3584,7 @@ export function LessonDetailsDialog({
                                             disabled={
                                                 isDeleting ||
                                                 isSaving ||
-                                                isPublishing ||
+                                                isPublishing || isUnpublishing ||
                                                 isArchiving ||
                                                 isRevising ||
                                                 isGeneratingActivity
@@ -3700,7 +3720,7 @@ export function LessonDetailsDialog({
                                                         !canManageCurrentLesson ||
                                                         isDeleting ||
                                                         isSaving ||
-                                                        isPublishing ||
+                                                        isPublishing || isUnpublishing ||
                                                         isArchiving ||
                                                         isRevising ||
                                                         isGeneratingActivity ||
@@ -3788,7 +3808,7 @@ export function LessonDetailsDialog({
                                 !canManageCurrentLesson ||
                                 (isLessonArchived && lesson.status !== "ready") ||
                                 isSaving ||
-                                isPublishing ||
+                                isPublishing || isUnpublishing ||
                                 isArchiving ||
                                 isDeleting ||
                                 isRevising ||
@@ -3816,7 +3836,7 @@ export function LessonDetailsDialog({
                             disabled={
                                 !canManageCurrentLesson ||
                                 isSaving ||
-                                isPublishing ||
+                                isPublishing || isUnpublishing ||
                                 isArchiving ||
                                 isDeleting ||
                                 isRevising ||
@@ -3840,7 +3860,7 @@ export function LessonDetailsDialog({
                             !canManageCurrentActivities ||
                             isDeleting ||
                             isSaving ||
-                            isPublishing ||
+                            isPublishing || isUnpublishing ||
                             isArchiving ||
                             isRevising ||
                             isGeneratingActivity ||
@@ -3856,7 +3876,7 @@ export function LessonDetailsDialog({
                         <Button
                             onClick={handleCancelEdit}
                             variant="outlined"
-                            disabled={isSaving || isPublishing || isArchiving || isDeleting || isGeneratingActivity || isSavingActivity || isUploadingCover}
+                            disabled={isSaving || isPublishing || isUnpublishing || isArchiving || isDeleting || isGeneratingActivity || isSavingActivity || isUploadingCover}
                             sx={lessonSecondaryButtonSx}
                         >
                             Cancel
@@ -3868,7 +3888,7 @@ export function LessonDetailsDialog({
                             disabled={
                                 !canManageCurrentLesson ||
                                 isSaving ||
-                                isPublishing ||
+                                isPublishing || isUnpublishing ||
                                 isArchiving ||
                                 isDeleting ||
                                 isRevising ||
@@ -3892,7 +3912,7 @@ export function LessonDetailsDialog({
                                     !canManageCurrentLesson ||
                                     isDeleting ||
                                     isSaving ||
-                                    isPublishing ||
+                                    isPublishing || isUnpublishing ||
                                     isArchiving ||
                                     isRevising ||
                                     isGeneratingActivity ||
@@ -3904,6 +3924,28 @@ export function LessonDetailsDialog({
                                 {isPublishing ? "Publishing..." : "Publish lesson"}
                             </Button>
                         )}
+                        {canUnpublishLesson && (
+                            <Button
+                                onClick={() => void handleUnpublish()}
+                                variant="outlined"
+                                startIcon={<LockOutlinedIcon />}
+                                title="Make the lesson Private — visible in the Library only to assigned users"
+                                disabled={
+                                    !canManageCurrentLesson ||
+                                    isDeleting ||
+                                    isSaving ||
+                                    isPublishing || isUnpublishing ||
+                                    isArchiving ||
+                                    isRevising ||
+                                    isGeneratingActivity ||
+                                    isSavingActivity ||
+                                    isUploadingCover
+                                }
+                                sx={lessonSecondaryButtonSx}
+                            >
+                                {isUnpublishing ? "Making private..." : "Make private"}
+                            </Button>
+                        )}
                         {canManageCurrentLesson && (
                             <Button
                                 onClick={() => setIsEditing(true)}
@@ -3912,7 +3954,7 @@ export function LessonDetailsDialog({
                                 disabled={
                                     isDeleting ||
                                     isSaving ||
-                                    isPublishing ||
+                                    isPublishing || isUnpublishing ||
                                     isArchiving ||
                                     isRevising ||
                                     isGeneratingActivity ||
@@ -4091,7 +4133,7 @@ export function LessonDetailsDialog({
                 setIsDiscardOpen(false);
             }}
             onDiscard={handleDiscardChanges}
-            disabled={isSaving || isPublishing || isArchiving || isDeleting || isRevising || isGeneratingActivity || isSavingActivity}
+            disabled={isSaving || isPublishing || isUnpublishing || isArchiving || isDeleting || isRevising || isGeneratingActivity || isSavingActivity}
         />
         </>
     );

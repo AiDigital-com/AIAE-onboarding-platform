@@ -15,9 +15,9 @@ const enrollmentOptions = [
 ];
 
 const lessonStatusOptions = [
-    { value: "ready", label: "Ready" },
+    { value: "published", label: "Public" },
+    { value: "private", label: "Private" },
     { value: "archived", label: "Archived" },
-    { value: "draft", label: "Draft" },
     { value: "all", label: "All" },
 ];
 
@@ -26,6 +26,8 @@ interface LessonLibraryFiltersProps {
     onQueryChange: (value: string) => void;
     status: string;
     onStatusChange: (value: string) => void;
+    /** Only a lessons.manage holder has a meaningful Public/Private/Archived filter to use. */
+    canFilterByPublicationStatus?: boolean;
     selectedTags?: string[];
     onSelectedTagsChange?: (tags: string[]) => void;
     availableTags?: string[];
@@ -49,6 +51,7 @@ export function LessonLibraryFilters(props: LessonLibraryFiltersProps) {
         onQueryChange,
         status,
         onStatusChange,
+        canFilterByPublicationStatus = false,
         selectedTags = [],
         onSelectedTagsChange,
         availableTags = [],
@@ -98,20 +101,22 @@ export function LessonLibraryFilters(props: LessonLibraryFiltersProps) {
                             <TextField {...params} label="Tags" placeholder="Choose tags" />
                         )}
                     />
-                    <TextField
-                        select
-                        label="Status"
-                        value={status}
-                        onChange={(event) => onStatusChange(event.target.value)}
-                        size="small"
-                        fullWidth
-                    >
-                        {lessonStatusOptions.map((option) => (
-                            <MenuItem key={option.value} value={option.value}>
-                                {option.label}
-                            </MenuItem>
-                        ))}
-                    </TextField>
+                    {canFilterByPublicationStatus && (
+                        <TextField
+                            select
+                            label="Status"
+                            value={status}
+                            onChange={(event) => onStatusChange(event.target.value)}
+                            size="small"
+                            fullWidth
+                        >
+                            {lessonStatusOptions.map((option) => (
+                                <MenuItem key={option.value} value={option.value}>
+                                    {option.label}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                    )}
                     <TextField
                         select
                         label="Activity"

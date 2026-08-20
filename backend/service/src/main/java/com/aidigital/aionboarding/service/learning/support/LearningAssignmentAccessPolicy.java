@@ -35,13 +35,27 @@ public class LearningAssignmentAccessPolicy {
      * @throws AppException with reason {@code C004} when any target is not manageable
      */
     public void requireAssignableTargets(AppUser actor, List<Long> targetUserIds, String forbiddenMessage) {
+        if (!assignableUserIds(actor).containsAll(targetUserIds)) {
+            throw new AppException(ErrorReason.C004, forbiddenMessage);
+        }
+    }
+
+    /**
+     * Resolves the set of user ids the actor may assign, revoke, or otherwise see
+     * learning-assignment data for: every user except themselves for an admin, their own team's
+     * members for a team lead, and no one for anyone else. Used both to validate assignment
+     * targets and to bound roster-style reads (e.g. listing a roadmap's or lesson's assignees) to
+     * only the users the actor is actually permitted to manage.
+     *
+     * @param actor user whose assignable-learner set is being resolved
+     * @return the assignable user ids for this actor
+     */
+    public Set<Long> assignableUserIds(AppUser actor) {
         Set<Long> assignableIds = new HashSet<>();
         for (UserRecord candidate : teamService.getAssignableLearningUsers(actor)) {
             assignableIds.add(candidate.id());
         }
-        if (!assignableIds.containsAll(targetUserIds)) {
-            throw new AppException(ErrorReason.C004, forbiddenMessage);
-        }
+        return assignableIds;
     }
 
     /**

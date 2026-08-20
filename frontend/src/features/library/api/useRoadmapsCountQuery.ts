@@ -9,9 +9,10 @@ import type { RoadmapsQueryParams } from "./useRoadmapsQuery";
  * Bounded count-only fetch for the Roadmaps tab label — a single COUNT query, not a full
  * search — so the tab count stays accurate while another tab's list is the one actually fetched.
  */
-export function useRoadmapsCountQuery(params: RoadmapsQueryParams = {}) {
+export function useRoadmapsCountQuery(params: RoadmapsQueryParams = {}, options?: { enabled?: boolean }) {
     return useQuery({
         queryKey: [...libraryQueryKeys.roadmaps, "count", params] as const,
+        enabled: options?.enabled ?? true,
         queryFn: async ({ signal }): Promise<number> => {
             // page/size/sort/direction are ignored server-side for a count-only request, but the
             // shared search request schema still declares them required.

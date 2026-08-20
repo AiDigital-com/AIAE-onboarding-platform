@@ -1,20 +1,20 @@
 import type { ReactNode } from "react";
 import { Tab, Tabs } from "@mui/material";
-
-const libraryTabs = [
-    { value: "materials", label: "Materials" },
-    { value: "lessons", label: "Lessons" },
-    { value: "roadmaps", label: "Roadmaps" },
-] as const;
+import type { LibraryTabDefinition } from "../api/types";
 
 interface LibraryTabsProps {
+    tabs: LibraryTabDefinition[];
     activeTab: string;
     onTabChange: (tab: string) => void;
     actionSlot?: ReactNode;
     counts?: Partial<Record<string, number>>;
 }
 
-export function LibraryTabs({ activeTab, onTabChange, actionSlot, counts = {} }: LibraryTabsProps) {
+/**
+ * Renders exactly the tabs it is given — the caller (LibraryPage) computes the
+ * permission-filtered tab list, keeping this component dumb and trivially testable.
+ */
+export function LibraryTabs({ tabs, activeTab, onTabChange, actionSlot, counts = {} }: LibraryTabsProps) {
     return (
         <section className="library-tabs">
             <div className="library-tabs__row">
@@ -42,7 +42,7 @@ export function LibraryTabs({ activeTab, onTabChange, actionSlot, counts = {} }:
                         },
                     }}
                 >
-                    {libraryTabs.map((tab) => (
+                    {tabs.map((tab) => (
                         <Tab
                             key={tab.value}
                             value={tab.value}

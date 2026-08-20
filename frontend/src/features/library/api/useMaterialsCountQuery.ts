@@ -9,9 +9,10 @@ import type { MaterialsQueryParams } from "./useMaterialsQuery";
  * Bounded count-only fetch for the Materials tab label — a single COUNT query, not a full
  * search — so the tab count stays accurate while another tab's list is the one actually fetched.
  */
-export function useMaterialsCountQuery(params: MaterialsQueryParams = {}) {
+export function useMaterialsCountQuery(params: MaterialsQueryParams = {}, options?: { enabled?: boolean }) {
     return useQuery({
         queryKey: [...libraryQueryKeys.materials, "count", params] as const,
+        enabled: options?.enabled ?? true,
         queryFn: async ({ signal }): Promise<number> => {
             // page/size/sort/direction are ignored server-side for a count-only request, but the
             // shared search request schema still declares them required.

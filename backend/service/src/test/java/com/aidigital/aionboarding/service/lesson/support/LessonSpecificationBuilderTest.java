@@ -91,7 +91,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null, null);
 		Predicate result = spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -123,7 +123,7 @@ class LessonSpecificationBuilderTest {
 		when(blankCb.and(any(Predicate[].class))).thenReturn(blankAnd);
 
 		// When:
-		Specification<Lesson> blankSpec = builder.build(blankFilter, visibility, null, null, null, null);
+		Specification<Lesson> blankSpec = builder.build(blankFilter, visibility, null, null, null, null, null);
 		blankSpec.toPredicate(blankRoot, blankQuery, blankCb);
 
 		// Then: only the visibility predicate is present
@@ -147,7 +147,7 @@ class LessonSpecificationBuilderTest {
 		when(nullCb.and(any(Predicate[].class))).thenReturn(nullAnd);
 
 		// When:
-		Specification<Lesson> nullSpec = builder.build(nullFilter, visibility, null, null, null, null);
+		Specification<Lesson> nullSpec = builder.build(nullFilter, visibility, null, null, null, null, null);
 		nullSpec.toPredicate(nullRoot, nullQuery, nullCb);
 
 		// Then:
@@ -195,7 +195,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null, null);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -226,7 +226,7 @@ class LessonSpecificationBuilderTest {
 		when(cb1.and(any(Predicate[].class))).thenReturn(and1);
 
 		// When:
-		Specification<Lesson> spec1 = builder.build(nullTagsFilter, visibility, null, null, null, null);
+		Specification<Lesson> spec1 = builder.build(nullTagsFilter, visibility, null, null, null, null, null);
 		spec1.toPredicate(root1, query1, cb1);
 
 		// Then:
@@ -249,7 +249,7 @@ class LessonSpecificationBuilderTest {
 		when(cb2.and(any(Predicate[].class))).thenReturn(and2);
 
 		// When:
-		Specification<Lesson> spec2 = builder.build(emptyTagsFilter, visibility, null, null, null, null);
+		Specification<Lesson> spec2 = builder.build(emptyTagsFilter, visibility, null, null, null, null, null);
 		spec2.toPredicate(root2, query2, cb2);
 
 		// Then:
@@ -289,7 +289,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, 100L, null, null, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, 100L, null, null, null, null);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -320,7 +320,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null, null);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -360,7 +360,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, null, 200L, null, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, null, 200L, null, null, null);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -391,7 +391,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null, null);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -430,7 +430,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null, null);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -461,7 +461,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null, null);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -500,7 +500,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, null, null, 400L, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, 400L, null, null);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -530,7 +530,7 @@ class LessonSpecificationBuilderTest {
 		when(cb1.and(any(Predicate[].class))).thenReturn(and1);
 
 		// When:
-		Specification<Lesson> spec1 = builder.build(falseFilter, visibility, null, null, 400L, null);
+		Specification<Lesson> spec1 = builder.build(falseFilter, visibility, null, null, 400L, null, null);
 		spec1.toPredicate(root1, query1, cb1);
 
 		// Then:
@@ -553,7 +553,7 @@ class LessonSpecificationBuilderTest {
 		when(cb2.and(any(Predicate[].class))).thenReturn(and2);
 
 		// When:
-		Specification<Lesson> spec2 = builder.build(nullFilter, visibility, null, null, 400L, null);
+		Specification<Lesson> spec2 = builder.build(nullFilter, visibility, null, null, 400L, null, null);
 		spec2.toPredicate(root2, query2, cb2);
 
 		// Then:
@@ -597,7 +597,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null, null);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -628,7 +628,7 @@ class LessonSpecificationBuilderTest {
 		when(cb1.and(any(Predicate[].class))).thenReturn(and1);
 
 		// When:
-		Specification<Lesson> spec1 = builder.build(falseFilter, visibility, null, null, null, null);
+		Specification<Lesson> spec1 = builder.build(falseFilter, visibility, null, null, null, null, null);
 		spec1.toPredicate(root1, query1, cb1);
 
 		// Then:
@@ -652,7 +652,7 @@ class LessonSpecificationBuilderTest {
 		when(cb2.and(any(Predicate[].class))).thenReturn(and2);
 
 		// When:
-		Specification<Lesson> spec2 = builder.build(nullFilter, visibility, null, null, null, null);
+		Specification<Lesson> spec2 = builder.build(nullFilter, visibility, null, null, null, null, null);
 		spec2.toPredicate(root2, query2, cb2);
 
 		// Then:
@@ -696,7 +696,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null, null);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -728,7 +728,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null, null);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -770,7 +770,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null, null);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -801,7 +801,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null, null);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -841,7 +841,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.desc(createdAtPath)).thenReturn(descOrder);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null, null);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -872,7 +872,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null, null);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -912,7 +912,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.asc(titlePath)).thenReturn(ascOrder);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null, null);
 		spec.toPredicate(root, query, cb);
 
 		// Then:
@@ -942,7 +942,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null);
+		Specification<Lesson> spec = builder.build(filter, visibility, null, null, null, null, null);
 		spec.toPredicate(root, query, cb);
 
 		// Then: buildOrder is never invoked, so the sort expression is never looked up either
@@ -1047,7 +1047,7 @@ class LessonSpecificationBuilderTest {
 		when(cb.and(any(Predicate[].class))).thenReturn(andPredicate);
 
 		// When:
-		Specification<Lesson> spec = builder.build(filter, visibility, 100L, 200L, 400L, 500L);
+		Specification<Lesson> spec = builder.build(filter, visibility, 100L, 200L, 400L, 500L, 600L);
 		Predicate result = spec.toPredicate(root, query, cb);
 
 		// Then: every active criterion contributes exactly one predicate, in declaration order,
@@ -1150,6 +1150,7 @@ class LessonSpecificationBuilderTest {
 		// Given:
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
+		CriteriaQuery query = mock(CriteriaQuery.class);
 		CriteriaBuilder cb = mock(CriteriaBuilder.class);
 		Root root = mock(Root.class);
 		Predicate conjunction = mock(Predicate.class);
@@ -1158,59 +1159,95 @@ class LessonSpecificationBuilderTest {
 		when(cb.conjunction()).thenReturn(conjunction);
 
 		// When:
-		Predicate result = builder.visibilityPredicate(cb, root, visibility, 900L);
+		Predicate result = builder.visibilityPredicate(query, cb, root, visibility, 900L, 950L);
 
-		// Then:
+		// Then: an admin short-circuits before the enrolled-by-viewer subquery is ever built
 		assertThat(result).isSameAs(conjunction);
 		verify(cb).conjunction();
+		verify(query, never()).subquery(Long.class);
 	}
 
 	@Test
-	void shouldReturnPublishedOnlyPredicateWhenCannotManageOwnLessonsTest() {
-		// Given:
+	void shouldReturnPublishedOrPrivateEnrolledPredicateWhenCannotManageOwnLessonsTest() {
+		// Given: a non-manager sees published lessons plus private lessons they are enrolled in
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
+		CriteriaQuery query = mock(CriteriaQuery.class);
 		CriteriaBuilder cb = mock(CriteriaBuilder.class);
 		Root root = mock(Root.class);
 		Path pubStatusPath = mock(Path.class);
 		Predicate publishedPredicate = mock(Predicate.class);
+		Predicate privateStatusPredicate = mock(Predicate.class);
+		Subquery subquery = mock(Subquery.class);
+		Root correlatedLesson = mock(Root.class);
+		Root userLessonRoot = mock(Root.class);
+		Predicate enrolledExists = mock(Predicate.class);
+		Predicate privateAndEnrolledPredicate = mock(Predicate.class);
+		Predicate basePredicate = mock(Predicate.class);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(false, false, 5L);
 
 		when(root.get((SingularAttribute) null)).thenReturn(pubStatusPath);
 		when(cb.equal(null, 900L)).thenReturn(publishedPredicate);
+		when(cb.equal(null, 950L)).thenReturn(privateStatusPredicate);
+		when(query.subquery(Long.class)).thenReturn(subquery);
+		when(subquery.correlate(root)).thenReturn(correlatedLesson);
+		when(subquery.from(UserLesson.class)).thenReturn(userLessonRoot);
+		// userLesson.get(UserLesson_.user).get(User_.id) chains two levels deep, so the first
+		// level must resolve to a non-null Path even though its own identity isn't asserted here.
+		when(userLessonRoot.get((SingularAttribute) null)).thenReturn(mock(Path.class));
+		when(cb.exists(subquery)).thenReturn(enrolledExists);
+		when(cb.and(privateStatusPredicate, enrolledExists)).thenReturn(privateAndEnrolledPredicate);
+		when(cb.or(publishedPredicate, privateAndEnrolledPredicate)).thenReturn(basePredicate);
 
 		// When:
-		Predicate result = builder.visibilityPredicate(cb, root, visibility, 900L);
+		Predicate result = builder.visibilityPredicate(query, cb, root, visibility, 900L, 950L);
 
 		// Then:
-		assertThat(result).isSameAs(publishedPredicate);
-		verify(cb).equal(null, 900L);
+		assertThat(result).isSameAs(basePredicate);
+		verify(subquery).correlate(root);
+		verify(cb).or(publishedPredicate, privateAndEnrolledPredicate);
 	}
 
 	@Test
-	void shouldReturnOwnedOrPublishedPredicateWhenCanManageOwnLessonsTest() {
-		// Given:
+	void shouldReturnOwnedOrBasePredicateWhenCanManageOwnLessonsTest() {
+		// Given: a manage-holder additionally sees their own lessons in every publication state
 		TagsFilterSupport tagsFilterSupport = mock(TagsFilterSupport.class);
 		LessonSpecificationBuilder builder = new LessonSpecificationBuilder(tagsFilterSupport);
+		CriteriaQuery query = mock(CriteriaQuery.class);
 		CriteriaBuilder cb = mock(CriteriaBuilder.class);
 		Root root = mock(Root.class);
 		Path sharedPath = mock(Path.class);
 		Predicate publishedPredicate = mock(Predicate.class);
+		Predicate privateStatusPredicate = mock(Predicate.class);
+		Subquery subquery = mock(Subquery.class);
+		Root correlatedLesson = mock(Root.class);
+		Root userLessonRoot = mock(Root.class);
+		Predicate enrolledExists = mock(Predicate.class);
+		Predicate privateAndEnrolledPredicate = mock(Predicate.class);
+		Predicate basePredicate = mock(Predicate.class);
 		Predicate ownedPredicate = mock(Predicate.class);
 		Predicate orPredicate = mock(Predicate.class);
 		LessonVisibilityFilter visibility = new LessonVisibilityFilter(false, true, 7L);
 
 		when(root.get((SingularAttribute) null)).thenReturn(sharedPath);
 		when(cb.equal(null, 900L)).thenReturn(publishedPredicate);
+		when(cb.equal(null, 950L)).thenReturn(privateStatusPredicate);
 		when(cb.equal(null, 7L)).thenReturn(ownedPredicate);
-		when(cb.or(ownedPredicate, publishedPredicate)).thenReturn(orPredicate);
+		when(query.subquery(Long.class)).thenReturn(subquery);
+		when(subquery.correlate(root)).thenReturn(correlatedLesson);
+		when(subquery.from(UserLesson.class)).thenReturn(userLessonRoot);
+		when(userLessonRoot.get((SingularAttribute) null)).thenReturn(mock(Path.class));
+		when(cb.exists(subquery)).thenReturn(enrolledExists);
+		when(cb.and(privateStatusPredicate, enrolledExists)).thenReturn(privateAndEnrolledPredicate);
+		when(cb.or(publishedPredicate, privateAndEnrolledPredicate)).thenReturn(basePredicate);
+		when(cb.or(ownedPredicate, basePredicate)).thenReturn(orPredicate);
 
 		// When:
-		Predicate result = builder.visibilityPredicate(cb, root, visibility, 900L);
+		Predicate result = builder.visibilityPredicate(query, cb, root, visibility, 900L, 950L);
 
 		// Then:
 		assertThat(result).isSameAs(orPredicate);
-		verify(cb).or(ownedPredicate, publishedPredicate);
+		verify(cb).or(ownedPredicate, basePredicate);
 	}
 
 	// ------------------------------------------------------------------

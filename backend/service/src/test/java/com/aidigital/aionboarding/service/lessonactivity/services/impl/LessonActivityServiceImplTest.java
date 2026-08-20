@@ -1,12 +1,12 @@
 package com.aidigital.aionboarding.service.lessonactivity.services.impl;
 
-import com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode;
-import com.aidigital.aionboarding.domain.common.dictionary.entities.LessonPublicationStatus;
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.learning.services.RoadmapEnrollmentSyncService;
+import com.aidigital.aionboarding.service.lesson.support.LessonVisibilityCase;
+import com.aidigital.aionboarding.service.lesson.support.LessonVisibilityPolicy;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityAttemptRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityAssemblyService;
@@ -17,6 +17,8 @@ import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -47,6 +49,8 @@ class LessonActivityServiceImplTest {
 	private LessonActivityManagementService managementService;
 	@Mock
 	private LessonActivityAssemblyService assemblyService;
+	@Mock
+	private LessonVisibilityPolicy lessonVisibilityPolicy;
 
 	@InjectMocks
 	private LessonActivityServiceImpl service;
@@ -62,8 +66,9 @@ class LessonActivityServiceImplTest {
 			AppUser viewer = learnerViewer();
 			Long lessonId = 10L;
 
-			Lesson lesson = publishedLesson();
+			Lesson lesson = mock(Lesson.class);
 			when(accessPolicy.requireLesson(lessonId)).thenReturn(lesson);
+			when(lessonVisibilityPolicy.isVisible(viewer, lesson)).thenReturn(true);
 			when(assemblyService.getLessonActivitiesForUser(lessonId, viewer.internalId())).thenReturn(List.of());
 			when(accessPolicy.redactQuizAnswersUnlessManager(List.of(), viewer, null)).thenReturn(List.of());
 
@@ -76,16 +81,17 @@ class LessonActivityServiceImplTest {
 		}
 
 		@Test
-		void getLessonActivities_calledForUnpublishedLessonByLearner_throwsNotFoundTest() {
-			// Given: an unpublished lesson — a plain learner may not preview it at all
+		void getLessonActivities_calledForLessonNotVisibleToLearner_throwsNotFoundTest() {
+			// Given: a lesson the shared visibility policy rejects for this viewer (e.g. a
+			// private lesson the learner is not enrolled in) — a plain learner may not preview
+			// its activities at all. The rule matrix itself lives in LessonVisibilityPolicyTest;
+			// this only proves requireVisibleLesson enforces whatever the policy decides.
 			AppUser viewer = learnerViewer();
 			Long lessonId = 15L;
 
 			Lesson lesson = mock(Lesson.class);
-			LessonPublicationStatus privateStatus = new LessonPublicationStatus();
-			privateStatus.setCode(LessonPublicationStatusCode.PRIVATE);
-			when(lesson.getPublicationStatus()).thenReturn(privateStatus);
 			when(accessPolicy.requireLesson(lessonId)).thenReturn(lesson);
+			when(lessonVisibilityPolicy.isVisible(viewer, lesson)).thenReturn(false);
 
 			// Execution
 			AppException thrown = assertThrows(AppException.class, () ->
@@ -105,6 +111,7 @@ class LessonActivityServiceImplTest {
 			// Admin skips publication check — just needs to be found
 			Lesson lesson = mock(Lesson.class);
 			when(accessPolicy.requireLesson(lessonId)).thenReturn(lesson);
+			when(lessonVisibilityPolicy.isVisible(viewer, lesson)).thenReturn(true);
 			when(assemblyService.getLessonActivitiesForUser(lessonId, viewer.internalId())).thenReturn(List.of());
 			when(accessPolicy.redactQuizAnswersUnlessManager(List.of(), viewer, null)).thenReturn(List.of());
 
@@ -113,6 +120,32 @@ class LessonActivityServiceImplTest {
 
 			// Verification
 			assertThat(result).isEmpty();
+		}
+	}
+
+	@Nested
+	class canViewLesson {
+
+		/**
+		 * Driven by the same {@code visibilityMatrix()} that exercises the real
+		 * {@link LessonVisibilityPolicy} in {@code LessonVisibilityPolicyTest}, so this
+		 * pure-delegation test and that rule-correctness test cannot drift apart: this only
+		 * proves {@code canViewLesson} returns whatever the policy decides for a given case,
+		 * never re-deriving the rule itself.
+		 */
+		@ParameterizedTest(name = "{0}")
+		@MethodSource("com.aidigital.aionboarding.service.lesson.support.LessonVisibilityPolicyTest#visibilityMatrix")
+		void delegatesToLessonVisibilityPolicyTest(LessonVisibilityCase visibilityCase) {
+			// Given:
+			AppUser viewer = learnerViewer();
+			Lesson lesson = mock(Lesson.class);
+			when(lessonVisibilityPolicy.isVisible(viewer, lesson)).thenReturn(visibilityCase.expectedVisible());
+
+			// Execution
+			boolean result = service.canViewLesson(viewer, lesson);
+
+			// Verification
+			assertThat(result).isEqualTo(visibilityCase.expectedVisible());
 		}
 	}
 
@@ -126,8 +159,9 @@ class LessonActivityServiceImplTest {
 			Long lessonId = 40L;
 			Long activityId = 1L;
 
-			Lesson lesson = publishedLesson();
+			Lesson lesson = mock(Lesson.class);
 			when(accessPolicy.requireLesson(lessonId)).thenReturn(lesson);
+			when(lessonVisibilityPolicy.isVisible(viewer, lesson)).thenReturn(true);
 
 			LessonActivityRecord activityRecord = mock(LessonActivityRecord.class);
 			when(assemblyService.getLessonActivity(lessonId, activityId, viewer.internalId())).thenReturn(activityRecord);
@@ -152,6 +186,7 @@ class LessonActivityServiceImplTest {
 			// Admin skips publication check — just needs to be found
 			Lesson lesson = mock(Lesson.class);
 			when(accessPolicy.requireLesson(lessonId)).thenReturn(lesson);
+			when(lessonVisibilityPolicy.isVisible(viewer, lesson)).thenReturn(true);
 
 			LessonActivityRecord activityRecord = mock(LessonActivityRecord.class);
 			when(assemblyService.getLessonActivity(lessonId, activityId, viewer.internalId())).thenReturn(activityRecord);
@@ -177,13 +212,5 @@ class LessonActivityServiceImplTest {
 
 	private AppUser adminViewer() {
 		return new AppUser(2L, "clerk-2", "admin@test.com", "Admin", "admin", "Admin", null, null, null);
-	}
-
-	private Lesson publishedLesson() {
-		Lesson lesson = mock(Lesson.class);
-		LessonPublicationStatus publishedStatus = new LessonPublicationStatus();
-		publishedStatus.setCode(LessonPublicationStatusCode.PUBLISHED);
-		when(lesson.getPublicationStatus()).thenReturn(publishedStatus);
-		return lesson;
 	}
 }

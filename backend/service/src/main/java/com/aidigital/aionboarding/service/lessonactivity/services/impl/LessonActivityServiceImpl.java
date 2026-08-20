@@ -1,12 +1,12 @@
 package com.aidigital.aionboarding.service.lessonactivity.services.impl;
 
 import com.aidigital.aionboarding.domain.common.dictionary.ActivityTypeCode;
-import com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode;
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.learning.services.RoadmapEnrollmentSyncService;
+import com.aidigital.aionboarding.service.lesson.support.LessonVisibilityPolicy;
 import com.aidigital.aionboarding.service.lessonactivity.models.ActivityAttemptRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.GenerateActivityResultRecord;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityRecord;
@@ -38,6 +38,7 @@ public class LessonActivityServiceImpl implements LessonActivityService {
 	private final LessonActivityProgressService progressService;
 	private final LessonActivityManagementService managementService;
 	private final LessonActivityAssemblyService assemblyService;
+	private final LessonVisibilityPolicy lessonVisibilityPolicy;
 
 	@Override
 	@Transactional(readOnly = true)
@@ -104,7 +105,7 @@ public class LessonActivityServiceImpl implements LessonActivityService {
 		}
 
 		accessPolicy.requireEnrollment(viewer, lessonId);
-		Lesson lesson = accessPolicy.requirePublishedReadyLesson(lessonId);
+		Lesson lesson = accessPolicy.requireLearnableLesson(lessonId);
 
 		var result = ActivityTypeCode.QUIZ.equals(type)
 				? progressService.completeQuiz(
@@ -133,7 +134,7 @@ public class LessonActivityServiceImpl implements LessonActivityService {
 	public void resetActivityProgress(AppUser viewer, Long lessonId, Long activityId) {
 		permissionService.requirePermission(viewer, PermissionKeys.LEARNING_COMPLETE);
 		accessPolicy.requireEnrollment(viewer, lessonId);
-		accessPolicy.requirePublishedReadyLesson(lessonId);
+		accessPolicy.requireLearnableLesson(lessonId);
 		progressService.resetProgress(viewer, lessonId, activityId);
 	}
 
@@ -151,15 +152,16 @@ public class LessonActivityServiceImpl implements LessonActivityService {
 		return lesson;
 	}
 
-	boolean canViewLesson(AppUser viewer, Lesson lesson) {
-		if (viewer.isAdmin()) {
-			return true;
-		}
-		if (permissionService.userHasPermission(viewer, PermissionKeys.LESSONS_MANAGE)
-				&& permissionService.canManageExistingLesson(viewer,
-				lesson.getCreatedByUser() == null ? null : lesson.getCreatedByUser().getId())) {
-			return true;
-		}
-		return LessonPublicationStatusCode.PUBLISHED.equals(lesson.getPublicationStatus().getCode());
-	}
+    /**
+     * Checks whether the viewer may see this lesson. Delegates to {@link LessonVisibilityPolicy},
+     * the single implementation of the viewer visibility rule, shared with
+     * {@code LessonMutationSupport.canView} and {@code RoadmapLessonValidator}.
+     *
+     * @param viewer authenticated viewer
+     * @param lesson lesson entity to check
+     * @return {@code true} when the lesson is visible to the viewer
+     */
+    boolean canViewLesson(AppUser viewer, Lesson lesson) {
+        return lessonVisibilityPolicy.isVisible(viewer, lesson);
+    }
 }

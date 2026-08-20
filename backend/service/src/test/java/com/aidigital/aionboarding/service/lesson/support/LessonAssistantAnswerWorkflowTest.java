@@ -1,16 +1,15 @@
 package com.aidigital.aionboarding.service.lesson.support;
 
-import com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode;
-import com.aidigital.aionboarding.domain.common.dictionary.LessonStatusCode;
-import com.aidigital.aionboarding.domain.common.dictionary.entities.LessonPublicationStatus;
-import com.aidigital.aionboarding.domain.common.dictionary.entities.LessonStatus;
+import com.aidigital.aionboarding.domain.learning.entities.UserLesson;
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
 import com.aidigital.aionboarding.domain.lesson.entities.LessonAssistantConversation;
 import com.aidigital.aionboarding.domain.user.entities.User;
+import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.observability.SecurityMetrics;
 import com.aidigital.aionboarding.service.common.observability.enums.ContinuationRejectionReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
+import com.aidigital.aionboarding.service.learning.services.LearningEnrollmentService;
 import com.aidigital.aionboarding.service.learning.services.entity.LearningEnrollmentEntityService;
 import com.aidigital.aionboarding.service.lesson.enums.LessonAssistantPreset;
 import com.aidigital.aionboarding.service.lesson.models.AskLessonResultRecord;
@@ -37,6 +36,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -58,6 +58,8 @@ class LessonAssistantAnswerWorkflowTest {
 	private UserEntityService userEntityService;
 	@Mock
 	private LearningEnrollmentEntityService learningEnrollmentEntityService;
+	@Mock
+	private LearningEnrollmentService learningEnrollmentService;
 	@Mock
 	private MaterialPreparationService materialPreparationService;
 	@Mock
@@ -409,6 +411,68 @@ class LessonAssistantAnswerWorkflowTest {
 		verify(securityMetrics).invalidContinuation(ContinuationRejectionReason.STALE_VERSION);
 	}
 
+	@Test
+	void askOnAPrivateLessonTheLearnerIsEnrolledIn_stillAnswersTest() {
+		// Given: a private (assigned-only) lesson the learner is enrolled in — the assistant must
+		// remain usable once enrollment is already verified, not demand the lesson be Public
+		AppUser viewer = viewer();
+		Long lessonId = 200L;
+		String question = "What is this lesson about?";
+
+		when(learningEnrollmentEntityService.findUserLessonByUserIdAndLessonId(viewer.internalId(), lessonId))
+				.thenReturn(Optional.of(mock(UserLesson.class)));
+		Lesson lesson = mock(Lesson.class);
+		when(lessonEntityService.findByIdWithFetches(lessonId)).thenReturn(lesson);
+		when(learningEnrollmentService.isLearnable(lesson)).thenReturn(true);
+		when(lessonMapper.toDetailMap(lesson)).thenReturn(Map.of());
+		PreparedMaterialsResult preparedMaterials = mock(PreparedMaterialsResult.class);
+		when(preparedMaterials.toLegacyMap()).thenReturn(Map.of("materials", List.of()));
+		when(materialPreparationService.prepareForLesson(lessonId)).thenReturn(preparedMaterials);
+		Map<String, Object> promptMap = Map.of(
+				"version", "lesson-reader-assistant-v1",
+				"cacheKey", "ck-lesson-200",
+				"instructions", "You are an assistant.",
+				"input", "User question: " + question,
+				"fileInputs", List.of()
+		);
+		when(lessonAssistantPromptBuilder.buildLessonAssistantPrompt(
+				any(), any(), anyString(), any(), any(), anyBoolean())).thenReturn(promptMap);
+		when(lessonGenService.generateLessonContent(any(LessonGenPrompt.class)))
+				.thenReturn(new GeneratedContentResult("Private-lesson answer.", Map.of()));
+		when(lessonAssistantConversationEntityService.findByUserIdAndLessonId(viewer.internalId(), lessonId))
+				.thenReturn(Optional.empty());
+		when(lessonAssistantConversationAssembler.appendTurn(any(), anyString(), anyString())).thenReturn(List.of());
+		when(currentTime.utcDateTime()).thenReturn(LocalDateTime.of(2026, 1, 1, 0, 0));
+		when(userEntityService.getReference(viewer.internalId())).thenReturn(mock(User.class));
+		when(lessonAssistantConversationEntityService.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+		// Execution
+		AskLessonResultRecord result =
+				workflow.ask(viewer, lessonId, question, List.of(), LessonAssistantPreset.REGULAR);
+
+		// Verification
+		assertThat(result.answer()).isEqualTo("Private-lesson answer.");
+	}
+
+	@Test
+	void askOnAnArchivedLesson_throwsNotFoundTest() {
+		// Given: an archived lesson the learner is (still) enrolled in — archived is never a
+		// learner state, even when enrolled
+		AppUser viewer = viewer();
+		Long lessonId = 201L;
+		String question = "What is this lesson about?";
+
+		when(learningEnrollmentEntityService.findUserLessonByUserIdAndLessonId(viewer.internalId(), lessonId))
+				.thenReturn(Optional.of(mock(UserLesson.class)));
+		Lesson lesson = mock(Lesson.class);
+		when(lessonEntityService.findByIdWithFetches(lessonId)).thenReturn(lesson);
+		when(learningEnrollmentService.isLearnable(lesson)).thenReturn(false);
+
+		// When-Then:
+		assertThatThrownBy(() -> workflow.ask(viewer, lessonId, question, List.of(), LessonAssistantPreset.REGULAR))
+				.isInstanceOf(AppException.class);
+	}
+
 	// -------------------------------------------------------------------------
 	// Setup helpers
 	// -------------------------------------------------------------------------
@@ -421,17 +485,12 @@ class LessonAssistantAnswerWorkflowTest {
 	                           GeneratedContentResult genResult) {
 		// Enrollment check passes
 		when(learningEnrollmentEntityService.findUserLessonByUserIdAndLessonId(viewer.internalId(), lessonId))
-				.thenReturn(Optional.of(mock(com.aidigital.aionboarding.domain.learning.entities.UserLesson.class)));
+				.thenReturn(Optional.of(mock(UserLesson.class)));
 
-		// Lesson is READY + PUBLISHED
+		// Lesson is learnable (READY + PUBLISHED)
 		Lesson lesson = mock(Lesson.class);
-		LessonStatus readyStatus = new LessonStatus();
-		readyStatus.setCode(LessonStatusCode.READY);
-		LessonPublicationStatus publishedStatus = new LessonPublicationStatus();
-		publishedStatus.setCode(LessonPublicationStatusCode.PUBLISHED);
-		when(lesson.getStatus()).thenReturn(readyStatus);
-		when(lesson.getPublicationStatus()).thenReturn(publishedStatus);
 		when(lessonEntityService.findByIdWithFetches(lessonId)).thenReturn(lesson);
+		when(learningEnrollmentService.isLearnable(lesson)).thenReturn(true);
 
 		// Mapper returns empty map
 		when(lessonMapper.toDetailMap(lesson)).thenReturn(Map.of());

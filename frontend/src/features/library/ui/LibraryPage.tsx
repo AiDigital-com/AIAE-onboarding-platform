@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { lessonDetailQueryOptions } from "@/features/lessons/api/lessonDetailQueryOptions";
 import { materialDetailQueryOptions } from "../api/materialDetailQueryOptions";
 import { useHasPermission } from "@/shared/auth/useHasPermission";
+import { usePermissionsQuery } from "@/shared/auth/usePermissionsQuery";
 import { useCurrentUser } from "@/shared/auth/useCurrentUser";
 import { useTaskTray } from "@/shared/context/TaskTrayContext";
 import { useDebounce } from "@/shared/hooks/useDebounce";
@@ -51,6 +52,7 @@ import {
     titleSortToParams,
 } from "../api/queryParamMappers";
 import type { LibraryLesson, LibraryMaterial, LibraryRoadmap } from "../api/types";
+import { ALL_LIBRARY_TABS, DEFAULT_LIBRARY_TAB } from "../constants";
 import { LearningAssignmentDialog } from "./LearningAssignmentDialog";
 import { LessonLibraryFilters } from "./LessonLibraryFilters";
 import { LibraryTabPanel } from "./LibraryTabPanel";
@@ -137,27 +139,17 @@ interface GroupAssignmentDialogState {
 export function LibraryPage() {
     const queryClient = useQueryClient();
     const hasPermission = useHasPermission();
+    const permissionsQuery = usePermissionsQuery();
     const { user: currentUser } = useCurrentUser();
     const { addTask, updateTask } = useTaskTray();
 
     const [searchParams, setSearchParams] = useSearchParams();
-    const initialTab = searchParams.get("tab") ?? "materials";
-    const [activeTab, setActiveTab] = useState(initialTab);
-    const activeTabRef = useRef(initialTab);
+    // Starts on the always-visible Lessons tab regardless of the requested tab, since permissions
+    // have not resolved yet at mount time and materials/roadmaps must never be assumed visible —
+    // the effect below promotes this to the requested/preferred tab once permissions confirm it.
+    const [activeTab, setActiveTab] = useState(DEFAULT_LIBRARY_TAB);
+    const activeTabRef = useRef(DEFAULT_LIBRARY_TAB);
     activeTabRef.current = activeTab;
-    useEffect(() => {
-        const fromUrl = searchParams.get("tab");
-        const valid = ["materials", "lessons", "roadmaps"];
-        if (fromUrl && valid.includes(fromUrl) && fromUrl !== activeTabRef.current) {
-            setActiveTab(fromUrl);
-        }
-        // Clean the param after consuming so it doesn't persist across unrelated navigations.
-        if (fromUrl) {
-            const next = new URLSearchParams(searchParams);
-            next.delete("tab");
-            setSearchParams(next, { replace: true });
-        }
-    }, [searchParams, setSearchParams]);
 
     const handleTabChange = (tab: string) => {
         setActiveTab(tab);
@@ -227,7 +219,59 @@ export function LibraryPage() {
     const canManageLessonActivities = hasPermission("lessons.manage_activities");
     const canPublishArchiveLessons = hasPermission("lessons.publish_archive");
     const canCreateRoadmaps = hasPermission("roadmaps.create");
+    const canManageRoadmaps = hasPermission("roadmaps.manage");
     const canAssignLearning = hasPermission("learning.assign");
+
+    // Materials is a content-maker surface and Roadmaps has its own "My Roadmaps" page, so a
+    // plain Member (none of these permissions) sees only the always-visible Lessons tab.
+    const visibleTabs = useMemo(
+        () =>
+            ALL_LIBRARY_TABS.filter((tab) => {
+                if (tab.value === "materials") {
+                    return canCreateMaterials || canEditMaterials || canDeleteMaterials;
+                }
+                if (tab.value === "roadmaps") {
+                    return canCreateRoadmaps || canManageRoadmaps;
+                }
+                return true;
+            }),
+        [canCreateMaterials, canEditMaterials, canDeleteMaterials, canCreateRoadmaps, canManageRoadmaps],
+    );
+
+    // Normalizes the active tab against the viewer's visible tabs and the deep-link `?tab=`
+    // param in one effect (URL -> state), so an unauthorized deep link falls back to the default
+    // tab without a double render or a flash of a forbidden tab. Waits for the permission
+    // snapshot to resolve before deciding or consuming `?tab=` — until then every permission
+    // defaults to false, which would otherwise read as "materials/roadmaps hidden" even for an
+    // Admin/Team Lead and permanently drop their deep link once the param is cleared below.
+    useEffect(() => {
+        if (!permissionsQuery.isSuccess) {
+            return;
+        }
+
+        const visibleValues: string[] = visibleTabs.map((tab) => tab.value);
+        const fromUrl = searchParams.get("tab");
+        // No explicit `?tab=` and materials is visible: preserve the pre-existing landing tab
+        // for a Team Lead/Admin rather than always defaulting to Lessons.
+        const preferred = visibleValues.includes("materials") ? "materials" : DEFAULT_LIBRARY_TAB;
+        const requested = fromUrl ?? preferred;
+        const resolved = visibleValues.includes(requested)
+            ? requested
+            : visibleValues.includes(DEFAULT_LIBRARY_TAB)
+              ? DEFAULT_LIBRARY_TAB
+              : (visibleValues[0] ?? DEFAULT_LIBRARY_TAB);
+
+        if (resolved !== activeTabRef.current) {
+            setActiveTab(resolved);
+        }
+
+        // Clean the param after consuming so it doesn't persist across unrelated navigations.
+        if (fromUrl) {
+            const next = new URLSearchParams(searchParams);
+            next.delete("tab");
+            setSearchParams(next, { replace: true });
+        }
+    }, [searchParams, setSearchParams, visibleTabs, permissionsQuery.isSuccess]);
 
     const debouncedAssignmentUserSearchQuery = useDebounce(assignmentUserSearchQuery, 300);
 
@@ -296,14 +340,22 @@ export function LibraryPage() {
 
     // Only the active tab's full list is fetched; the other two tabs' grids stay unmounted and
     // unfetched until selected. Tab-count badges are covered separately by the cheap count-only
-    // queries below, which stay enabled for every tab regardless of which list is active.
-    const materialsQuery = useMaterialsQuery(materialsParams, { enabled: activeTab === "materials" });
+    // queries below, which stay enabled for every VISIBLE tab regardless of which list is
+    // active — but never for a tab the viewer cannot see, so a Member's Library page never
+    // issues a materials/roadmaps request at all.
+    const isMaterialsTabVisible = visibleTabs.some((tab) => tab.value === "materials");
+    const isRoadmapsTabVisible = visibleTabs.some((tab) => tab.value === "roadmaps");
+    const materialsQuery = useMaterialsQuery(materialsParams, {
+        enabled: activeTab === "materials" && isMaterialsTabVisible,
+    });
     const lessonsQuery = useLessonsQuery(lessonsParams, { enabled: activeTab === "lessons" });
-    const roadmapsQuery = useRoadmapsQuery(roadmapsParams, { enabled: activeTab === "roadmaps" });
+    const roadmapsQuery = useRoadmapsQuery(roadmapsParams, {
+        enabled: activeTab === "roadmaps" && isRoadmapsTabVisible,
+    });
 
-    const materialsCountQuery = useMaterialsCountQuery(materialsParams);
+    const materialsCountQuery = useMaterialsCountQuery(materialsParams, { enabled: isMaterialsTabVisible });
     const lessonsCountQuery = useLessonsCountQuery(lessonsParams);
-    const roadmapsCountQuery = useRoadmapsCountQuery(roadmapsParams);
+    const roadmapsCountQuery = useRoadmapsCountQuery(roadmapsParams, { enabled: isRoadmapsTabVisible });
 
     // Unfiltered, single-page (size 100) catalogs for the lesson/roadmap creation pickers —
     // independent of the Library tab's active filters, only fetched while their dialog is open.
@@ -501,7 +553,7 @@ export function LibraryPage() {
         setLessonSelectedTags([]);
         setLessonActivityFilter("all");
         setLessonEnrollmentFilter("all");
-        setLessonStatusFilter(isVisibleAsReady ? "ready" : "draft");
+        setLessonStatusFilter(isVisibleAsReady ? "published" : "private");
     };
 
     const handlePrimaryAction = () => {
@@ -1179,6 +1231,7 @@ export function LibraryPage() {
             />
 
             <LibraryTabs
+                tabs={visibleTabs}
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
                 counts={{
@@ -1211,6 +1264,7 @@ export function LibraryPage() {
                             onQueryChange={setLessonSearchQuery}
                             status={lessonStatusFilter}
                             onStatusChange={setLessonStatusFilter}
+                            canFilterByPublicationStatus={canManageLessons}
                             selectedTags={lessonSelectedTags}
                             onSelectedTagsChange={setLessonSelectedTags}
                             availableTags={lessonAvailableTags}

@@ -333,6 +333,10 @@ class LessonEntityServiceTest {
 				com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode.PUBLISHED
 		);
 		publishedStatus.setId(2L);
+		LessonPublicationStatus privateStatus = publication(
+				com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode.PRIVATE
+		);
+		privateStatus.setId(3L);
 		LessonListQuery query = new LessonListQuery(
 				"term", List.of("design"), null, null, null, null, null,
 				"quiz", true, LessonSortField.CREATED_AT, Sort.Direction.DESC
@@ -348,7 +352,10 @@ class LessonEntityServiceTest {
 		when(lessonPublicationStatusEntityService.getReferenceByCode(
 				com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode.PUBLISHED
 		)).thenReturn(publishedStatus);
-		when(lessonSpecificationBuilder.build(query, visibility, null, null, 1L, 2L)).thenReturn(specification);
+		when(lessonPublicationStatusEntityService.getReferenceByCode(
+				com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode.PRIVATE
+		)).thenReturn(privateStatus);
+		when(lessonSpecificationBuilder.build(query, visibility, null, null, 1L, 2L, 3L)).thenReturn(specification);
 		when(lessonRepository.searchSummaries(eq(specification), any(Pageable.class))).thenReturn(expectedPage);
 
 		// When:
@@ -356,7 +363,7 @@ class LessonEntityServiceTest {
 
 		// Then:
 		assertThat(result.getContent()).containsExactly(projection);
-		verify(lessonSpecificationBuilder).build(query, visibility, null, null, 1L, 2L);
+		verify(lessonSpecificationBuilder).build(query, visibility, null, null, 1L, 2L, 3L);
 	}
 
 	@Test
@@ -368,6 +375,10 @@ class LessonEntityServiceTest {
 				com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode.PUBLISHED
 		);
 		publishedStatus.setId(2L);
+		LessonPublicationStatus privateStatus = publication(
+				com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode.PRIVATE
+		);
+		privateStatus.setId(3L);
 		LessonListQuery query = new LessonListQuery(
 				"term", List.of("design"), null, null, null, null, null,
 				"quiz", true, LessonSortField.CREATED_AT, Sort.Direction.DESC
@@ -381,7 +392,10 @@ class LessonEntityServiceTest {
 		when(lessonPublicationStatusEntityService.getReferenceByCode(
 				com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode.PUBLISHED
 		)).thenReturn(publishedStatus);
-		when(lessonSpecificationBuilder.build(query, visibility, null, null, 1L, 2L)).thenReturn(specification);
+		when(lessonPublicationStatusEntityService.getReferenceByCode(
+				com.aidigital.aionboarding.domain.common.dictionary.LessonPublicationStatusCode.PRIVATE
+		)).thenReturn(privateStatus);
+		when(lessonSpecificationBuilder.build(query, visibility, null, null, 1L, 2L, 3L)).thenReturn(specification);
 		when(lessonRepository.count(specification)).thenReturn(6L);
 
 		// When:
@@ -389,7 +403,7 @@ class LessonEntityServiceTest {
 
 		// Then:
 		assertThat(result).isEqualTo(6L);
-		verify(lessonSpecificationBuilder).build(query, visibility, null, null, 1L, 2L);
+		verify(lessonSpecificationBuilder).build(query, visibility, null, null, 1L, 2L, 3L);
 	}
 
 	@org.junit.jupiter.api.Nested

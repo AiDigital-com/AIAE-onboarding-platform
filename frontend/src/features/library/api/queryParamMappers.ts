@@ -35,20 +35,23 @@ export function titleSortToParams(sort: string): Pick<LessonsQueryParams, "sort"
 }
 
 /**
- * Maps the UI's lesson status filter to status/publicationStatus query params.
- * "draft" maps to publicationStatus=private: a lesson can only be published once it is ready,
- * so "not (ready and published), and not archived" is equivalent to "private" in practice.
+ * Maps the UI's lesson visibility filter to status/publicationStatus query params.
+ * "published" (labeled Public in the UI) restricts to ready and published lessons.
+ * "private" (labeled Private) restricts to the private (assigned-only) publication state —
+ * a lesson can only be published once it is ready, so this also covers not-yet-published
+ * ready lessons. "archived" is unchanged. This filter only narrows visibility; the server's
+ * own visibility rule always additionally restricts a non-manager viewer to public lessons
+ * plus lessons assigned to them.
  */
 export function lessonStatusFilterToParams(
     status: string,
 ): Pick<LessonsQueryParams, "status" | "publicationStatus"> {
     switch (status) {
-        case "ready":
+        case "published":
             return { status: "ready", publicationStatus: "published" };
         case "archived":
             return { publicationStatus: "archived" };
-        case "draft":
-        case "pending": // legacy filter value
+        case "private":
             return { publicationStatus: "private" };
         default:
             return {};

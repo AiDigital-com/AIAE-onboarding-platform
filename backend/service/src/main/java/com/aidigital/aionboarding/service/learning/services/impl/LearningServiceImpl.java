@@ -21,6 +21,7 @@ import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,7 +49,7 @@ public class LearningServiceImpl implements LearningService {
         learningAssignmentAccessPolicy.requireAssignableTargets(
             actor, targetUserIds, "You can assign lessons only to manageable users.");
 
-        Lesson lesson = learningEnrollmentService.requireEnrollableLesson(lessonId);
+        Lesson lesson = learningEnrollmentService.requireLearnableLesson(lessonId);
         LocalDateTime enrolledAt = currentTime.utcDateTime();
         List<UserLesson> enrollmentRows =
             learningEnrollmentService.enrollUsersInLesson(targetUserIds, lesson, enrolledAt, false);
@@ -60,12 +61,23 @@ public class LearningServiceImpl implements LearningService {
         return new LessonAssignmentResultRecord(true, enrollments);
     }
 
+    /**
+     * Lists the assignees for a lesson, restricted to the subset of enrollees the actor may
+     * actually manage (every user but themselves for an admin, their own team's members for a
+     * team lead). {@code LEARNING_ASSIGN} alone does not tie the actor to this specific lesson,
+     * and since Phase B made lessons genuinely private, an unfiltered roster here would disclose
+     * the names, emails, and enrollment/completion state of every enrollee of an arbitrary lesson
+     * id to any assign-permission holder — the same class of leak fixed for
+     * {@code RoadmapAssignmentServiceImpl.listRoadmapAssignees}.
+     */
     @Override
     @Transactional(readOnly = true)
     public List<LearningAssigneeRecord> listLessonAssignees(AppUser actor, Long lessonId) {
         permissionService.requirePermission(actor, PermissionKeys.LEARNING_ASSIGN);
-        learningEnrollmentService.requireEnrollableLesson(lessonId);
+        learningEnrollmentService.requireLearnableLesson(lessonId);
+        Set<Long> assignableUserIds = learningAssignmentAccessPolicy.assignableUserIds(actor);
         return learningEnrollmentEntityService.findByLessonIdWithUser(lessonId).stream()
+            .filter(enrollment -> assignableUserIds.contains(enrollment.getId().getUserId()))
             .map(enrollment -> new LearningAssigneeRecord(
                 enrollment.getId().getUserId(),
                 enrollment.getUser().getName(),
@@ -86,7 +98,7 @@ public class LearningServiceImpl implements LearningService {
         }
         learningAssignmentAccessPolicy.requireAssignableTargets(
             actor, targetUserIds, "You can revoke lesson assignments only for manageable users.");
-        learningEnrollmentService.requireEnrollableLesson(lessonId);
+        learningEnrollmentService.requireLearnableLesson(lessonId);
         learningEnrollmentService.unenrollUsersFromLesson(targetUserIds, lessonId);
     }
 
@@ -94,7 +106,7 @@ public class LearningServiceImpl implements LearningService {
     @Transactional
     public LessonEnrollmentResultRecord enrollLesson(AppUser user, Long lessonId) {
         permissionService.requirePermission(user, PermissionKeys.LEARNING_ENROLL);
-        Lesson lesson = learningEnrollmentService.requireEnrollableLesson(lessonId);
+        Lesson lesson = learningEnrollmentService.requireSelfEnrollableLesson(lessonId);
         UserLesson enrollment = learningEnrollmentService.enrollUserInLesson(
             user.internalId(),
             lesson,

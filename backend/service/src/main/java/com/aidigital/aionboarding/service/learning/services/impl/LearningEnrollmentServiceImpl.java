@@ -15,6 +15,7 @@ import com.aidigital.aionboarding.service.learning.services.LearningEnrollmentSe
 import com.aidigital.aionboarding.service.learning.services.entity.LearningEnrollmentEntityService;
 import com.aidigital.aionboarding.service.learning.support.LearningEnrollmentSupport;
 import com.aidigital.aionboarding.service.lesson.services.entity.LessonEntityService;
+import com.aidigital.aionboarding.service.lesson.support.LessonLearnabilityPolicy;
 import com.aidigital.aionboarding.service.lessonactivity.models.LessonActivityCountsRecord;
 import com.aidigital.aionboarding.service.lessonactivity.services.LessonActivityAssemblyService;
 import com.aidigital.aionboarding.service.user.services.entity.UserEntityService;
@@ -45,6 +46,7 @@ public class LearningEnrollmentServiceImpl implements LearningEnrollmentService 
 	private final UserEntityService userEntityService;
 	private final LearningEnrollmentSupport enrollmentSupport;
 	private final LessonActivityAssemblyService lessonActivityAssemblyService;
+	private final LessonLearnabilityPolicy lessonLearnabilityPolicy;
 
 	@Override
 	@Transactional(readOnly = true)
@@ -98,18 +100,32 @@ public class LearningEnrollmentServiceImpl implements LearningEnrollmentService 
 	}
 
 	@Override
-	public Lesson requireEnrollableLesson(Long lessonId) {
+	public Lesson requireSelfEnrollableLesson(Long lessonId) {
 		Lesson lesson = lessonEntityService.getReference(lessonId);
-		if (!isEnrollable(lesson)) {
+		if (!isSelfEnrollable(lesson)) {
 			throw new AppException(ErrorReason.C001, "Lesson was not found or is not ready yet.");
 		}
 		return lesson;
 	}
 
 	@Override
-	public boolean isEnrollable(Lesson lesson) {
+	public Lesson requireLearnableLesson(Long lessonId) {
+		Lesson lesson = lessonEntityService.getReference(lessonId);
+		if (!isLearnable(lesson)) {
+			throw new AppException(ErrorReason.C001, "Lesson was not found or is not ready yet.");
+		}
+		return lesson;
+	}
+
+	@Override
+	public boolean isSelfEnrollable(Lesson lesson) {
 		return LessonStatusCode.READY.equals(lesson.getStatus().getCode())
 				&& LessonPublicationStatusCode.PUBLISHED.equals(lesson.getPublicationStatus().getCode());
+	}
+
+	@Override
+	public boolean isLearnable(Lesson lesson) {
+		return lessonLearnabilityPolicy.isLearnable(lesson);
 	}
 
 	@Override

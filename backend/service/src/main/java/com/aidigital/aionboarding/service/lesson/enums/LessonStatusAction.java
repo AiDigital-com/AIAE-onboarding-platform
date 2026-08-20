@@ -5,6 +5,7 @@ package com.aidigital.aionboarding.service.lesson.enums;
  */
 public enum LessonStatusAction {
     PUBLISH("publish"),
+    UNPUBLISH("unpublish"),
     ARCHIVE("archive"),
     RESTORE("restore");
 
