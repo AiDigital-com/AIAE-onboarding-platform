@@ -69,8 +69,12 @@ public class SecurityConfig {
                         .contentSecurityPolicy(csp -> csp.policyDirectives(
                                 "default-src 'self'; "
                                         + "frame-ancestors " + securityProperties.getCsp().getFrameAncestors() + "; "
-                                        + "script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://challenges.cloudflare.com; "                         + "worker-src 'self' blob:; "
-                                        + "frame-src 'self' https://*.clerk.accounts.dev https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com; "
+                                        // clerk.aidigital.tech is the production Clerk Frontend API
+                                        // host (encoded in the pk_live key); *.clerk.accounts.dev
+                                        // covers the dev instance the workspace runs on.
+                                        + "script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://clerk.aidigital.tech https://challenges.cloudflare.com; "
+                                        + "worker-src 'self' blob:; "
+                                        + "frame-src 'self' https://*.clerk.accounts.dev https://clerk.aidigital.tech https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com; "
                                         + "style-src 'self' 'unsafe-inline'; "
                                         + "img-src 'self' data: blob: https:; "
                                         + "media-src 'self' blob: https:; "

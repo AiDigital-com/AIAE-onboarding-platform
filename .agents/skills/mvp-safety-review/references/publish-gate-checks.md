@@ -133,7 +133,9 @@ Canonical: backend SKILL → "Port architecture lock" + replit.md → "Replit de
 - [ ] `.replit` `[env]` sets `SPRING_PROFILES_ACTIVE = "replit"` and `PORT = "5000"`.
 - [ ] `.replit` `[deployment].deploymentTarget = "gce"` (Reserved VM), not Autoscale.
 - [ ] `.replit` `onBoot` runs `bash scripts/setup-project.sh`.
-- [ ] Build command (`mvn -DskipTests package` + frontend-maven-plugin build) succeeds in CI.
+- [ ] Build command succeeds in CI. Frontend and backend build separately: `npm run build`
+      in `frontend/` writes the SPA into `backend/application/src/main/resources/static/`,
+      then `mvn -DskipTests package` packages it. Maven does not invoke npm.
 - [ ] Deployment Secrets pane has copies of `SPRING_PROFILES_ACTIVE`, `CLERK_*`, `AUTH_*`,
       `USAGE_LOG_*` (workspace `[env]` does NOT propagate).
 

@@ -9,6 +9,14 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+
+# Same PRD_* override the build applies, so the running app's backend-side
+# values (authorized parties, CORS, CSP) match the bundle it serves.
+if [ -f scripts/lib/deploy-env.sh ]; then
+  # shellcheck source=lib/deploy-env.sh
+  . scripts/lib/deploy-env.sh
+fi
+
 source scripts/replit-env.sh
 
 # Prefer the extracted layout produced by replit-build.sh for faster cold starts.
@@ -21,4 +29,9 @@ if [ -z "${JAR}" ]; then
   exit 1
 fi
 
-exec java -XX:TieredStopAtLevel=1 -Dspring.jmx.enabled=false -jar "${JAR}"
+# Fast-start JVM flags: TieredStopAtLevel=1 (C1-only) slashes JIT overhead
+# during Spring init on the throttled Reserved VM; JMX adds nothing here.
+# MaxRAMPercentage=75 gives the JVM an explicit container-aware heap ceiling
+# instead of the ergonomic ~25%-of-RAM default, which is too small to survive
+# AI lesson generation, file buffering, or a large CSV export on this VM.
+exec java -XX:TieredStopAtLevel=1 -XX:MaxRAMPercentage=75 -Dspring.jmx.enabled=false -jar "${JAR}"

@@ -1,6 +1,20 @@
+#!/usr/bin/env bash
+#
+# replit-build.sh — invoked by .replit [deployment].build.
+
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+
+# Swap in the published-app values before Maven runs: the SPA bakes
+# CLERK_PUBLISHABLE_KEY into the bundle at build time, so a runtime-only
+# override would be too late. Must precede replit-env.sh, which derives
+# VITE_CLERK_PUBLISHABLE_KEY from CLERK_PUBLISHABLE_KEY.
+if [ -f scripts/lib/deploy-env.sh ]; then
+  # shellcheck source=lib/deploy-env.sh
+  . scripts/lib/deploy-env.sh
+fi
+
 source scripts/replit-env.sh
 
 cd frontend

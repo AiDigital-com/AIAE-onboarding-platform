@@ -7,8 +7,22 @@ onBoot = "bash scripts/setup-project.sh"
 [userenv]
 
 [userenv.shared]
+# Base values = the DEV Clerk instance, used by the workspace ([workflows]).
+# The published app overrides them from the PRD_* block below — see
+# scripts/lib/deploy-env.sh, sourced only by replit-build.sh / replit-run.sh.
 CLERK_PUBLISHABLE_KEY = "pk_test_bGl2aW5nLWluc2VjdC02MC5jbGVyay5hY2NvdW50cy5kZXYk"
-AUTH_AUTHORIZED_PARTIES = "https://ai-onboarding-platform-poc.replit.app, https://ef470bbc-73d7-4b41-a937-273ced204772-00-1jsl8gtyv5yzd.worf.replit.dev,https://aiae-onboarding.aidigital.tech"
+# Matched EXACTLY against the JWT azp claim (ClerkJwtClaimsValidator uses
+# List.contains) — no wildcards here, and the :5173 workspace origin is a
+# separate entry from the portless one.
+AUTH_AUTHORIZED_PARTIES = "https://ai-onboarding-platform-poc.replit.app, https://ef470bbc-73d7-4b41-a937-273ced204772-00-1jsl8gtyv5yzd.worf.replit.dev, https://ef470bbc-73d7-4b41-a937-273ced204772-00-1jsl8gtyv5yzd.worf.replit.dev:5173, https://aiae-onboarding.aidigital.tech, http://localhost:5173, http://localhost:5000"
+# Spring setAllowedOriginPatterns — wildcards allowed, but a pattern without a
+# port only matches origins without one, hence the :[*] variants. The Vite dev
+# proxy forwards the browser's Origin header verbatim, so the workspace's
+# :5173 origin reaches this check.
+APP_SECURITY_CORS_ALLOWED_ORIGINS = "https://*.replit.dev, https://*.replit.dev:[*], https://*.repl.co, https://*.repl.co:[*], https://ai-onboarding-platform-poc.replit.app, https://aiae-onboarding.aidigital.tech, http://localhost:5173, http://localhost:5000"
+# CSP host-source: a bare host matches the default port only, so ports are
+# explicit. Replit previews the workspace app inside an iframe.
+APP_SECURITY_CSP_FRAME_ANCESTORS = "'self' https://*.replit.dev https://*.replit.dev:* https://*.repl.co https://*.repl.co:* https://aiae-onboarding.aidigital.tech"
 AUTH_ALLOWED_EMAIL_DOMAIN = "aidigital.com"
 VITE_CLERK_JWT_TEMPLATE = "aidigital-api"
 OPENAI_ENABLED = "true"
@@ -17,6 +31,17 @@ YOUTUBE_ENABLED = "true"
 CLOUDFRONT_ENABLED = "true"
 REGION = "us-east-1"
 BUCKET = "aidigital-onboarding-platform-389473156764-us-east-1-an"
+
+# === Published app overrides (PRD_<NAME> -> <NAME>) ===
+# Applied by scripts/lib/deploy-env.sh before the frontend build, so the PROD
+# publishable key is baked into the bundle. The workspace never sources that
+# script and keeps the DEV values above.
+# The prod Clerk key is bound to aidigital.tech, so login works only on that
+# domain and its subdomains — the .replit.app URL is deliberately absent here.
+PRD_CLERK_PUBLISHABLE_KEY = "pk_live_Y2xlcmsuYWlkaWdpdGFsLnRlY2gk"
+PRD_AUTH_AUTHORIZED_PARTIES = "https://aiae-onboarding.aidigital.tech"
+PRD_APP_SECURITY_CORS_ALLOWED_ORIGINS = "https://aiae-onboarding.aidigital.tech"
+PRD_APP_SECURITY_CSP_FRAME_ANCESTORS = "'self' https://aiae-onboarding.aidigital.tech"
 
 [nix]
 channel = "stable-24_11"
