@@ -1,7 +1,6 @@
 package com.aidigital.aionboarding.service.material.services.impl;
 
 import com.aidigital.aionboarding.external.openai.OpenAiClient;
-import com.aidigital.aionboarding.external.openai.OpenAiExternalException;
 import com.aidigital.aionboarding.external.openai.model.OpenAiFileInput;
 import com.aidigital.aionboarding.external.openai.model.OpenAiFileUploadResponse;
 import com.aidigital.aionboarding.service.material.models.MaterialAttachmentInput;
@@ -55,6 +54,12 @@ public class MaterialOpenAiFilePreparationServiceImpl implements MaterialOpenAiF
     /** Upload status value indicating a failed upload. */
     private static final String STATUS_ERROR = "error";
 
+    /** Responses API content-part type for documents (PDF, plain text). */
+    private static final String INPUT_TYPE_FILE = "input_file";
+
+    /** Responses API content-part type for images; {@code input_file} is rejected for them. */
+    private static final String INPUT_TYPE_IMAGE = "input_image";
+
     private final ObjectProvider<OpenAiClient> openAiClientProvider;
     private final MaterialFileService materialFileService;
     private final StorageService storageService;
@@ -77,14 +82,15 @@ public class MaterialOpenAiFilePreparationServiceImpl implements MaterialOpenAiF
             if (!isCompatible(attachment)) {
                 continue;
             }
+            String inputType = resolveInputType(attachment);
             String fileId = attachment.openaiFileId();
             if (fileId != null && !fileId.isBlank() && STATUS_UPLOADED.equals(attachment.openaiFileStatus())) {
-                result.add(new OpenAiFileInput("input_file", fileId));
+                result.add(new OpenAiFileInput(inputType, fileId));
                 continue;
             }
             fileId = uploadAndPersist(attachment, client);
             if (fileId != null) {
-                result.add(new OpenAiFileInput("input_file", fileId));
+                result.add(new OpenAiFileInput(inputType, fileId));
             }
         }
         return result;
@@ -112,6 +118,21 @@ public class MaterialOpenAiFilePreparationServiceImpl implements MaterialOpenAiF
                 new MaterialOpenAiUploadInput(null, FILE_PURPOSE, STATUS_ERROR, ex.getMessage()));
             return null;
         }
+    }
+
+    /**
+     * Maps an attachment's MIME type to the Responses API content-part type. Images must be sent
+     * as {@code input_image}; sending them as {@code input_file} is rejected with HTTP 400.
+     *
+     * @param attachment attachment already accepted by {@link #isCompatible}
+     * @return {@code input_image} for image MIME types, {@code input_file} otherwise
+     */
+    String resolveInputType(MaterialAttachmentInput attachment) {
+        String mime = attachment.mimeType();
+        if (mime != null && mime.startsWith(MIME_IMAGE_PREFIX)) {
+            return INPUT_TYPE_IMAGE;
+        }
+        return INPUT_TYPE_FILE;
     }
 
     /**

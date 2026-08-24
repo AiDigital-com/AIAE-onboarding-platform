@@ -394,6 +394,10 @@ class OpenAiClientImplTest {
 			assertThat(body).contains("\"type\":\"input_file\"");
 			assertThat(body).contains("\"file_id\":\"file-abc\"");
 			assertThat(body).contains("\"input_text\"");
+			// Content parts must be nested inside a role=user message item. Emitting them at the
+			// top level of `input` is rejected by the Responses API with
+			// 400 invalid_value on input[0].
+			assertThat(body).contains("\"input\":[{\"type\":\"message\",\"role\":\"user\",\"content\":[");
 		} finally {
 			factory.destroy();
 			server.shutdown();

@@ -896,6 +896,8 @@ paths:
         '400': { $ref: '#/components/responses/BadRequestV1' }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
         '403': { $ref: '#/components/responses/ForbiddenV1' }
+        '502': { $ref: '#/components/responses/BadGatewayV1' }
+        '504': { $ref: '#/components/responses/GatewayTimeoutV1' }
   /api/v1/lessons/upload-url:
     post:
       summary: Create lesson upload URL
@@ -1029,6 +1031,8 @@ paths:
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
         '403': { $ref: '#/components/responses/ForbiddenV1' }
         '404': { $ref: '#/components/responses/NotFoundV1' }
+        '502': { $ref: '#/components/responses/BadGatewayV1' }
+        '504': { $ref: '#/components/responses/GatewayTimeoutV1' }
   /api/v1/lessons/{id}/activities:
     get:
       summary: List lesson activities
@@ -1062,6 +1066,8 @@ paths:
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
         '403': { $ref: '#/components/responses/ForbiddenV1' }
         '404': { $ref: '#/components/responses/NotFoundV1' }
+        '502': { $ref: '#/components/responses/BadGatewayV1' }
+        '504': { $ref: '#/components/responses/GatewayTimeoutV1' }
   /api/v1/lessons/{id}/activities/{activityId}:
     get:
       summary: Get lesson activity
@@ -1166,6 +1172,8 @@ paths:
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
         '403': { $ref: '#/components/responses/ForbiddenV1' }
         '404': { $ref: '#/components/responses/NotFoundV1' }
+        '502': { $ref: '#/components/responses/BadGatewayV1' }
+        '504': { $ref: '#/components/responses/GatewayTimeoutV1' }
   /api/v1/lessons/{id}/assistant-conversation:
     get:
       summary: Get saved lesson assistant conversation
@@ -1362,6 +1370,8 @@ paths:
         '403': { $ref: '#/components/responses/ForbiddenV1' }
         '404': { $ref: '#/components/responses/NotFoundV1' }
         '409': { $ref: '#/components/responses/ConflictV1' }
+        '502': { $ref: '#/components/responses/BadGatewayV1' }
+        '504': { $ref: '#/components/responses/GatewayTimeoutV1' }
     get:
       summary: Get teacher video
       description: Returns teacher video generation status for a lesson.
@@ -1375,6 +1385,8 @@ paths:
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
         '403': { $ref: '#/components/responses/ForbiddenV1' }
         '404': { $ref: '#/components/responses/NotFoundV1' }
+        '502': { $ref: '#/components/responses/BadGatewayV1' }
+        '504': { $ref: '#/components/responses/GatewayTimeoutV1' }
     delete:
       summary: Delete teacher video
       description: Deletes generated teacher video metadata for a lesson.
@@ -1760,6 +1772,16 @@ components:
           schema: { $ref: '#/components/schemas/ApiErrorV1' }
     ConflictV1:
       description: Conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiErrorV1' }
+    BadGatewayV1:
+      description: An upstream provider (AI, video, transcript) rejected the call or returned an unusable result
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiErrorV1' }
+    GatewayTimeoutV1:
+      description: An upstream provider did not respond within the configured timeout
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ApiErrorV1' }

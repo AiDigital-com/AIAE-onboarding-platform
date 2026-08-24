@@ -10,6 +10,7 @@ public class OpenAiExternalException extends RuntimeException {
 
     private final int httpStatus;
     private final String responseBody;
+    private final boolean timeout;
 
     /**
      * Constructs an exception from a non-2xx HTTP response.
@@ -22,6 +23,7 @@ public class OpenAiExternalException extends RuntimeException {
         super(message);
         this.httpStatus = httpStatus;
         this.responseBody = responseBody;
+        this.timeout = false;
     }
 
     /**
@@ -31,9 +33,31 @@ public class OpenAiExternalException extends RuntimeException {
      * @param cause   underlying exception
      */
     public OpenAiExternalException(String message, Throwable cause) {
+        this(message, cause, false);
+    }
+
+    /**
+     * Constructs an exception from a network or parse failure, recording whether it was a
+     * timeout so callers can distinguish "provider too slow" from "provider rejected us".
+     *
+     * @param message human-readable description
+     * @param cause   underlying exception
+     * @param timeout {@code true} when the call exceeded the configured response timeout
+     */
+    public OpenAiExternalException(String message, Throwable cause, boolean timeout) {
         super(message, cause);
         this.httpStatus = -1;
         this.responseBody = "";
+        this.timeout = timeout;
+    }
+
+    /**
+     * Returns whether this failure was a connect/read timeout rather than a provider response.
+     *
+     * @return {@code true} when the call timed out
+     */
+    public boolean isTimeout() {
+        return timeout;
     }
 
     /**

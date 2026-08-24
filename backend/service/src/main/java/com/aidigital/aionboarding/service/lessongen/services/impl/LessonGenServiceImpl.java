@@ -1,9 +1,6 @@
 package com.aidigital.aionboarding.service.lessongen.services.impl;
 
-import com.aidigital.aionboarding.external.openai.OpenAiClient;
-import com.aidigital.aionboarding.external.openai.OpenAiExternalException;
 import com.aidigital.aionboarding.external.openai.config.OpenAiProperties;
-import com.aidigital.aionboarding.external.openai.model.OpenAiFileInput;
 import com.aidigital.aionboarding.external.openai.model.OpenAiFileUploadResponse;
 import com.aidigital.aionboarding.external.openai.model.OpenAiResponsesResult;
 import com.aidigital.aionboarding.service.common.error.AppException;
@@ -15,9 +12,9 @@ import com.aidigital.aionboarding.service.lessongen.model.GeneratedRevisionBrief
 import com.aidigital.aionboarding.service.lessongen.model.LessonGenPrompt;
 import com.aidigital.aionboarding.service.lessongen.services.LessonGenService;
 import com.aidigital.aionboarding.service.lessongen.support.GenerationMetadataAssembler;
+import com.aidigital.aionboarding.service.lessongen.support.OpenAiPromptExecutor;
 import com.aidigital.aionboarding.service.lessongen.util.LessonGenJsonSupport;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -32,11 +29,11 @@ public class LessonGenServiceImpl implements LessonGenService {
 
     private static final Set<String> ALLOWED_REVISION_SCOPES = Set.of("targeted", "substantial", "near-complete");
 
-    private final ObjectProvider<OpenAiClient> openAiClientProvider;
     private final OpenAiProperties openAiProperties;
     private final LessonGenProperties lessonGenProperties;
     private final LessonGenJsonSupport lessonGenJsonSupport;
     private final GenerationMetadataAssembler generationMetadataAssembler;
+    private final OpenAiPromptExecutor openAiPromptExecutor;
 
     @Override
     public GeneratedContentResult condenseSourceText(LessonGenPrompt prompt) {
@@ -138,17 +135,12 @@ public class LessonGenServiceImpl implements LessonGenService {
 
     @Override
     public OpenAiFileUploadResponse uploadFile(byte[] content, String filename, String purpose) {
-        try {
-            return requireClient().uploadFile(content, filename, purpose);
-        } catch (OpenAiExternalException ex) {
-            throw new AppException(ErrorReason.C003, ex.getMessage(), ex);
-        }
+        return openAiPromptExecutor.uploadFile(content, filename, purpose);
     }
 
     /**
-     * Calls the OpenAI Responses API with the given prompt and model, trims the output text,
-     * and wraps the result into an {@link OpenAiResponsesResult}. Translates
-     * {@link OpenAiExternalException} into an {@link AppException} with reason {@code C003}.
+     * Delegates the Responses API call to {@link OpenAiPromptExecutor}. Kept as a package-private
+     * seam so every generation method routes through one place and stays spyable in tests.
      *
      * @param prompt the generation prompt containing instructions, input, and cache metadata
      * @param model  the OpenAI model identifier to use
@@ -156,34 +148,7 @@ public class LessonGenServiceImpl implements LessonGenService {
      * @throws AppException if the API call fails
      */
     OpenAiResponsesResult createResponseText(LessonGenPrompt prompt, String model) {
-        List<OpenAiFileInput> fileInputs = prompt.fileInputs() == null ? List.of()
-            : prompt.fileInputs().stream()
-                .map(m -> new OpenAiFileInput("input_file", (String) m.get("file_id")))
-                .filter(f -> f.fileId() != null && !f.fileId().isBlank())
-                .toList();
-        try {
-            OpenAiResponsesResult raw = requireClient().createResponse(
-                prompt.instructions(), prompt.input(), model, prompt.cacheKey(), fileInputs,
-                prompt.store() ? Boolean.TRUE : null, prompt.previousResponseId());
-            return new OpenAiResponsesResult(raw.responseId(), raw.usage(), raw.text().trim());
-        } catch (OpenAiExternalException ex) {
-            throw new AppException(ErrorReason.C003, firstNonBlank(ex.getMessage(), "OpenAI lesson generation failed."), ex);
-        }
-    }
-
-    /**
-     * Returns the available {@link OpenAiClient}. Throws {@link AppException} with reason
-     * {@code C003} when the API key is not configured and no client bean is registered.
-     *
-     * @return the resolved OpenAI client
-     * @throws AppException if no OpenAI client is available
-     */
-    OpenAiClient requireClient() {
-        OpenAiClient client = openAiClientProvider.getIfAvailable();
-        if (client == null) {
-            throw new AppException(ErrorReason.C003, "OPENAI_API_KEY is not configured.");
-        }
-        return client;
+        return openAiPromptExecutor.execute(prompt, model);
     }
 
     /**

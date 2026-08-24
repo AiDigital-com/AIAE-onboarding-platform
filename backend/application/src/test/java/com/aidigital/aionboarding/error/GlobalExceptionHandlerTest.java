@@ -34,6 +34,9 @@ class GlobalExceptionHandlerTest {
 		assertThat(status(ErrorReason.C007)).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
 		assertThat(status(ErrorReason.C000)).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
 		assertThat(status(ErrorReason.C002)).isEqualTo(HttpStatus.BAD_REQUEST);
+		// An upstream failure is not a client error: C003/C008 must never collapse into 400.
+		assertThat(status(ErrorReason.C003)).isEqualTo(HttpStatus.BAD_GATEWAY);
+		assertThat(status(ErrorReason.C008)).isEqualTo(HttpStatus.GATEWAY_TIMEOUT);
 	}
 
 	private HttpStatus status(ErrorReason reason) {
