@@ -41,7 +41,8 @@ public enum ErrorReason {
 	C004("Access forbidden"),
 	C005("Authentication required"),
 	C006("Conflict: %s"),
-	C007("Rate limit exceeded");
+	C007("Rate limit exceeded"),
+	C008("External call timed out: %s");
 
 	private final String description;
 

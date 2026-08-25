@@ -20,6 +20,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -44,6 +46,11 @@ public class LessonGenerationWorkflow {
     private static final String FILE_INPUT_TYPE = "type";
     private static final String FILE_INPUT_ID = "file_id";
 
+    /** Author-facing text for an unclassified generation failure; details go to the log. */
+    private static final String GENERIC_FAILURE_MESSAGE = "lesson generation failed. Please try again.";
+
+    private static final Logger LOG = LoggerFactory.getLogger(LessonGenerationWorkflow.class);
+
     private final LessonEntityService lessonEntityService;
     private final MaterialOpenAiFilePreparationService materialOpenAiFilePreparationService;
     private final LessonPromptBuilder lessonPromptBuilder;
@@ -60,8 +67,9 @@ public class LessonGenerationWorkflow {
      * @param materialIds source material ids, used to prepare OpenAI file attachments
      * @param draftTitle  fallback title used if the generated content has none
      * @return the lesson in its final {@code ready} state
-     * @throws AppException with reason {@code C003} when the AI provider call fails; the lesson
-     *                       is marked failed first so the failure is visible to the requester
+     * @throws AppException when the AI provider call fails — {@code C008} for a provider timeout,
+     *                       {@code C003} otherwise; the lesson is marked failed first so the
+     *                       failure is visible to the requester
      */
     public Lesson run(
         Lesson lesson,
@@ -126,7 +134,14 @@ public class LessonGenerationWorkflow {
             failedMeta.put(META_ATTACHED_FILES, attachedFiles);
             failedMeta.put(META_FAILED_AT, currentTime.utcDateTime().toString());
             lessonEntityService.markFailed(lesson, errorMessage, new LessonGenerationMetadata(failedMeta));
-            throw new AppException(ErrorReason.C003, "Lesson generation failed", ex);
+            // An AppException from below already carries an author-facing message and the right
+            // code (C008 -> 504 for a provider timeout), so re-throw it untouched. Anything else
+            // is an unclassified failure whose raw message must not reach the API response.
+            if (ex instanceof AppException appException) {
+                throw appException;
+            }
+            LOG.warn("Lesson generation failed for lesson {}", lesson.getId(), ex);
+            throw new AppException(ErrorReason.C003, GENERIC_FAILURE_MESSAGE, ex);
         }
     }
 

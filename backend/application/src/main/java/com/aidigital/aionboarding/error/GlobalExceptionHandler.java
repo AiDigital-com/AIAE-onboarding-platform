@@ -49,6 +49,8 @@ public class GlobalExceptionHandler {
 	private static final String UNAUTH_PREFIX = "C005";
 	private static final String CONFLICT_PREFIX = "C006";
 	private static final String RATE_LIMIT_PREFIX = "C007";
+	private static final String EXTERNAL_CALL_PREFIX = "C003";
+	private static final String EXTERNAL_TIMEOUT_PREFIX = "C008";
 	private static final String VALIDATION_PREFIX = "V";
 
 	/**
@@ -223,6 +225,14 @@ public class GlobalExceptionHandler {
 		}
 		if (code.startsWith(RATE_LIMIT_PREFIX)) {
 			return HttpStatus.TOO_MANY_REQUESTS;
+		}
+		// An upstream provider failing or timing out is not the caller's fault; returning 400
+		// made a rejected request, a 429, a provider 500 and a read timeout indistinguishable.
+		if (code.startsWith(EXTERNAL_CALL_PREFIX)) {
+			return HttpStatus.BAD_GATEWAY;
+		}
+		if (code.startsWith(EXTERNAL_TIMEOUT_PREFIX)) {
+			return HttpStatus.GATEWAY_TIMEOUT;
 		}
 		if (code.startsWith(VALIDATION_PREFIX)) {
 			return HttpStatus.BAD_REQUEST;

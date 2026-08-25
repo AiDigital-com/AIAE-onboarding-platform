@@ -8,12 +8,14 @@ import com.aidigital.aionboarding.external.openai.model.OpenAiFileUploadResponse
 import com.aidigital.aionboarding.external.openai.model.OpenAiResponsesResult;
 import com.aidigital.aionboarding.external.openai.model.OpenAiResponsesUsage;
 import com.aidigital.aionboarding.service.common.error.AppException;
+import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.lessongen.config.LessonGenProperties;
 import com.aidigital.aionboarding.service.lessongen.model.GeneratedActivityResult;
 import com.aidigital.aionboarding.service.lessongen.model.GeneratedContentResult;
 import com.aidigital.aionboarding.service.lessongen.model.GeneratedRevisionBriefResult;
 import com.aidigital.aionboarding.service.lessongen.model.LessonGenPrompt;
 import com.aidigital.aionboarding.service.lessongen.support.GenerationMetadataAssembler;
+import com.aidigital.aionboarding.service.lessongen.support.OpenAiPromptExecutor;
 import com.aidigital.aionboarding.service.lessongen.util.LessonGenJsonSupport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,9 +29,9 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -46,9 +48,11 @@ class LessonGenServiceImplTest {
 	private final GenerationMetadataAssembler generationMetadataAssembler = new GenerationMetadataAssembler();
 
 	private LessonGenServiceImpl service(LessonGenProperties lessonGenProperties) {
+		// A real executor over the mocked client: these tests assert what reaches the OpenAI
+		// adapter, so stubbing the executor away would delete the behaviour under test.
 		return new LessonGenServiceImpl(
-				openAiClientProvider, openAiProperties, lessonGenProperties, lessonGenJsonSupport,
-				generationMetadataAssembler);
+				openAiProperties, lessonGenProperties, lessonGenJsonSupport,
+				generationMetadataAssembler, new OpenAiPromptExecutor(openAiClientProvider));
 	}
 
 	private LessonGenProperties defaultProperties() {
@@ -126,6 +130,35 @@ class LessonGenServiceImplTest {
 		assertThat(capturedFileInputs).hasSize(1);
 		assertThat(capturedFileInputs.get(0).type()).isEqualTo("input_file");
 		assertThat(capturedFileInputs.get(0).fileId()).isEqualTo("file-abc");
+	}
+
+	@Test
+	void shouldPreserveCallerSuppliedInputImageTypeTest() {
+		// Given: images are classified upstream as input_image; overwriting that with input_file
+		// makes the Responses API reject the request with HTTP 400.
+		LessonGenServiceImpl service = service(defaultProperties());
+		when(openAiClientProvider.getIfAvailable()).thenReturn(openAiClient);
+		List<Map<String, Object>> rawFileInputs = List.of(
+				Map.of("type", "input_image", "file_id", "file-img"),
+				Map.of("file_id", "file-untyped")
+		);
+		LessonGenPrompt prompt = new LessonGenPrompt("v1", "cache-key", "instructions", "input", rawFileInputs);
+		OpenAiResponsesResult result = new OpenAiResponsesResult(
+				"resp-img", new OpenAiResponsesUsage(1, 1, 2), "image-based content");
+		ArgumentCaptor<List<OpenAiFileInput>> fileInputCaptor = ArgumentCaptor.forClass(List.class);
+		when(openAiClient.createResponse(eq("instructions"), eq("input"), eq("gpt-4o-mini"),
+				any(), fileInputCaptor.capture(), isNull(), isNull()))
+				.thenReturn(result);
+
+		// When:
+		service.generateLessonContent(prompt);
+
+		// Then:
+		List<OpenAiFileInput> capturedFileInputs = fileInputCaptor.getValue();
+		assertThat(capturedFileInputs).hasSize(2);
+		assertThat(capturedFileInputs.get(0).type()).isEqualTo("input_image");
+		// A map without an explicit type still falls back to the document content-part type.
+		assertThat(capturedFileInputs.get(1).type()).isEqualTo("input_file");
 	}
 
 	@Test
@@ -371,7 +404,9 @@ class LessonGenServiceImplTest {
 		// When-Then:
 		assertThatThrownBy(() -> service.uploadFile(new byte[]{0, 1, 2}, "test.txt", "user_data"))
 				.isInstanceOf(AppException.class)
-				.hasMessageContaining("upload failed");
+				// Provider internals stay in the log; the API gets an author-facing message.
+				.hasMessageContaining("the AI service is temporarily unavailable")
+				.hasMessageNotContaining("upload failed");
 	}
 
 	@Test
@@ -384,7 +419,9 @@ class LessonGenServiceImplTest {
 		// When-Then:
 		assertThatThrownBy(() -> service.generateLessonContent(prompt))
 				.isInstanceOf(AppException.class)
-				.hasMessageContaining("OPENAI_API_KEY is not configured");
+				// The missing variable is named in the log, never in the API response.
+				.hasMessageContaining("the AI service is temporarily unavailable")
+				.hasMessageNotContaining("OPENAI_API_KEY");
 	}
 
 	@Test
@@ -401,7 +438,29 @@ class LessonGenServiceImplTest {
 		// When-Then:
 		assertThatThrownBy(() -> service.generateLessonContent(prompt))
 				.isInstanceOf(AppException.class)
-				.hasMessageContaining("network error");
+				// Provider internals stay in the log; the API gets an author-facing message.
+				.hasMessageContaining("the AI service is temporarily unavailable")
+				.hasMessageNotContaining("network error")
+				.satisfies(ex -> assertThat(((AppException) ex).getCode()).isEqualTo(ErrorReason.C003.name()));
+	}
+
+	@Test
+	void shouldReportProviderTimeoutAsC008Test() {
+		// Given:
+		LessonGenServiceImpl service = service(defaultProperties());
+		when(openAiClientProvider.getIfAvailable()).thenReturn(openAiClient);
+		LessonGenPrompt prompt = new LessonGenPrompt("v1", "cache-key", "instructions", "input");
+		OpenAiExternalException cause =
+				new OpenAiExternalException("read timed out", new RuntimeException("boom"), true);
+		when(openAiClient.createResponse(eq("instructions"), eq("input"), eq("gpt-4o-mini"),
+				eq("cache-key"), eq(List.of()), isNull(), isNull()))
+				.thenThrow(cause);
+
+		// When-Then: C008 maps to 504, so a slow provider stays distinguishable from a rejection.
+		assertThatThrownBy(() -> service.generateLessonContent(prompt))
+				.isInstanceOf(AppException.class)
+				.hasMessageContaining("the AI service did not respond in time")
+				.satisfies(ex -> assertThat(((AppException) ex).getCode()).isEqualTo(ErrorReason.C008.name()));
 	}
 
 	@Test

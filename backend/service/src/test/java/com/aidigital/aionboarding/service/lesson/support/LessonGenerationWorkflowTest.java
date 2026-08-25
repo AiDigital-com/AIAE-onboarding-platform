@@ -168,7 +168,9 @@ class LessonGenerationWorkflowTest {
 		// Then
 		assertThatThrownBy(() -> workflow.run(draft, prepared, input, materialIds, "Draft"))
 				.isInstanceOf(AppException.class)
-				.hasMessageContaining("Lesson generation failed")
+				// An unclassified failure must not leak its raw message into the API response...
+				.hasMessageContaining("lesson generation failed")
+				.hasMessageNotContaining("OpenAI rate limit")
 				.satisfies(ex -> assertThat(((AppException) ex).getCode()).isEqualTo(ErrorReason.C003.name()));
 
 		ArgumentCaptor<LessonGenerationMetadata> metaCaptor = ArgumentCaptor.forClass(LessonGenerationMetadata.class);
@@ -289,7 +291,7 @@ class LessonGenerationWorkflowTest {
 			// Execution / Verification
 			assertThatThrownBy(() -> workflow.run(draft, prepared, input, ids, "Draft"))
 					.isInstanceOf(AppException.class)
-					.hasMessageContaining("Lesson generation failed");
+					.hasMessageContaining("lesson generation failed");
 
 			ArgumentCaptor<LessonGenerationMetadata> failedMetaCaptor = ArgumentCaptor.forClass(LessonGenerationMetadata.class);
 			verify(lessonEntityService).markFailed(eq(generating), eq("OpenAI rate limit"),

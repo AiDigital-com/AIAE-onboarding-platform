@@ -54,8 +54,28 @@ class MaterialOpenAiFilePreparationServiceImplTest {
 		// Then:
 		assertThat(result).hasSize(1);
 		assertThat(result.get(0).fileId()).isEqualTo("file-existing-001");
+		assertThat(result.get(0).type()).isEqualTo("input_file");
 		verify(openAiClient, never()).uploadFile(any(), any(), any());
 		verify(materialFileService, never()).updateMaterialFileOpenAIUpload(any(), any());
+	}
+
+	@Test
+	void shouldSendImageAttachmentAsInputImageTest() {
+		// Given: the Responses API rejects an image sent as input_file with HTTP 400.
+		MaterialOpenAiFilePreparationServiceImpl service =
+				new MaterialOpenAiFilePreparationServiceImpl(openAiClientProvider, materialFileService,
+						storageService);
+		when(openAiClientProvider.getIfAvailable()).thenReturn(openAiClient);
+		MaterialAttachmentInput attachment = attachmentWith("file-image-001", "uploaded", "image/png");
+		when(materialFileService.findAttachmentsForMaterials(List.of(1L))).thenReturn(List.of(attachment));
+
+		// When:
+		List<OpenAiFileInput> result = service.prepareFileInputs(List.of(1L));
+
+		// Then:
+		assertThat(result).hasSize(1);
+		assertThat(result.get(0).type()).isEqualTo("input_image");
+		assertThat(result.get(0).fileId()).isEqualTo("file-image-001");
 	}
 
 	@Test
