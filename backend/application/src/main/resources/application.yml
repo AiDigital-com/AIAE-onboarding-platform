@@ -158,7 +158,12 @@ app:
     headers-to-censor: [ Authorization, Cookie, Set-Cookie, X-API-Key, AccessKey, Proxy-Authorization ]
     json-fields-to-censor: [ ".*password.*", ".*token.*", ".*secret.*", ".*key.*", ".*credential.*", ".*authorization.*", privateKey, clientSecret, serviceAccount ]
     excluded:
+      # Both forms are needed: "/**/actuator/**" requires at least one path
+      # segment before "actuator", so it never matches /actuator/... when
+      # server.servlet.context-path is empty (the EKS deployment). Without the
+      # second pattern every probe is logged at TRACE three times per 10s.
       "/**/actuator/**": [ GET ]
+      "/actuator/**": [ GET ]
       "/**/swagger-ui/**": [ GET ]
       "/**/specs/**": [ GET ]
       "/health": [ GET ]

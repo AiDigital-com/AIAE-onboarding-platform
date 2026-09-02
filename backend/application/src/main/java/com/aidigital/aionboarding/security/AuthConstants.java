@@ -31,7 +31,14 @@ public final class AuthConstants {
         "/sign-in/**",
         "/sign-up",
         "/sign-up/**",
-        "/actuator/health",
+        // "/**" is required, not just "/actuator/health": Kubernetes startup,
+        // readiness and liveness probes and the ALB target-group health check all
+        // call the GROUP paths /actuator/health/readiness and
+        // /actuator/health/liveness. The exact-match pattern left those returning
+        // 401, so the pod never became Ready and the rollout never completed.
+        // Anonymous callers still see only {"status":"UP"} because
+        // management.endpoint.health.show-details is when-authorized.
+        "/actuator/health/**",
         "/actuator/prometheus",
         "/api/v1/specs/**",
         "/swagger-ui/**",
