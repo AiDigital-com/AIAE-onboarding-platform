@@ -6,7 +6,7 @@ import { fileURLToPath, URL } from "node:url";
 // Replit-tuned Vite config. Hard rules:
 //  - Vite stays on 5173 (backend owns 5000 → externalPort 80).
 //  - /api/* proxied to backend; never hardcode backend URLs.
-//  - Build → ../backend/application/src/main/resources/static (Spring serves SPA).
+//  - Build → frontend/dist (S3/CloudFront serve the SPA on AWS).
 //  - allowedHosts must include `.replit.dev`/`.repl.co`/`.kirk.replit.dev`
 //    (Vite 5+ blocks unknown Host headers).
 // See `.claude/agent_docs/frontend/canonical-react-frontend-rules.md`
@@ -54,7 +54,13 @@ export default defineConfig(({ mode }) => {
             },
         },
         build: {
-            outDir: "../backend/application/src/main/resources/static",
+            // Standalone artifact uploaded to S3 and served by CloudFront on AWS.
+            // Previously this wrote straight into the Spring static directory so the
+            // Replit Reserved VM could serve the SPA from the jar; on AWS the SPA and
+            // the API are separate origins joined by one CloudFront distribution
+            // (default behaviour -> S3, /api/* -> ALB), so the browser still sees a
+            // single origin and runtimeConfig.apiBaseUrl stays empty.
+            outDir: "dist",
             emptyOutDir: true,
         },
         preview: {

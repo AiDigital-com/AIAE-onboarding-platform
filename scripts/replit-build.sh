@@ -32,6 +32,15 @@ npm run build
 cd ..
 
 STATIC_DIR="backend/application/src/main/resources/static"
+
+# Vite now builds to frontend/dist so GitHub Actions can upload a standalone SPA
+# artifact to S3/CloudFront on AWS. Replit still serves the SPA from inside the
+# Spring jar, so stage the same output into the static directory here. Removed
+# together with the rest of the Replit deployment path.
+rm -rf "${STATIC_DIR}"
+mkdir -p "${STATIC_DIR}"
+cp -R frontend/dist/. "${STATIC_DIR}/"
+
 test -f "${STATIC_DIR}/index.html" || {
   echo "ERROR: frontend build did not produce ${STATIC_DIR}/index.html." >&2
   exit 1

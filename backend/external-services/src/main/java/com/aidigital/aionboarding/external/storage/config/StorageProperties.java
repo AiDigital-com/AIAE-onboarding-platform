@@ -46,13 +46,28 @@ public class StorageProperties {
     }
 
     /**
-     * Returns whether credentials and bucket are present enough for a live client.
+     * Returns whether the bucket and some resolvable credential source are present.
      *
-     * @return {@code true} when bucket and access keys are non-blank
+     * <p>On EKS the pod authenticates through IRSA, so the static key pair is absent by
+     * design and the AWS SDK default provider chain supplies credentials instead. Requiring
+     * static keys here would report an IRSA-backed deployment as unconfigured.
+     *
+     * @return {@code true} when a bucket is set
      */
     public boolean isConfigured() {
-        return bucket != null && !bucket.isBlank()
-            && accessKeyId != null && !accessKeyId.isBlank()
+        return bucket != null && !bucket.isBlank();
+    }
+
+    /**
+     * Returns whether an explicit static access key pair was supplied.
+     *
+     * <p>True for local development and S3-compatible third-party endpoints, false on EKS
+     * where IRSA provides short-lived credentials through the default provider chain.
+     *
+     * @return {@code true} when both the access key id and secret access key are non-blank
+     */
+    public boolean hasStaticCredentials() {
+        return accessKeyId != null && !accessKeyId.isBlank()
             && secretAccessKey != null && !secretAccessKey.isBlank();
     }
 }

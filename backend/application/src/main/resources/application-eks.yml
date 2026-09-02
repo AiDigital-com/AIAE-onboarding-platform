@@ -1,0 +1,42 @@
+# application-eks.yml
+#
+# AWS EKS profile (AIAE shared DEV/PROD clusters). Activated by the Helm chart
+# via SPRING_PROFILES_ACTIVE=eks.
+#
+# Environment-specific values (origins, ports, feature flags) come from the
+# ConfigMap rendered by AIAE-helm; secrets arrive from AWS Secrets Manager
+# through the Secrets Store CSI driver. Nothing environment-specific belongs
+# in this file — it is shared by DEV and PROD.
+
+spring:
+  liquibase:
+    # Schema migration runs as an Argo CD PreSync Job from the paired
+    # liquibase-* image BEFORE any new pod rolls out, so the application must
+    # never migrate on startup. With multiple replicas, startup migration would
+    # also race between pods on the same changelog lock.
+    enabled: false
+
+  jpa:
+    # The PreSync Job owns the schema, so the runtime only validates that the
+    # mapped entities match what the migration produced. A mismatch must fail
+    # startup loudly rather than be silently tolerated.
+    hibernate:
+      ddl-auto: validate
+
+server:
+  # The browser origin is CloudFront, which forwards to an ALB; both append
+  # X-Forwarded-*. Without this, Spring builds absolute URLs (redirects, CORS
+  # pre-flight, Swagger) from the internal http://pod:5000 address instead of
+  # the public https origin. Also set in the base config; repeated here because
+  # correct behaviour behind two proxies is a hard requirement of this profile.
+  forward-headers-strategy: framework
+
+management:
+  health:
+    # Exposes /actuator/health/readiness and /actuator/health/liveness, which
+    # the chart's startup/readiness/liveness probes and the ALB target-group
+    # health check depend on. The chart also sets this via
+    # MANAGEMENT_HEALTH_PROBES_ENABLED; kept here so the profile is correct
+    # even if the ConfigMap entry is ever dropped.
+    probes:
+      enabled: true

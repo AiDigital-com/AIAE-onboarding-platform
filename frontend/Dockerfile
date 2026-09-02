@@ -22,8 +22,8 @@ RUN npm run generate:api && npm run build
 
 FROM nginx:1.27-alpine
 ENV APP_CONTEXT_PATH=
-# vite.config.ts sets build.outDir to the backend static directory (Replit
-# packages the SPA into the jar), so the build output is there, not in dist/.
-COPY --from=build /workspace/backend/application/src/main/resources/static /usr/share/nginx/html
+# vite.config.ts builds to frontend/dist; nginx serves it here, and proxies
+# /api/* to the backend service (see nginx.conf.template).
+COPY --from=build /workspace/frontend/dist /usr/share/nginx/html
 COPY frontend/nginx.conf.template /etc/nginx/templates/default.conf.template
 EXPOSE 80
