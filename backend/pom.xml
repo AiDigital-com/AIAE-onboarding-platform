@@ -361,6 +361,10 @@
 										 classpath; it owns no Java class today that would reference
 										 liquibase-core. -->
 									<ignoredUnusedDeclaredDependency>org.liquibase:liquibase-core</ignoredUnusedDeclaredDependency>
+									<!-- external-services: required on the classpath for IRSA
+										 web-identity credential resolution; no Java class
+										 references it. -->
+									<ignoredUnusedDeclaredDependency>software.amazon.awssdk:sts</ignoredUnusedDeclaredDependency>
 									<!-- migrations/observability: resource-only or transitively-
 										 consumed-elsewhere internal modules with no direct class
 										 import from application. -->

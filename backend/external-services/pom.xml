@@ -87,6 +87,18 @@
 			<artifactId>cloudfront</artifactId>
 			<version>2.29.45</version>
 		</dependency>
+		<!-- Runtime-only, and required for IRSA. DefaultCredentialsProvider's
+			 WebIdentityTokenFileCredentialsProvider needs the sts module to exchange
+			 the projected service-account token for credentials; without it the SDK
+			 logs "To use web identity tokens, the 'sts' service module must be on the
+			 class path", silently skips that provider, and every presign fails. No
+			 Java class references it, so analyze-only reports it unused - see
+			 backend/DEPENDENCY-ANALYSIS.md. -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>sts</artifactId>
+			<version>2.29.45</version>
+		</dependency>
 
 		<dependency>
 			<groupId>org.zalando</groupId>
