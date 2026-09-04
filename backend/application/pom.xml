@@ -140,6 +140,33 @@
 			<scope>runtime</scope>
 		</dependency>
 
+		<!-- AWS Advanced JDBC Wrapper. Only the eks profile uses it: there the
+			 JDBC URL is jdbc:aws-wrapper:postgresql://... and the awsSecretsManager
+			 plugin reads the database username and password from the RDS-managed
+			 master user secret through the pod's IRSA role. When PostgreSQL rejects
+			 a login because AWS rotated that password, the plugin force-refetches
+			 the secret and retries the connection, so a rotation never reaches the
+			 application: no pod restart, and no second copy of the password that
+			 could fall out of sync. Local, replit and test runs keep the plain
+			 driver above. Runtime scope, like that driver: no Java class refers to
+			 either, both are found through JDBC driver discovery. -->
+		<dependency>
+			<groupId>software.amazon.jdbc</groupId>
+			<artifactId>aws-advanced-jdbc-wrapper</artifactId>
+			<version>2.6.0</version>
+			<scope>runtime</scope>
+		</dependency>
+		<!-- The wrapper declares the Secrets Manager SDK as optional, so the
+			 awsSecretsManager plugin above cannot fetch anything without it. Keep
+			 this version equal to the AWS SDK version in external-services/pom.xml
+			 (s3, sts, cloudfront); one SDK core must serve both. -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>secretsmanager</artifactId>
+			<version>2.29.45</version>
+			<scope>runtime</scope>
+		</dependency>
+
 		<!-- Hibernate L2/query cache (dictionary entities only, see
 			 domain/.../dictionary/entities/*.java @Cache annotations and
 			 application.yml spring.jpa.properties.hibernate.cache.*). -->

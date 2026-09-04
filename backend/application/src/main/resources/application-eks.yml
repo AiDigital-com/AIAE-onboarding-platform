@@ -23,6 +23,45 @@ spring:
     hibernate:
       ddl-auto: validate
 
+  datasource:
+    # Database credentials for this profile come from the RDS-managed master
+    # user secret, and nothing copies them anywhere else. The AWS Advanced JDBC
+    # Wrapper's awsSecretsManager plugin reads that secret through the pod's
+    # IRSA role when it opens a connection. AWS rotates the password every
+    # seven days; when PostgreSQL then rejects a login, the plugin refetches
+    # the secret and retries the connection, so the rotation never surfaces.
+    #
+    # Projecting the password into an environment variable cannot work here.
+    # Environment variables are fixed for the lifetime of a container, while
+    # the pool retires connections within a minute (idle-timeout below), so a
+    # rotated password starts failing about a minute after the rotation and
+    # keeps failing until something restarts the pod.
+    url: jdbc:aws-wrapper:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+    driver-class-name: software.amazon.jdbc.Driver
+
+    # Deliberately empty: the plugin supplies both from the secret's username
+    # and password fields. Inheriting the base profile's POSTGRES_USER and
+    # POSTGRES_PASSWORD instead would let a misconfigured plugin fall back to
+    # stale or default credentials and connect anyway; an empty credential
+    # fails the connection loudly, which is the behaviour this profile wants.
+    username: ""
+    password: ""
+
+    hikari:
+      # Forwarded to the driver as connection properties, which is how the
+      # wrapper is configured.
+      data-source-properties:
+        # This plugin only. The wrapper's default plugin list targets Aurora
+        # failover topology, which a single-instance RDS deployment has not
+        # got.
+        wrapperPlugins: awsSecretsManager
+        wrapperDialect: rds-pg
+        # ARN of the RDS-managed secret, supplied by the chart's ConfigMap from
+        # the Terraform output onboarding_database_master_secret_arn. An ARN is
+        # not itself a secret.
+        secretsManagerSecretId: ${DB_MASTER_SECRET_ID}
+        secretsManagerRegion: ${AWS_REGION:us-east-1}
+
 server:
   # The browser origin is CloudFront, which forwards to an ALB; both append
   # X-Forwarded-*. Without this, Spring builds absolute URLs (redirects, CORS
