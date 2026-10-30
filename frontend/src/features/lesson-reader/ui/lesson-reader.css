@@ -1,3 +1,6 @@
+/* Highlight palette tokens (--tt-color-highlight-*) referenced by stored <mark> styles. */
+@import "@/shared/editor/styles/variables.css";
+
 .lesson-reader {
     color: #172033;
     font-size: 18px;
