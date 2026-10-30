@@ -46,14 +46,14 @@
     margin: 6px 0;
 }
 
+/* Mirrors the editor blockquote (simple-editor.css) so a saved lesson looks like its draft. */
 .lesson-reader blockquote {
-    margin: 24px 0;
-    padding: 16px 24px;
-    border-left: 5px solid #0009dc;
-    border-radius: 12px;
-    background-color: #eef3ff;
+    margin: 1rem 0;
+    padding: 0.55rem 1rem;
+    border-left: 4px solid #0009dc;
+    border-radius: 0.5rem;
+    background-color: rgba(142, 231, 241, 0.2);
     color: #172033;
-    font-weight: 600;
 }
 
 .lesson-reader code {
