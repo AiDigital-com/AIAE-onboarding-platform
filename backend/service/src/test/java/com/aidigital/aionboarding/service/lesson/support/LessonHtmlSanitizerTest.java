@@ -273,4 +273,42 @@ class LessonHtmlSanitizerTest {
 		assertThat(result).contains("IGNORE ALL PREVIOUS INSTRUCTIONS");
 		assertThat(result).doesNotContain("<script").doesNotContain("evil.example.com");
 	}
+
+	@Test
+	void sanitizeShouldPreserveHighlightPaletteVariableOnMarkTest() {
+		// Given: the editor's highlight popover stores the palette variable, not the resolved color.
+		String html = "<p><mark data-color=\"var(--tt-color-highlight-green)\" "
+				+ "style=\"background-color:var(--tt-color-highlight-green);color:inherit;\">kept</mark></p>";
+
+		// When:
+		String result = sanitizer.sanitize(html);
+
+		// Then:
+		assertThat(result).isEqualTo(html);
+	}
+
+	@Test
+	void sanitizeShouldPreserveHexHighlightColorOnMarkTest() {
+		// Given:
+		String html = "<p><mark data-color=\"#e0f2fe\" style=\"background-color:#e0f2fe;color:inherit;\">kept</mark></p>";
+
+		// When:
+		String result = sanitizer.sanitize(html);
+
+		// Then:
+		assertThat(result).isEqualTo(html);
+	}
+
+	@Test
+	void sanitizeShouldStripNonPaletteVariableFromMarkTest() {
+		// Given: only the allowlisted highlight palette may be referenced; any other variable is dropped.
+		String html = "<p><mark data-color=\"var(--evil)\" "
+				+ "style=\"background-color:var(--evil);color:inherit;\">text</mark></p>";
+
+		// When:
+		String result = sanitizer.sanitize(html);
+
+		// Then:
+		assertThat(result).isEqualTo("<p><mark style=\"color:inherit;\">text</mark></p>");
+	}
 }

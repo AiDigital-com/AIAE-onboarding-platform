@@ -35,7 +35,16 @@ public class LessonHtmlSanitizer {
     private static final Pattern TASK_ITEM_CHECKED_PATTERN = Pattern.compile("^(true|false)$");
     private static final Pattern PIXEL_OR_PERCENT_PATTERN = Pattern.compile("^\\d{1,5}(\\.\\d+)?(px|%)$");
     private static final Pattern DIMENSION_OR_AUTO_PATTERN = Pattern.compile("^(auto|\\d{1,5}(\\.\\d+)?(px|%))$");
-    private static final Pattern HEX_OR_NAMED_COLOR_PATTERN = Pattern.compile("^([a-zA-Z]{3,20}|#[0-9a-fA-F]{3,8})$");
+    /** Palette names behind the editor's {@code --tt-color-highlight-<name>} CSS variables
+     * ({@code frontend/src/shared/editor/styles/variables.css}); each also has a {@code -contrast}
+     * variant. The highlight popover stores the variable reference, not the resolved color, so the
+     * reader can re-theme highlights (e.g. dark mode) without touching stored lessons. */
+    private static final String HIGHLIGHT_PALETTE_NAMES = "yellow|green|blue|purple|red|gray|brown|orange|pink";
+    private static final String HIGHLIGHT_VARIABLE_REGEX =
+        "var\\(--tt-color-highlight-(" + HIGHLIGHT_PALETTE_NAMES + ")(-contrast)?\\)";
+    /** A hex color, a CSS named color, or one of the allowlisted highlight palette variables. */
+    private static final Pattern HIGHLIGHT_COLOR_PATTERN =
+        Pattern.compile("^([a-zA-Z]{3,20}|#[0-9a-fA-F]{3,8}|" + HIGHLIGHT_VARIABLE_REGEX + ")$");
     private static final Pattern TEXT_ALIGN_VALUE_PATTERN = Pattern.compile("^(left|right|center|justify)$");
 
     private final PolicyFactory policy = buildPolicy();
@@ -80,8 +89,8 @@ public class LessonHtmlSanitizer {
             .allowElements("div")
             .allowAttributes("data-type").matching(literal("horizontalRule")).onElements("div")
             // Highlight mark color.
-            .allowAttributes("data-color").matching(HEX_OR_NAMED_COLOR_PATTERN).onElements("mark")
-            .allowAttributes("style").matching((e, a, v) -> sanitizeDeclarations(v, HEX_OR_NAMED_COLOR_PATTERN, "background-color", "color")).onElements("mark")
+            .allowAttributes("data-color").matching(HIGHLIGHT_COLOR_PATTERN).onElements("mark")
+            .allowAttributes("style").matching((e, a, v) -> sanitizeDeclarations(v, HIGHLIGHT_COLOR_PATTERN, "background-color", "color")).onElements("mark")
             // Links.
             .allowElements("a")
             .allowAttributes("href").matching(httpOrMailtoUrlPolicy).onElements("a")
