@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
 import ArrowForwardOutlinedIcon from "@mui/icons-material/ArrowForwardOutlined";
 import CheckOutlinedIcon from "@mui/icons-material/CheckOutlined";
+import { getRoadmapPathActionLabel } from "@/features/lessons/lib/continuePath";
 import { AI_DIGITAL_COLORS } from "@/shared/lib/brandColors";
 import type { RoadmapView } from "../types";
 import "./roadmaps.css";
@@ -224,7 +225,7 @@ export function RoadmapsGrid({ roadmaps, onUnenrollRoadmap }: Props) {
                                         to={primaryLessonHref}
                                         onClick={(event) => event.stopPropagation()}
                                     >
-                                        Continue path <ArrowForwardOutlinedIcon />
+                                        {getRoadmapPathActionLabel(progress.completedCount)} <ArrowForwardOutlinedIcon />
                                     </Link>
                                 )}
                                 {onUnenrollRoadmap && (
