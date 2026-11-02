@@ -9,6 +9,7 @@ import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import QuizOutlinedIcon from "@mui/icons-material/QuizOutlined";
 import RouteOutlinedIcon from "@mui/icons-material/RouteOutlined";
+import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import type { components } from "@/shared/api/generated/schema";
 import { useCurrentUser } from "@/shared/auth/useCurrentUser";
 import { ErrorAlert } from "@/shared/ui/ErrorAlert";
@@ -65,6 +66,28 @@ function formatDateShort(value?: string | null) {
     } catch {
         return "n/a";
     }
+}
+
+/**
+ * Filters the member table by a free-text query. Every whitespace-separated term must match the
+ * member's name, email, or role (case-insensitive substring), so "ann design" finds Ann the
+ * Designer but not Ann the Engineer. A blank query returns every member unchanged.
+ */
+export function filterMembersByQuery<T extends Pick<TeamDashboardMemberV1, "name" | "email" | "role">>(
+    members: T[],
+    query: string,
+): T[] {
+    const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (terms.length === 0) {
+        return members;
+    }
+    return members.filter((member) => {
+        const haystack = [member.name, member.email, member.role]
+            .filter((value): value is string => Boolean(value))
+            .join(" ")
+            .toLowerCase();
+        return terms.every((term) => haystack.includes(term));
+    });
 }
 
 function averageQuizScore(members: TeamDashboardMemberV1[]) {
@@ -362,6 +385,7 @@ export function TeamProgressDashboard() {
     const [selectedLesson, setSelectedLesson] =
         useState<TeamDashboardLowConfidenceLessonV1 | null>(null);
     const [activityRange, setActivityRange] = useState<"24h" | "7d" | "30d">("24h");
+    const [memberSearch, setMemberSearch] = useState("");
 
     const { data, isLoading, error } = useTeamDashboardQuery(period);
     const avatarStorageKeys = [
@@ -396,6 +420,9 @@ export function TeamProgressDashboard() {
     const members = allMembers.filter((member) => includeTeamLead || !member.isTeamLead);
     const selectedMember = members.find((member) => member.id === scope);
     const isTeam = scope === "team";
+    // Search narrows only the member table; KPIs, charts, and activity stay team-wide.
+    const isSearching = memberSearch.trim().length > 0;
+    const searchedMembers = filterMembersByQuery(members, memberSearch);
     const scopeOptions = [
         { id: "team", label: "Whole team" },
         ...members.map((member) => ({ id: member.id, label: member.name })),
@@ -688,11 +715,29 @@ export function TeamProgressDashboard() {
                         <h2>{isTeam ? "Team members" : "Roadmaps and lessons"}</h2>
                         {!isTeam && <p>{selectedMember?.name}</p>}
                     </div>
-                    <p>
-                        {isTeam
-                            ? `${members.length} members`
-                            : `${visibleRoadmapGroups.length} roadmap${visibleRoadmapGroups.length === 1 ? "" : "s"} - ${visibleLessonCount} lessons total`}
-                    </p>
+                    {isTeam ? (
+                        <div className="team-progress-section__tools">
+                            <label className="team-progress-search">
+                                <SearchOutlinedIcon aria-hidden="true" />
+                                <input
+                                    type="search"
+                                    value={memberSearch}
+                                    placeholder="Search by name, email, or role…"
+                                    aria-label="Search team members"
+                                    onChange={(event) => setMemberSearch(event.target.value)}
+                                />
+                            </label>
+                            <p role="status">
+                                {isSearching
+                                    ? `${searchedMembers.length} of ${members.length} members`
+                                    : `${members.length} members`}
+                            </p>
+                        </div>
+                    ) : (
+                        <p>
+                            {`${visibleRoadmapGroups.length} roadmap${visibleRoadmapGroups.length === 1 ? "" : "s"} - ${visibleLessonCount} lessons total`}
+                        </p>
+                    )}
                 </div>
 
                 {isTeam ? (
@@ -704,7 +749,12 @@ export function TeamProgressDashboard() {
                                 ),
                             )}
                         </div>
-                        {members.map((member) => (
+                        {isSearching && searchedMembers.length === 0 && (
+                            <p className="team-progress-table__empty">
+                                No members match “{memberSearch.trim()}”.
+                            </p>
+                        )}
+                        {searchedMembers.map((member) => (
                             <div key={member.id} className="team-progress-table__row">
                                 <div className="team-progress-table__member">
                                     <UserAvatar
