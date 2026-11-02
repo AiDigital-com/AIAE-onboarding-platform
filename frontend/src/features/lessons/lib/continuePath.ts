@@ -4,7 +4,18 @@ export const PASSING_SCORE = 80;
 
 export const ROADMAPS_HREF = "/roadmaps";
 export const CONTINUE_PATH_LABEL = "Continue path";
+export const START_PATH_LABEL = "Start path";
 export const COMPLETE_ROADMAP_LABEL = "Complete roadmap";
+
+/**
+ * Label for a roadmap card's primary action. A learner who has not completed a single lesson of
+ * the roadmap is invited to "Start path"; once any lesson is done the action reads "Continue path".
+ *
+ * @param completedLessonCount number of the roadmap's lessons the viewer has completed
+ */
+export function getRoadmapPathActionLabel(completedLessonCount: number): string {
+    return completedLessonCount > 0 ? CONTINUE_PATH_LABEL : START_PATH_LABEL;
+}
 
 /** Roadmap position of the lesson being viewed; `null` when the lesson is standalone. */
 export interface ContinueRoadmapContext {

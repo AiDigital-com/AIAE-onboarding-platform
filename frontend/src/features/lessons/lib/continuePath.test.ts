@@ -4,9 +4,11 @@ import {
     COMPLETE_ROADMAP_LABEL,
     CONTINUE_PATH_LABEL,
     ROADMAPS_HREF,
+    START_PATH_LABEL,
     canCompleteRoadmap,
     getContinueButtonLabel,
     getContinuePathTarget,
+    getRoadmapPathActionLabel,
 } from "./continuePath";
 
 const LESSON_ID = 10;
@@ -136,5 +138,25 @@ describe("getContinueButtonLabel", () => {
     it("stays neutral while the attempt is unpassed, never promising roadmap completion", () => {
         expect(getContinueButtonLabel(false, completeRoadmap)).toBe(CONTINUE_PATH_LABEL);
         expect(getContinueButtonLabel(false, nextLesson)).toBe(CONTINUE_PATH_LABEL);
+    });
+});
+
+describe("getRoadmapPathActionLabel", () => {
+    it("should offer Start path when no lesson of the roadmap is completed test", () => {
+        // Given:
+        const completedLessonCount = 0;
+
+        // When:
+        const label = getRoadmapPathActionLabel(completedLessonCount);
+
+        // Then:
+        expect(label).toBe(START_PATH_LABEL);
+        expect(label).toBe("Start path");
+    });
+
+    it("should offer Continue path once at least one lesson is completed test", () => {
+        // Given / When / Then:
+        expect(getRoadmapPathActionLabel(1)).toBe(CONTINUE_PATH_LABEL);
+        expect(getRoadmapPathActionLabel(5)).toBe(CONTINUE_PATH_LABEL);
     });
 });

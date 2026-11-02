@@ -5,6 +5,7 @@ import ArrowDropDownOutlinedIcon from "@mui/icons-material/ArrowDropDownOutlined
 import ArrowForwardOutlinedIcon from "@mui/icons-material/ArrowForwardOutlined";
 import CheckOutlinedIcon from "@mui/icons-material/CheckOutlined";
 import PlaylistAddOutlinedIcon from "@mui/icons-material/PlaylistAddOutlined";
+import { getRoadmapPathActionLabel } from "@/features/lessons/lib/continuePath";
 import { Button } from "@/shared/ui/Button";
 import { AI_DIGITAL_COLORS } from "@/shared/lib/brandColors";
 import type { LibraryRoadmap } from "../api/types";
@@ -225,7 +226,8 @@ export function RoadmapsGrid({
                                             className="ui-btn ui-btn--primary ui-btn--sm"
                                             onClick={(event) => event.stopPropagation()}
                                         >
-                                            Continue path <ArrowForwardOutlinedIcon style={{ fontSize: 16 }} />
+                                            {getRoadmapPathActionLabel(progress.completedCount)}{" "}
+                                            <ArrowForwardOutlinedIcon style={{ fontSize: 16 }} />
                                         </Link>
                                     )}
                                     {(onEnrollRoadmap || onUnenrollRoadmap) && (
