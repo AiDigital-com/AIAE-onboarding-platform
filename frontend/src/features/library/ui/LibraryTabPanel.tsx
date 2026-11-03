@@ -30,10 +30,7 @@ interface LibraryTabPanelProps {
     onAssignLesson?: (lesson: LibraryLesson) => void;
     onResetLessonFilters?: () => void;
     onResetRoadmapFilters?: () => void;
-    onEnrollRoadmap?: (roadmap: LibraryRoadmap) => void;
-    onUnenrollRoadmap?: (roadmap: LibraryRoadmap) => void;
     onAssignRoadmap?: (roadmap: LibraryRoadmap) => void;
-    onAssignRoadmapToTeam?: (roadmap: LibraryRoadmap) => void;
     onOpenRoadmap?: (roadmap: LibraryRoadmap) => void;
     canAssignLearning?: boolean;
 }
@@ -83,10 +80,7 @@ export function LibraryTabPanel({
     onAssignLesson,
     onResetLessonFilters,
     onResetRoadmapFilters,
-    onEnrollRoadmap,
-    onUnenrollRoadmap,
     onAssignRoadmap,
-    onAssignRoadmapToTeam,
     onOpenRoadmap,
     canAssignLearning = false,
 }: LibraryTabPanelProps) {
@@ -193,10 +187,7 @@ export function LibraryTabPanel({
             <>
                 <RoadmapsGrid
                     roadmaps={roadmaps}
-                    onEnrollRoadmap={onEnrollRoadmap}
-                    onUnenrollRoadmap={onUnenrollRoadmap}
                     onAssignRoadmap={onAssignRoadmap}
-                    onAssignRoadmapToTeam={onAssignRoadmapToTeam}
                     onOpenRoadmap={onOpenRoadmap}
                     canAssignLearning={canAssignLearning}
                 />

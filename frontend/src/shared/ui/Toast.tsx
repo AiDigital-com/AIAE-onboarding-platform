@@ -13,6 +13,8 @@ interface ToastProps {
     message: string;
     severity?: ToastSeverity;
     autoCloseMs?: number;
+    /** Optional inline action such as "Undo"; clicking it also dismisses the toast. */
+    action?: { label: string; onClick: () => void };
     onClose: () => void;
 }
 
@@ -21,6 +23,7 @@ export function Toast({
     message,
     severity = "success",
     autoCloseMs = DEFAULT_AUTO_CLOSE_MS,
+    action,
     onClose,
 }: ToastProps) {
     const [shouldRender, setShouldRender] = useState(open && Boolean(message));
@@ -105,6 +108,20 @@ export function Toast({
             aria-live="polite"
         >
             <p className="ui-toast__message">{message}</p>
+            {action && (
+                <button
+                    type="button"
+                    className="ui-toast__action"
+                    onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        action.onClick();
+                        closeWithAnimation();
+                    }}
+                >
+                    {action.label}
+                </button>
+            )}
             <button
                 type="button"
                 className="ui-toast__close"

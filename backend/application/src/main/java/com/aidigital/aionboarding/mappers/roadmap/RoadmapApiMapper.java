@@ -1,6 +1,7 @@
 package com.aidigital.aionboarding.mappers.roadmap;
 
 import com.aidigital.aionboarding.api.v1.model.CreateRoadmapRequestV1;
+import com.aidigital.aionboarding.api.v1.model.RoadmapAssigneePreviewV1;
 import com.aidigital.aionboarding.api.v1.model.RoadmapLessonV1;
 import com.aidigital.aionboarding.api.v1.model.RoadmapResponseV1;
 import com.aidigital.aionboarding.api.v1.model.RoadmapV1;
@@ -12,6 +13,7 @@ import com.aidigital.aionboarding.mappers.common.LessonGenerationStatusApiMapper
 import com.aidigital.aionboarding.mappers.common.PageInfoApiMapper;
 import com.aidigital.aionboarding.mappers.common.SortDirectionApiMapper;
 import com.aidigital.aionboarding.service.roadmap.models.CreateRoadmapInput;
+import com.aidigital.aionboarding.service.roadmap.models.RoadmapAssigneePreviewRecord;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapLessonRecord;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapListQuery;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapRecord;
@@ -38,6 +40,8 @@ public interface RoadmapApiMapper extends PageInfoApiMapper {
 
     RoadmapLessonV1 toRoadmapLessonV1(RoadmapLessonRecord lesson);
 
+    RoadmapAssigneePreviewV1 toRoadmapAssigneePreviewV1(RoadmapAssigneePreviewRecord assignee);
+
     @Mapping(target = "roadmap", source = ".")
     RoadmapResponseV1 toRoadmapResponseV1(RoadmapRecord roadmap);
 
@@ -51,6 +55,7 @@ public interface RoadmapApiMapper extends PageInfoApiMapper {
             request == null ? null : request.getTags(),
             request == null ? null : request.getCreatedByUserId(),
             request == null ? null : request.getAssignedToMe(),
+            request == null ? null : request.getAutoAssignNewUsers(),
             roadmapSortField(request),
             sortDirection(request)
         );

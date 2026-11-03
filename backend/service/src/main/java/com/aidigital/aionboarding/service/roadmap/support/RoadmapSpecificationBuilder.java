@@ -73,6 +73,10 @@ public class RoadmapSpecificationBuilder {
 				predicates.add(enrolledByViewer(query, cb, root, visibility.viewerUserId()));
 			}
 
+			if (Boolean.TRUE.equals(filter.autoAssignNewUsers())) {
+				predicates.add(cb.isTrue(root.get(Roadmap_.autoAssignNewUsers)));
+			}
+
 			predicates.add(visibilityPredicate(query, cb, root, visibility));
 
 			if (Roadmap.class.equals(query.getResultType())) {

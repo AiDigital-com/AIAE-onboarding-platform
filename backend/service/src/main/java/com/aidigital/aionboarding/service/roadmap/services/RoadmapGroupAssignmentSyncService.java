@@ -41,4 +41,13 @@ public interface RoadmapGroupAssignmentSyncService {
      * @param newGradeId  the user's new grade id, or {@code null} when the grade was cleared
      */
     void syncUserGradeChange(Long userId, Long newGradeId);
+
+    /**
+     * Resolves the current group members a grade filter matches, without enrolling anyone.
+     *
+     * @param groupId       group whose members are considered
+     * @param gradeIdFilter grade ids to narrow by; {@code null} or empty means every member
+     * @return matching member user ids
+     */
+    List<Long> resolveMatchingMemberIds(Long groupId, Set<Long> gradeIdFilter);
 }

@@ -6,6 +6,7 @@ import com.aidigital.aionboarding.service.roadmap.models.RoadmapGroupAssignmentR
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapGroupAssignmentResultRecord;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Manages standing roadmap-to-group assignments, including their optional grade filter, and
@@ -78,4 +79,14 @@ public interface RoadmapGroupAssignmentService {
 	 * @throws com.aidigital.aionboarding.service.common.error.AppException when the caller cannot manage the group
 	 */
 	RoadmapGroupAssignmentPreviewRecord previewAssignment(AppUser viewer, Long groupId, List<Long> gradeIds);
+
+	/**
+	 * Resolves, for every standing group assignment of a roadmap, which users it currently
+	 * covers (group members matching its grade filter), so an assignee list can show "via
+	 * &lt;group&gt;". Not permission-filtered: callers already bound the user set they expose.
+	 *
+	 * @param roadmapId roadmap primary key
+	 * @return user id to the names of the roadmap's assigned groups that cover that user
+	 */
+	Map<Long, List<String>> groupNamesByCoveredUserId(Long roadmapId);
 }

@@ -91,6 +91,16 @@ public class RoadmapEntityService {
     }
 
     /**
+     * Loads every roadmap whose "auto-assign to new users" setting is on.
+     *
+     * @return roadmaps new users are enrolled in at their first login
+     */
+    @Transactional(readOnly = true)
+    public List<Roadmap> findAutoAssignedToNewUsers() {
+        return roadmapRepository.findByAutoAssignNewUsersTrue();
+    }
+
+    /**
      * Persists any changes to the given roadmap entity and returns the saved state.
      *
      * @param roadmap the roadmap entity to persist

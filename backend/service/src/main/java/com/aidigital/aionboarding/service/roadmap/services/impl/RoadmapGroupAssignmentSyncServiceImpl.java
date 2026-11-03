@@ -75,7 +75,9 @@ public class RoadmapGroupAssignmentSyncServiceImpl implements RoadmapGroupAssign
         }
     }
 
-    List<Long> resolveMatchingMemberIds(Long groupId, Set<Long> gradeIdFilter) {
+    @Override
+    @Transactional(readOnly = true)
+    public List<Long> resolveMatchingMemberIds(Long groupId, Set<Long> gradeIdFilter) {
         List<GroupMember> members = gradeIdFilter == null || gradeIdFilter.isEmpty()
             ? groupMemberEntityService.findByGroupId(groupId)
             : groupMemberEntityService.findByGroupIdAndMemberGradeIdIn(groupId, gradeIdFilter);

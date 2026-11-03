@@ -1,5 +1,6 @@
 package com.aidigital.aionboarding.service.roadmap.services.impl;
 
+import com.aidigital.aionboarding.domain.grade.entities.Grade;
 import com.aidigital.aionboarding.domain.group.entities.Group;
 import com.aidigital.aionboarding.domain.roadmap.entities.Roadmap;
 import com.aidigital.aionboarding.domain.roadmap.entities.RoadmapGroupAssignment;
@@ -27,6 +28,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -235,6 +237,43 @@ class RoadmapGroupAssignmentServiceImplTest {
 
 			// Then:
 			assertThat(result).containsExactly(assignmentRecord);
+		}
+	}
+
+	@Nested
+	class GroupNamesByCoveredUserId {
+
+		@Test
+		void shouldMapEveryCoveredMemberToTheGroupsWhoseAssignmentMatchesThemTest() {
+			// Given: two standing assignments; member 10 is in both groups, member 11 only in Design
+			Group design = new Group();
+			design.setId(1L);
+			design.setName("Design");
+			Group qa = new Group();
+			qa.setId(2L);
+			qa.setName("QA");
+			RoadmapGroupAssignment designAssignment = new RoadmapGroupAssignment();
+			designAssignment.setId(100L);
+			designAssignment.setGroup(design);
+			RoadmapGroupAssignment qaAssignment = new RoadmapGroupAssignment();
+			qaAssignment.setId(101L);
+			qaAssignment.setGroup(qa);
+			Grade senior = new Grade();
+			senior.setId(5L);
+			when(roadmapGroupAssignmentEntityService.findByRoadmapId(50L))
+					.thenReturn(List.of(designAssignment, qaAssignment));
+			when(roadmapGroupAssignmentRecordAssembler.gradesOf(designAssignment)).thenReturn(Map.of());
+			when(roadmapGroupAssignmentRecordAssembler.gradesOf(qaAssignment)).thenReturn(Map.of(5L, senior));
+			when(roadmapGroupAssignmentSyncService.resolveMatchingMemberIds(1L, Set.of())).thenReturn(List.of(10L, 11L));
+			when(roadmapGroupAssignmentSyncService.resolveMatchingMemberIds(2L, Set.of(5L))).thenReturn(List.of(10L));
+
+			// When:
+			Map<Long, List<String>> result = service.groupNamesByCoveredUserId(50L);
+
+			// Then:
+			assertThat(result).containsOnlyKeys(10L, 11L);
+			assertThat(result.get(10L)).containsExactly("Design", "QA");
+			assertThat(result.get(11L)).containsExactly("Design");
 		}
 	}
 }

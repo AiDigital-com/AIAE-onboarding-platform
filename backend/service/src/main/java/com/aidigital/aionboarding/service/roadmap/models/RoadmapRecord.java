@@ -13,6 +13,9 @@ public record RoadmapRecord(
     Boolean isEnrolled,
     LocalDateTime enrolledAt,
     Boolean viewerCanManage,
+    boolean autoAssignNewUsers,
+    Long assigneeCount,
+    List<RoadmapAssigneePreviewRecord> assigneePreview,
     String createdBy,
     LocalDateTime createdAt,
     LocalDateTime updatedAt

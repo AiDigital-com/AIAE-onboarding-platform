@@ -5,6 +5,8 @@ import com.aidigital.aionboarding.domain.learning.entities.UserLesson;
 import com.aidigital.aionboarding.domain.learning.entities.UserRoadmap;
 import com.aidigital.aionboarding.domain.learning.repositories.CompletedRoadmapProjection;
 import com.aidigital.aionboarding.domain.learning.repositories.MyLessonSummaryProjection;
+import com.aidigital.aionboarding.domain.learning.repositories.RoadmapAssigneePreviewProjection;
+import com.aidigital.aionboarding.domain.learning.repositories.RoadmapEnrollmentCountProjection;
 import com.aidigital.aionboarding.domain.learning.repositories.UserLessonRepository;
 import com.aidigital.aionboarding.domain.learning.repositories.UserRoadmapRepository;
 import com.aidigital.aionboarding.service.learning.models.CompletedRoadmapRecord;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -358,6 +361,37 @@ public class LearningEnrollmentEntityService {
 		return userLessonRepository.findByUserIdAndLessonIdIn(userId, List.copyOf(lessonIds)).stream()
 				.map(userLesson -> userLesson.getId().getLessonId())
 				.collect(Collectors.toSet());
+	}
+
+	/**
+	 * Counts enrolled learners per roadmap in one grouped query.
+	 *
+	 * @param roadmapIds roadmap primary keys
+	 * @return roadmap id to enrolled learner count; roadmaps with no enrollment are absent
+	 */
+	@Transactional(readOnly = true)
+	public Map<Long, Long> countUserRoadmapsByRoadmapIds(Collection<Long> roadmapIds) {
+		if (roadmapIds == null || roadmapIds.isEmpty()) {
+			return Map.of();
+		}
+		return userRoadmapRepository.countByRoadmapIds(roadmapIds).stream()
+				.collect(Collectors.toMap(RoadmapEnrollmentCountProjection::roadmapId,
+						RoadmapEnrollmentCountProjection::count));
+	}
+
+	/**
+	 * Loads at most {@code limit} most recently enrolled learners per roadmap in one query.
+	 *
+	 * @param roadmapIds roadmap primary keys
+	 * @param limit      maximum learners per roadmap
+	 * @return preview rows ordered by roadmap, newest enrollment first
+	 */
+	@Transactional(readOnly = true)
+	public List<RoadmapAssigneePreviewProjection> findAssigneePreviews(Collection<Long> roadmapIds, int limit) {
+		if (roadmapIds == null || roadmapIds.isEmpty()) {
+			return List.of();
+		}
+		return userRoadmapRepository.findAssigneePreviews(roadmapIds, limit);
 	}
 
 	CompletedRoadmapRecord toCompletedRoadmapRecord(CompletedRoadmapProjection projection) {

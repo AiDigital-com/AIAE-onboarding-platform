@@ -76,7 +76,7 @@ class RoadmapSearchCountRepositoryIntegrationTest {
 		roadmapRepository.save(roadmap("Unrelated", List.of(), null));
 
 		RoadmapListQuery query = new RoadmapListQuery(
-				null, List.of("design"), null, null, RoadmapSortField.CREATED_AT, Sort.Direction.DESC
+				null, List.of("design"), null, null, null, RoadmapSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		RoadmapVisibilityFilter admin = new RoadmapVisibilityFilter(true, false, false, 1L);
 		Specification<Roadmap> specification = specificationBuilder.build(query, admin);
@@ -192,7 +192,7 @@ class RoadmapSearchCountRepositoryIntegrationTest {
 
 	private RoadmapListQuery anyRoadmapQuery() {
 		return new RoadmapListQuery(
-				null, null, null, null, RoadmapSortField.CREATED_AT, Sort.Direction.DESC
+				null, null, null, null, null, RoadmapSortField.CREATED_AT, Sort.Direction.DESC
 		);
 	}
 

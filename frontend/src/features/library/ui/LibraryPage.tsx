@@ -19,11 +19,6 @@ import {
     useRevokeLearningAssignmentMutation,
 } from "../api/useLearningAssignmentMutation";
 import {
-    useAssignRoadmapToGroupMutation,
-    useUnassignRoadmapFromGroupMutation,
-} from "../api/useRoadmapGroupAssignmentMutations";
-import { useRoadmapGroupAssignmentsQuery } from "../api/useRoadmapGroupAssignmentsQuery";
-import {
     useCreateMaterialMutation,
     useDeleteMaterialMutation,
     useUpdateMaterialMutation,
@@ -38,7 +33,6 @@ import { useGeneratingLessonsPolling } from "../api/useGeneratingLessonsPolling"
 import {
     useCreateRoadmapMutation,
     useDeleteRoadmapMutation,
-    useRoadmapEnrollmentMutation,
     useUpdateRoadmapMutation,
 } from "../api/useRoadmapMutations";
 import { useRoadmapsQuery } from "../api/useRoadmapsQuery";
@@ -62,7 +56,7 @@ import { MaterialDetailsDialog } from "./MaterialDetailsDialog";
 import { MaterialLibrarySearch } from "./MaterialLibrarySearch";
 import { RoadmapFormDialog } from "./RoadmapFormDialog";
 import { RoadmapLibraryFilters } from "./RoadmapLibraryFilters";
-import { RoadmapGroupAssignmentDialog } from "./RoadmapGroupAssignmentDialog";
+import { RoadmapAssignDialog } from "./RoadmapAssignDialog";
 import { UploadMaterialDialog } from "./UploadMaterialDialog";
 import "./library.css";
 
@@ -129,11 +123,6 @@ interface AssignmentDialogState {
     selectedRevokeUserIds: number[];
 }
 
-interface GroupAssignmentDialogState {
-    open: boolean;
-    roadmap: LibraryRoadmap | null;
-    pendingGroupId: number | null;
-}
 
 /** Library hub — materials, lessons, and roadmaps with filters and dialogs. */
 export function LibraryPage() {
@@ -160,7 +149,6 @@ export function LibraryPage() {
     const updateMaterial = useUpdateMaterialMutation();
     const deleteMaterial = useDeleteMaterialMutation();
     const lessonEnrollment = useLessonEnrollmentMutation();
-    const roadmapEnrollment = useRoadmapEnrollmentMutation();
     const createRoadmap = useCreateRoadmapMutation();
     const updateRoadmap = useUpdateRoadmapMutation();
     const deleteRoadmap = useDeleteRoadmapMutation();
@@ -186,6 +174,7 @@ export function LibraryPage() {
     const [roadmapSort, setRoadmapSort] = useState("recent");
     const [roadmapSelectedTags, setRoadmapSelectedTags] = useState<string[]>([]);
     const [roadmapEnrollmentFilter, setRoadmapEnrollmentFilter] = useState("all");
+    const [roadmapAutoAssignOnly, setRoadmapAutoAssignOnly] = useState(false);
     const [areRoadmapFiltersOpen, setAreRoadmapFiltersOpen] = useState(false);
     const [isSavingMaterial, setIsSavingMaterial] = useState(false);
     const [isSavingRoadmap, setIsSavingRoadmap] = useState(false);
@@ -199,13 +188,14 @@ export function LibraryPage() {
         selectedRevokeUserIds: [],
     });
     const [assignmentUserSearchQuery, setAssignmentUserSearchQuery] = useState("");
-    const [groupAssignmentDialog, setGroupAssignmentDialog] = useState<GroupAssignmentDialogState>({
-        open: false,
-        roadmap: null,
-        pendingGroupId: null,
-    });
+    const [assignRoadmapDialog, setAssignRoadmapDialog] = useState<LibraryRoadmap | null>(null);
     const [materialFormResetKey, setMaterialFormResetKey] = useState(0);
-    const [toast, setToast] = useState<{ open: boolean; message: string; severity: ToastSeverity }>({
+    const [toast, setToast] = useState<{
+        open: boolean;
+        message: string;
+        severity: ToastSeverity;
+        action?: { label: string; onClick: () => void };
+    }>({
         open: false,
         message: "",
         severity: "success",
@@ -221,6 +211,7 @@ export function LibraryPage() {
     const canCreateRoadmaps = hasPermission("roadmaps.create");
     const canManageRoadmaps = hasPermission("roadmaps.manage");
     const canAssignLearning = hasPermission("learning.assign");
+    const isAdmin = currentUser?.role === "admin";
 
     // Materials is a content-maker surface and Roadmaps has its own "My Roadmaps" page, so a
     // plain Member (none of these permissions) sees only the always-visible Lessons tab.
@@ -290,12 +281,6 @@ export function LibraryPage() {
     );
     const revokeAssignment = useRevokeLearningAssignmentMutation(assignmentDialog.itemType);
 
-    const roadmapGroupAssignmentsQuery = useRoadmapGroupAssignmentsQuery(
-        groupAssignmentDialog.roadmap?.id ?? null,
-        canAssignLearning && groupAssignmentDialog.open,
-    );
-    const assignRoadmapToGroup = useAssignRoadmapToGroupMutation();
-    const unassignRoadmapFromGroup = useUnassignRoadmapFromGroupMutation();
 
     // Debounce free-text search so typing doesn't fire a request per keystroke.
     const debouncedMaterialSearchQuery = useDebounce(materialSearchQuery, 300);
@@ -333,9 +318,10 @@ export function LibraryPage() {
             query: debouncedRoadmapSearchQuery.trim() || undefined,
             tags: roadmapSelectedTags.length > 0 ? roadmapSelectedTags : undefined,
             ...enrollmentFilterToAssignedToMe(roadmapEnrollmentFilter),
+            autoAssignNewUsers: roadmapAutoAssignOnly ? true : undefined,
             ...titleSortToParams(roadmapSort),
         }),
-        [debouncedRoadmapSearchQuery, roadmapSelectedTags, roadmapEnrollmentFilter, roadmapSort],
+        [debouncedRoadmapSearchQuery, roadmapSelectedTags, roadmapEnrollmentFilter, roadmapAutoAssignOnly, roadmapSort],
     );
 
     // Only the active tab's full list is fetched; the other two tabs' grids stay unmounted and
@@ -396,8 +382,12 @@ export function LibraryPage() {
     const pickerMaterials = allMaterialsQuery.data?.pages[0]?.items ?? [];
     const pickerLessons = allLessonsQuery.data?.pages[0]?.items ?? [];
 
-    const showToast = (message: string, severity: ToastSeverity = "success") => {
-        setToast({ open: true, message, severity });
+    const showToast = (
+        message: string,
+        severity: ToastSeverity = "success",
+        action?: { label: string; onClick: () => void },
+    ) => {
+        setToast({ open: true, message, severity, action });
     };
 
     useEffect(() => {
@@ -536,12 +526,14 @@ export function LibraryPage() {
     const hasActiveRoadmapFilters =
         roadmapSearchQuery.trim().length > 0 ||
         roadmapSelectedTags.length > 0 ||
-        roadmapEnrollmentFilter !== "all";
+        roadmapEnrollmentFilter !== "all" ||
+        roadmapAutoAssignOnly;
 
     const resetRoadmapFilters = () => {
         setRoadmapSearchQuery("");
         setRoadmapSelectedTags([]);
         setRoadmapEnrollmentFilter("all");
+        setRoadmapAutoAssignOnly(false);
     };
 
     const showCreatedLessonInFilters = (lesson: LibraryLesson) => {
@@ -871,62 +863,11 @@ export function LibraryPage() {
         }
     };
 
-    const handleOpenGroupAssignmentDialog = (roadmap: LibraryRoadmap) => {
+    const handleOpenAssignRoadmapDialog = (roadmap: LibraryRoadmap) => {
         if (!canAssignLearning) {
             return;
         }
-
-        setGroupAssignmentDialog({ open: true, roadmap, pendingGroupId: null });
-    };
-
-    const handleCloseGroupAssignmentDialog = () => {
-        if (groupAssignmentDialog.pendingGroupId !== null) {
-            return;
-        }
-
-        setGroupAssignmentDialog({ open: false, roadmap: null, pendingGroupId: null });
-    };
-
-    const handleAssignRoadmapToGroup = async (groupId: number, gradeIds: number[]) => {
-        const roadmap = groupAssignmentDialog.roadmap;
-        if (!roadmap) {
-            return;
-        }
-
-        setGroupAssignmentDialog((prev) => ({ ...prev, pendingGroupId: groupId }));
-
-        try {
-            await assignRoadmapToGroup.mutateAsync({ roadmapId: roadmap.id, groupId, gradeIds });
-            showToast("Roadmap assigned to team.");
-        } catch (error) {
-            showToast(
-                error instanceof Error ? error.message : "Failed to update team assignment.",
-                "error",
-            );
-        } finally {
-            setGroupAssignmentDialog((prev) => ({ ...prev, pendingGroupId: null }));
-        }
-    };
-
-    const handleRevokeRoadmapFromGroup = async (groupId: number) => {
-        const roadmap = groupAssignmentDialog.roadmap;
-        if (!roadmap) {
-            return;
-        }
-
-        setGroupAssignmentDialog((prev) => ({ ...prev, pendingGroupId: groupId }));
-
-        try {
-            await unassignRoadmapFromGroup.mutateAsync({ roadmapId: roadmap.id, groupId });
-            showToast("Roadmap unassigned from team.");
-        } catch (error) {
-            showToast(
-                error instanceof Error ? error.message : "Failed to update team assignment.",
-                "error",
-            );
-        } finally {
-            setGroupAssignmentDialog((prev) => ({ ...prev, pendingGroupId: null }));
-        }
+        setAssignRoadmapDialog(roadmap);
     };
 
     const handleSaveRoadmap = async (formData: {
@@ -1000,27 +941,6 @@ export function LibraryPage() {
             showToast(error instanceof Error ? error.message : "Failed to delete roadmap.", "error");
         } finally {
             setIsDeletingRoadmap(false);
-        }
-    };
-
-    const handleEnrollRoadmap = async (roadmap: LibraryRoadmap) => {
-        try {
-            await roadmapEnrollment.enroll.mutateAsync(roadmap.id);
-            showToast("Roadmap added to your learning plan.");
-        } catch (error) {
-            showToast(error instanceof Error ? error.message : "Failed to subscribe to roadmap.", "error");
-        }
-    };
-
-    const handleUnenrollRoadmap = async (roadmap: LibraryRoadmap) => {
-        try {
-            await roadmapEnrollment.unenroll.mutateAsync(roadmap.id);
-            showToast("Roadmap removed from your learning plan.");
-        } catch (error) {
-            showToast(
-                error instanceof Error ? error.message : "Failed to unsubscribe from roadmap.",
-                "error",
-            );
         }
     };
 
@@ -1290,6 +1210,8 @@ export function LibraryPage() {
                             availableTags={roadmapAvailableTags}
                             enrollment={roadmapEnrollmentFilter}
                             onEnrollmentChange={setRoadmapEnrollmentFilter}
+                            autoAssignOnly={roadmapAutoAssignOnly}
+                            onAutoAssignOnlyChange={setRoadmapAutoAssignOnly}
                             sort={roadmapSort}
                             onSortChange={setRoadmapSort}
                             totalCount={roadmapsTotal}
@@ -1353,10 +1275,7 @@ export function LibraryPage() {
                     onEnrollLesson={handleEnrollLesson}
                     onUnenrollLesson={handleUnenrollLesson}
                     onAssignLesson={(lesson) => handleOpenAssignmentDialog("lesson", lesson)}
-                    onEnrollRoadmap={handleEnrollRoadmap}
-                    onUnenrollRoadmap={handleUnenrollRoadmap}
-                    onAssignRoadmap={(roadmap) => handleOpenAssignmentDialog("roadmap", roadmap)}
-                    onAssignRoadmapToTeam={handleOpenGroupAssignmentDialog}
+                    onAssignRoadmap={handleOpenAssignRoadmapDialog}
                     onOpenRoadmap={handleOpenRoadmap}
                     canAssignLearning={canAssignLearning}
                 />
@@ -1464,21 +1383,25 @@ export function LibraryPage() {
                 onRevokeSelected={() => void handleRevokeSelectedAssignments()}
             />
 
-            <RoadmapGroupAssignmentDialog
-                open={groupAssignmentDialog.open}
-                roadmap={groupAssignmentDialog.roadmap}
-                assignments={roadmapGroupAssignmentsQuery.data ?? []}
-                isLoadingAssignments={roadmapGroupAssignmentsQuery.isLoading}
-                pendingGroupId={groupAssignmentDialog.pendingGroupId}
-                onClose={handleCloseGroupAssignmentDialog}
-                onAssign={handleAssignRoadmapToGroup}
-                onRevoke={handleRevokeRoadmapFromGroup}
+            <RoadmapAssignDialog
+                open={assignRoadmapDialog !== null}
+                roadmap={
+                    // Prefer the live list entry so cache updates (e.g. the auto-assign toggle)
+                    // reach the dialog instead of the snapshot taken when it was opened.
+                    roadmaps.find((item) => item.id === assignRoadmapDialog?.id) ?? assignRoadmapDialog
+                }
+                canToggleAutoAssign={isAdmin}
+                onClose={() => setAssignRoadmapDialog(null)}
+                onNotify={(message, severity = "success", undo) =>
+                    showToast(message, severity, undo ? { label: "Undo", onClick: undo } : undefined)
+                }
             />
 
             <Toast
                 open={toast.open}
                 message={toast.message}
                 severity={toast.severity}
+                action={toast.action}
                 onClose={() => setToast((prev) => ({ ...prev, open: false }))}
             />
         </div>

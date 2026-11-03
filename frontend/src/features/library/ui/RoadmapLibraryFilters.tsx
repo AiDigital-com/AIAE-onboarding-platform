@@ -1,5 +1,5 @@
 import { LibrarySearchToolbar } from "./LibrarySearchToolbar";
-import { Autocomplete, Chip, MenuItem, TextField } from "@mui/material";
+import { Autocomplete, Checkbox, Chip, FormControlLabel, MenuItem, TextField } from "@mui/material";
 
 const enrollmentOptions = [
     { value: "all", label: "Any roadmap" },
@@ -15,6 +15,8 @@ interface RoadmapLibraryFiltersProps {
     availableTags?: string[];
     enrollment: string;
     onEnrollmentChange: (value: string) => void;
+    autoAssignOnly?: boolean;
+    onAutoAssignOnlyChange?: (value: boolean) => void;
     sort?: string;
     onSortChange?: (value: string) => void;
     totalCount?: number;
@@ -33,6 +35,8 @@ export function RoadmapLibraryFilters({
     availableTags = [],
     enrollment,
     onEnrollmentChange,
+    autoAssignOnly = false,
+    onAutoAssignOnlyChange,
     sort = "recent",
     onSortChange,
     totalCount = 0,
@@ -88,6 +92,17 @@ export function RoadmapLibraryFilters({
                             </MenuItem>
                         ))}
                     </TextField>
+                    <FormControlLabel
+                        className="library-filters-grid__checkbox"
+                        control={
+                            <Checkbox
+                                size="small"
+                                checked={autoAssignOnly}
+                                onChange={(event) => onAutoAssignOnlyChange?.(event.target.checked)}
+                            />
+                        }
+                        label="Auto-assigned to new users"
+                    />
                 </div>
             }
         />

@@ -9,6 +9,7 @@ import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.learning.services.entity.LearningEnrollmentEntityService;
 import com.aidigital.aionboarding.service.mappers.roadmap.RoadmapMapper;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapLessonRecord;
+import com.aidigital.aionboarding.service.roadmap.models.RoadmapAssignees;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapRecord;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,6 +49,7 @@ class RoadmapRecordAssemblerTest {
 		RoadmapRecord base = new RoadmapRecord(
 				1L, "Roadmap", "Desc", List.of("tag"),
 				List.of(), List.of(), false, null, false,
+				false, null, List.of(),
 				"creator", LocalDateTime.parse("2026-07-15T10:00:00"),
 				LocalDateTime.parse("2026-07-15T11:00:00")
 		);
@@ -55,7 +57,7 @@ class RoadmapRecordAssemblerTest {
 
 		// When:
 		RoadmapRecord result = assembler.toRecord(roadmap, Set.of(1L), null, List.of(roadmapLesson),
-				Map.of(10L, true));
+				Map.of(10L, true), new RoadmapAssignees(Map.of(), Map.of()));
 
 		// Then:
 		assertThat(result.id()).isEqualTo(1L);
@@ -80,6 +82,7 @@ class RoadmapRecordAssemblerTest {
 		RoadmapRecord base = new RoadmapRecord(
 				2L, "Roadmap", "Desc", List.of(),
 				List.of(), List.of(), false, null, false,
+				false, null, List.of(),
 				"creator", LocalDateTime.parse("2026-07-15T10:00:00"),
 				LocalDateTime.parse("2026-07-15T11:00:00")
 		);

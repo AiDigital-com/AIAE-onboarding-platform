@@ -15,6 +15,7 @@ import com.aidigital.aionboarding.service.storage.StorageService;
 import com.aidigital.aionboarding.service.team.services.TeamService;
 import com.aidigital.aionboarding.service.user.models.AdminUserStatsRecord;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
+import com.aidigital.aionboarding.service.user.services.UserFirstLoginAssignmentSyncService;
 import com.aidigital.aionboarding.service.user.services.UserService;
 import com.aidigital.aionboarding.service.user.services.entity.UserEntityService;
 import com.aidigital.aionboarding.service.user.support.UserGradeUpdateSupport;
@@ -43,6 +44,7 @@ public class UserServiceImpl implements UserService {
     private final PermissionService permissionService;
     private final StorageService storageService;
     private final UserGradeUpdateSupport userGradeUpdateSupport;
+    private final UserFirstLoginAssignmentSyncService userFirstLoginAssignmentSyncService;
     private final CurrentTime currentTime;
 
     @Override
@@ -210,7 +212,11 @@ public class UserServiceImpl implements UserService {
         user.setAvatarColor("");
         user.setCreatedAt(now);
         user.setUpdatedAt(now);
-        return userEntityService.save(user);
+        User saved = userEntityService.save(user);
+        // Same transaction as the user row: a new hire either exists with their standing
+        // roadmaps or not at all, so the first Library view never races the enrollment.
+        userFirstLoginAssignmentSyncService.onUserCreated(saved.getId());
+        return saved;
     }
 
     int roleOrder(String roleCode) {

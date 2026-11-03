@@ -52,6 +52,13 @@ public class Roadmap extends IdAwareEntity {
 	private LocalDateTime updatedAt;
 
 	/**
+	 * When {@code true}, every user created at their first login is enrolled in this roadmap.
+	 * Existing users are never backfilled; see {@code RoadmapAutoAssignmentService}.
+	 */
+	@Column(name = "auto_assign_new_users", nullable = false)
+	private boolean autoAssignNewUsers;
+
+	/**
 	 * Optimistic-locking version, so concurrent updates to the same roadmap (title/description/
 	 * tags/lesson-list edits) cannot silently overwrite one another.
 	 */

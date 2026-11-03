@@ -15,6 +15,7 @@ import com.aidigital.aionboarding.service.storage.StorageService;
 import com.aidigital.aionboarding.service.team.services.TeamService;
 import com.aidigital.aionboarding.service.user.models.AdminUserStatsRecord;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
+import com.aidigital.aionboarding.service.user.services.UserFirstLoginAssignmentSyncService;
 import com.aidigital.aionboarding.service.user.services.entity.UserEntityService;
 import com.aidigital.aionboarding.service.user.support.UserGradeUpdateSupport;
 import org.instancio.Instancio;
@@ -57,6 +58,8 @@ class UserServiceImplTest {
 	private StorageService storageService;
 	@Mock
 	private UserGradeUpdateSupport userGradeUpdateSupport;
+	@Mock
+	private UserFirstLoginAssignmentSyncService userFirstLoginAssignmentSyncService;
 
 	@Spy
 	private CurrentTime currentTime = new CurrentTimeImpl();
@@ -188,6 +191,8 @@ class UserServiceImplTest {
 			assertThat(created.getEmail()).isEqualTo("new@test.com");
 			assertThat(created.getName()).isEqualTo("New User");
 			assertThat(created.getRole()).isEqualTo(memberRole);
+			// A first-login user is handed to the standing "auto-assign to new users" rule once.
+			verify(userFirstLoginAssignmentSyncService).onUserCreated(created.getId());
 		}
 	}
 

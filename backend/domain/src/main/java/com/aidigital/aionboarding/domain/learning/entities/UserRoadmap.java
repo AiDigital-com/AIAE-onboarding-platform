@@ -43,6 +43,10 @@ public class UserRoadmap {
 	@Column(name = "enrolled_at", nullable = false)
 	private LocalDateTime enrolledAt;
 
+	/** {@code true} when the enrollment was created by the roadmap's "auto-assign to new users" rule. */
+	@Column(name = "auto_assigned", nullable = false)
+	private boolean autoAssigned;
+
 	@Embeddable
 	@Getter
 	@Setter

@@ -83,7 +83,9 @@ public class LearningServiceImpl implements LearningService {
                 enrollment.getUser().getName(),
                 enrollment.getUser().getEmail(),
                 enrollment.getEnrolledAt(),
-                enrollment.getCompletedAt() != null
+                enrollment.getCompletedAt() != null,
+                false,
+                List.of()
             ))
             .toList();
     }

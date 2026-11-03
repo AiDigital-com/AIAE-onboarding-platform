@@ -25,4 +25,7 @@
 	     backend/cache-management. See docs/aiae-migration-plan.md §2.7. -->
 	<include file="changes/0003-cache-invalidation.xml" relativeToChangelogFile="true"/>
 
+	<!-- PAC_084: roadmap "auto-assign to new users" setting and enrollment source flag. -->
+	<include file="changes/0004-roadmap-auto-assign.xml" relativeToChangelogFile="true"/>
+
 </databaseChangeLog>
