@@ -9,7 +9,6 @@ import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import QuizOutlinedIcon from "@mui/icons-material/QuizOutlined";
 import RouteOutlinedIcon from "@mui/icons-material/RouteOutlined";
-import SearchOutlinedIcon from "@mui/icons-material/SearchOutlined";
 import type { components } from "@/shared/api/generated/schema";
 import { useCurrentUser } from "@/shared/auth/useCurrentUser";
 import { ErrorAlert } from "@/shared/ui/ErrorAlert";
@@ -18,10 +17,12 @@ import { UserAvatar } from "@/shared/ui/UserAvatar";
 import { useFilePreviewUrls } from "@/shared/api/files";
 import { getApiErrorMessage } from "@/shared/lib/apiError";
 import "@/shared/ui/select.css";
+import { TEAM_SCOPE } from "../constants/teamScope";
 import {
     useTeamDashboardQuery,
     type DashboardPeriod,
 } from "../api/useTeamDashboardQuery";
+import { TeamScopePicker } from "./TeamScopePicker";
 import "./team-progress.css";
 
 type TeamDashboardResponseV1 = components["schemas"]["TeamDashboardResponseV1"];
@@ -66,28 +67,6 @@ function formatDateShort(value?: string | null) {
     } catch {
         return "n/a";
     }
-}
-
-/**
- * Filters the member table by a free-text query. Every whitespace-separated term must match the
- * member's name, email, or role (case-insensitive substring), so "ann design" finds Ann the
- * Designer but not Ann the Engineer. A blank query returns every member unchanged.
- */
-export function filterMembersByQuery<T extends Pick<TeamDashboardMemberV1, "name" | "email" | "role">>(
-    members: T[],
-    query: string,
-): T[] {
-    const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    if (terms.length === 0) {
-        return members;
-    }
-    return members.filter((member) => {
-        const haystack = [member.name, member.email, member.role]
-            .filter((value): value is string => Boolean(value))
-            .join(" ")
-            .toLowerCase();
-        return terms.every((term) => haystack.includes(term));
-    });
 }
 
 function averageQuizScore(members: TeamDashboardMemberV1[]) {
@@ -379,13 +358,12 @@ function QuizAttemptsDialog({
 /** Team progress dashboard for team leads and admins. */
 export function TeamProgressDashboard() {
     const { user } = useCurrentUser();
-    const [scope, setScope] = useState<string>("team");
+    const [scope, setScope] = useState<string>(TEAM_SCOPE);
     const [period, setPeriod] = useState<DashboardPeriod>("month");
     const [includeTeamLead, setIncludeTeamLead] = useState(false);
     const [selectedLesson, setSelectedLesson] =
         useState<TeamDashboardLowConfidenceLessonV1 | null>(null);
     const [activityRange, setActivityRange] = useState<"24h" | "7d" | "30d">("24h");
-    const [memberSearch, setMemberSearch] = useState("");
 
     const { data, isLoading, error } = useTeamDashboardQuery(period);
     const avatarStorageKeys = [
@@ -419,14 +397,7 @@ export function TeamProgressDashboard() {
     const leadId = allMembers.find((member) => member.isTeamLead)?.id ?? null;
     const members = allMembers.filter((member) => includeTeamLead || !member.isTeamLead);
     const selectedMember = members.find((member) => member.id === scope);
-    const isTeam = scope === "team";
-    // Search narrows only the member table; KPIs, charts, and activity stay team-wide.
-    const isSearching = memberSearch.trim().length > 0;
-    const searchedMembers = filterMembersByQuery(members, memberSearch);
-    const scopeOptions = [
-        { id: "team", label: "Whole team" },
-        ...members.map((member) => ({ id: member.id, label: member.name })),
-    ];
+    const isTeam = scope === TEAM_SCOPE;
     const periodLabel =
         PERIOD_OPTIONS.find((item) => item.id === period)?.label.toLowerCase() ?? "this month";
     const teamAverageQuizScore = averageQuizScore(members);
@@ -552,18 +523,12 @@ export function TeamProgressDashboard() {
                     </p>
                 </div>
                 <div className="team-progress__controls">
-                    <span className="team-progress__field">
-                        <span className="team-progress__field-icon" aria-hidden="true">
-                            {isTeam ? <GroupsOutlinedIcon /> : <PersonOutlineOutlinedIcon />}
-                        </span>
-                        <select className="ui-select" value={scope} onChange={(event) => setScope(event.target.value)}>
-                            {scopeOptions.map((option) => (
-                                <option key={option.id} value={option.id}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
-                    </span>
+                    <TeamScopePicker
+                        members={members}
+                        scope={scope}
+                        icon={isTeam ? <GroupsOutlinedIcon /> : <PersonOutlineOutlinedIcon />}
+                        onScopeChange={setScope}
+                    />
                     <span className="team-progress__field">
                         <span className="team-progress__field-icon" aria-hidden="true">
                             <CalendarMonthOutlinedIcon />
@@ -588,7 +553,7 @@ export function TeamProgressDashboard() {
                                 onChange={(event) => {
                                     const shouldInclude = event.target.checked;
                                     if (!shouldInclude && selectedMember?.isTeamLead) {
-                                        setScope("team");
+                                        setScope(TEAM_SCOPE);
                                     }
                                     setIncludeTeamLead(shouldInclude);
                                 }}
@@ -708,36 +673,18 @@ export function TeamProgressDashboard() {
                 <div className="team-progress-section__header">
                     <div>
                         {!isTeam && (
-                            <button type="button" onClick={() => setScope("team")}>
+                            <button type="button" onClick={() => setScope(TEAM_SCOPE)}>
                                 <ArrowBackOutlinedIcon /> Team
                             </button>
                         )}
                         <h2>{isTeam ? "Team members" : "Roadmaps and lessons"}</h2>
                         {!isTeam && <p>{selectedMember?.name}</p>}
                     </div>
-                    {isTeam ? (
-                        <div className="team-progress-section__tools">
-                            <label className="team-progress-search">
-                                <SearchOutlinedIcon aria-hidden="true" />
-                                <input
-                                    type="search"
-                                    value={memberSearch}
-                                    placeholder="Search by name, email, or role…"
-                                    aria-label="Search team members"
-                                    onChange={(event) => setMemberSearch(event.target.value)}
-                                />
-                            </label>
-                            <p role="status">
-                                {isSearching
-                                    ? `${searchedMembers.length} of ${members.length} members`
-                                    : `${members.length} members`}
-                            </p>
-                        </div>
-                    ) : (
-                        <p>
-                            {`${visibleRoadmapGroups.length} roadmap${visibleRoadmapGroups.length === 1 ? "" : "s"} - ${visibleLessonCount} lessons total`}
-                        </p>
-                    )}
+                    <p>
+                        {isTeam
+                            ? `${members.length} members`
+                            : `${visibleRoadmapGroups.length} roadmap${visibleRoadmapGroups.length === 1 ? "" : "s"} - ${visibleLessonCount} lessons total`}
+                    </p>
                 </div>
 
                 {isTeam ? (
@@ -749,12 +696,7 @@ export function TeamProgressDashboard() {
                                 ),
                             )}
                         </div>
-                        {isSearching && searchedMembers.length === 0 && (
-                            <p className="team-progress-table__empty">
-                                No members match “{memberSearch.trim()}”.
-                            </p>
-                        )}
-                        {searchedMembers.map((member) => (
+                        {members.map((member) => (
                             <div key={member.id} className="team-progress-table__row">
                                 <div className="team-progress-table__member">
                                     <UserAvatar

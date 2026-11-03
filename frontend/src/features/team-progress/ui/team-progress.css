@@ -73,6 +73,125 @@
     font-size: 13px;
 }
 
+.team-scope-picker {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    min-inline-size: 11rem;
+    max-inline-size: 100%;
+}
+
+.team-scope-picker__icon {
+    position: absolute;
+    top: 50%;
+    left: 0.875rem;
+    transform: translateY(-50%);
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    pointer-events: none;
+    color: var(--text-heading);
+}
+
+.team-scope-picker__icon svg {
+    width: 1.125rem;
+    height: 1.125rem;
+}
+
+.team-scope-picker__input {
+    inline-size: 100%;
+    min-inline-size: 0;
+    height: 2.625rem;
+    padding: 0 var(--space-6) 0 2.25rem;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-full);
+    background-color: var(--surface-default);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a8a8a' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right var(--space-2) center;
+    background-size: 1rem;
+    color: var(--text-default);
+    font-size: var(--text-body);
+    font-weight: 700;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.team-scope-picker--open .team-scope-picker__input {
+    font-weight: 400;
+    cursor: text;
+}
+
+.team-scope-picker__input::placeholder {
+    color: var(--text-label);
+    font-weight: 400;
+}
+
+.team-scope-picker__input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 0.1875rem var(--focus-ring);
+}
+
+.team-scope-picker__list {
+    position: absolute;
+    top: calc(100% + var(--space-1));
+    left: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 100%;
+    inline-size: max-content;
+    max-inline-size: min(22rem, 90vw);
+    max-block-size: 18rem;
+    margin: 0;
+    padding: var(--space-1);
+    overflow-y: auto;
+    list-style: none;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    background: var(--surface-elevated);
+    box-shadow: var(--shadow-soft);
+}
+
+.team-scope-picker__option {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-inline-size: 0;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    color: var(--text-default);
+    font-size: var(--text-body);
+    cursor: pointer;
+}
+
+.team-scope-picker__option--active {
+    background: var(--surface-muted);
+}
+
+.team-scope-picker__option--selected .team-scope-picker__option-label {
+    color: var(--accent-primary);
+}
+
+.team-scope-picker__option-label {
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.team-scope-picker__option-hint {
+    color: var(--text-label);
+    font-size: var(--text-pill);
+    overflow-wrap: anywhere;
+}
+
+.team-scope-picker__empty {
+    padding: var(--space-3);
+    color: var(--text-label);
+    font-size: var(--text-body);
+    overflow-wrap: anywhere;
+}
+
 .team-progress__include-me {
     display: inline-flex;
     align-items: center;
@@ -356,62 +475,6 @@
     margin: 0;
     color: #80808e;
     font-size: 12px;
-}
-
-.team-progress-section__tools {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    min-inline-size: 0;
-}
-
-.team-progress-search {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    inline-size: 16rem;
-    max-inline-size: 100%;
-    height: 2.25rem;
-    padding: 0 var(--space-3);
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-md);
-    background: var(--surface-muted);
-    color: var(--text-label);
-    transition: box-shadow 0.15s ease, border-color 0.15s ease;
-}
-
-.team-progress-search:focus-within {
-    border-color: var(--accent-primary);
-    background: var(--surface-default);
-    box-shadow: 0 0 0 3px var(--focus-ring);
-}
-
-.team-progress-search svg {
-    width: 1.125rem;
-    height: 1.125rem;
-    flex-shrink: 0;
-}
-
-.team-progress-search input {
-    flex: 1;
-    min-width: 0;
-    border: 0;
-    background: transparent;
-    color: var(--text-default);
-    font-size: var(--text-body);
-}
-
-.team-progress-search input:focus {
-    outline: none;
-}
-
-.team-progress-table__empty {
-    margin: 0;
-    padding: var(--space-6) var(--space-4);
-    color: var(--text-label);
-    font-size: var(--text-body);
-    text-align: center;
-    overflow-wrap: anywhere;
 }
 
 .team-progress-table {
