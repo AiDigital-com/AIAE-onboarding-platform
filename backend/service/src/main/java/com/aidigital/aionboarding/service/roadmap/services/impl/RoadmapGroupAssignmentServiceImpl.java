@@ -24,8 +24,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -99,6 +102,21 @@ public class RoadmapGroupAssignmentServiceImpl implements RoadmapGroupAssignment
 	public RoadmapGroupAssignmentPreviewRecord previewAssignment(AppUser viewer, Long groupId, List<Long> gradeIds) {
 		requireCanManage(viewer, groupId, "You can preview assignments only for groups you lead.");
 		return roadmapGroupAssignmentRecordAssembler.previewAssignment(groupId, gradeIds);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Map<Long, List<String>> groupNamesByCoveredUserId(Long roadmapId) {
+		Map<Long, List<String>> namesByUserId = new HashMap<>();
+		for (RoadmapGroupAssignment assignment : roadmapGroupAssignmentEntityService.findByRoadmapId(roadmapId)) {
+			Set<Long> gradeIds = roadmapGroupAssignmentRecordAssembler.gradesOf(assignment).keySet();
+			for (Long userId : roadmapGroupAssignmentSyncService.resolveMatchingMemberIds(
+					assignment.getGroup().getId(), gradeIds)) {
+				namesByUserId.computeIfAbsent(userId, ignored -> new ArrayList<>())
+						.add(assignment.getGroup().getName());
+			}
+		}
+		return namesByUserId;
 	}
 
 	void requireCanManage(AppUser viewer, Long groupId, String forbiddenMessage) {

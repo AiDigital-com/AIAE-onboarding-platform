@@ -171,4 +171,21 @@ class RoadmapApiMapperTest {
 			assertThat(input.description()).isEmpty();
 		}
 	}
+
+	@Nested
+	class AutoAssignFilter {
+
+		@Test
+		void shouldCarryTheAutoAssignFilterIntoTheListQueryTest() {
+			// Given:
+			SearchRoadmapsV1 request = new SearchRoadmapsV1().autoAssignNewUsers(true);
+
+			// When:
+			RoadmapListQuery query = mapper.toRoadmapListQuery(request);
+
+			// Then:
+			assertThat(query.autoAssignNewUsers()).isTrue();
+			assertThat(mapper.toRoadmapListQuery(null).autoAssignNewUsers()).isNull();
+		}
+	}
 }

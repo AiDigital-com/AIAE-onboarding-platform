@@ -18,6 +18,7 @@ import com.aidigital.aionboarding.api.v1.model.RoadmapGroupAssignmentsListRespon
 import com.aidigital.aionboarding.api.v1.model.RoadmapResponseV1;
 import com.aidigital.aionboarding.api.v1.model.RoadmapTeamAssignmentResponseV1;
 import com.aidigital.aionboarding.api.v1.model.RoadmapTeamAssignmentsListResponseV1;
+import com.aidigital.aionboarding.api.v1.model.RoadmapAutoAssignRequestV1;
 import com.aidigital.aionboarding.api.v1.model.RoadmapsListResponseV1;
 import com.aidigital.aionboarding.api.v1.model.SearchRoadmapsV1;
 import com.aidigital.aionboarding.api.v1.model.UpdateRoadmapRequestV1;
@@ -91,6 +92,15 @@ public class RoadmapsController implements RoadmapsApi {
 		AppUser viewer = currentUser.requireUser();
 		return ResponseEntity.ok(roadmapApiMapper.toRoadmapResponseV1(
 				roadmapService.updateRoadmap(viewer, id, roadmapApiMapper.toUpdateRoadmapInput(request))));
+	}
+
+	@Override
+	@PreAuthorize("@perm.has('" + PermissionKeys.ROADMAPS_MANAGE + "')")
+	@Transactional
+	public ResponseEntity<RoadmapResponseV1> setRoadmapAutoAssign(Long id, RoadmapAutoAssignRequestV1 request) {
+		AppUser viewer = currentUser.requireUser();
+		return ResponseEntity.ok(roadmapApiMapper.toRoadmapResponseV1(
+				roadmapService.setAutoAssignNewUsers(viewer, id, Boolean.TRUE.equals(request.getEnabled()))));
 	}
 
 	@Override

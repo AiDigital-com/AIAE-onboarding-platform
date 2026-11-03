@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    PAC_084 — "Automatically assign to new users" roadmap setting.
+
+    roadmaps.auto_assign_new_users: when true, every user created at their first login is
+    enrolled in the roadmap (RoadmapAutoAssignmentService). user_roadmaps.auto_assigned
+    records which enrollments came from that rule so the assignment UI can label them.
+-->
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
+
+    <changeSet id="0004-roadmaps-auto-assign-new-users" author="aionboarding">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="roadmaps" columnName="auto_assign_new_users"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="roadmaps">
+            <column name="auto_assign_new_users" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="0004-user-roadmaps-auto-assigned" author="aionboarding">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="user_roadmaps" columnName="auto_assigned"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="user_roadmaps">
+            <column name="auto_assigned" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

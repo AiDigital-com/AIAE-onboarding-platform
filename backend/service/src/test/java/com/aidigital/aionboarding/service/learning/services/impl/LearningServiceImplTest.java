@@ -111,7 +111,7 @@ class LearningServiceImplTest {
 
 			// Then:
 			assertThat(result).containsExactly(
-					new LearningAssigneeRecord(20L, user.getName(), user.getEmail(), enrolledAt, false)
+					new LearningAssigneeRecord(20L, user.getName(), user.getEmail(), enrolledAt, false, false, List.of())
 			);
 			verify(permissionService).requirePermission(actor, PermissionKeys.LEARNING_ASSIGN);
 		}
@@ -136,7 +136,7 @@ class LearningServiceImplTest {
 
 			// Then:
 			assertThat(result).containsExactly(
-					new LearningAssigneeRecord(20L, user.getName(), user.getEmail(), enrolledAt, true)
+					new LearningAssigneeRecord(20L, user.getName(), user.getEmail(), enrolledAt, true, false, List.of())
 			);
 		}
 

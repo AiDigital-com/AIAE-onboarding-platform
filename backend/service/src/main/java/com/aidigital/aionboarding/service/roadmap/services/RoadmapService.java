@@ -66,4 +66,19 @@ public interface RoadmapService {
 	 *                                                                      of the author is not allowed
 	 */
 	void deleteRoadmap(AppUser viewer, Long id);
+
+	/**
+	 * Turns the roadmap's "automatically assign to new users" setting on or off. Only an admin
+	 * may change it: it reaches every future employee of the company, not just one team.
+	 * Turning it on never backfills existing users; turning it off keeps every enrollment it
+	 * already produced.
+	 *
+	 * @param viewer  authenticated admin
+	 * @param id      roadmap identifier
+	 * @param enabled new value of the setting
+	 * @return updated roadmap record
+	 * @throws com.aidigital.aionboarding.service.common.error.AppException when the roadmap is missing
+	 *                                                                      or the caller is not an admin
+	 */
+	RoadmapRecord setAutoAssignNewUsers(AppUser viewer, Long id, boolean enabled);
 }

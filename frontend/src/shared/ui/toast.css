@@ -39,6 +39,21 @@
     line-height: 1.4;
 }
 
+.ui-toast__action {
+    flex: 0 0 auto;
+    padding: 0 var(--space-1);
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    cursor: pointer;
+}
+
 .ui-toast__close {
     flex: 0 0 auto;
     display: grid;

@@ -56,6 +56,7 @@ class RoadmapSpecificationBuilderTest {
 				List.of("tag1"),
 				5L,
 				true,
+				null,
 				RoadmapSortField.TITLE,
 				Sort.Direction.ASC
 		);
@@ -152,7 +153,7 @@ class RoadmapSpecificationBuilderTest {
 		// Given:
 		RoadmapSpecificationBuilder builder = new RoadmapSpecificationBuilder(tagsFilterSupport);
 		RoadmapListQuery filter = new RoadmapListQuery(
-				null, null, null, false, RoadmapSortField.CREATED_AT, Sort.Direction.DESC
+				null, null, null, false, null, RoadmapSortField.CREATED_AT, Sort.Direction.DESC
 		);
 
 		CriteriaBuilder cb = mock(CriteriaBuilder.class);
@@ -180,7 +181,7 @@ class RoadmapSpecificationBuilderTest {
 		// Given:
 		RoadmapSpecificationBuilder builder = new RoadmapSpecificationBuilder(tagsFilterSupport);
 		RoadmapListQuery filter = new RoadmapListQuery(
-				null, null, null, false, RoadmapSortField.CREATED_AT, Sort.Direction.DESC
+				null, null, null, false, null, RoadmapSortField.CREATED_AT, Sort.Direction.DESC
 		);
 
 		CriteriaBuilder cb = mock(CriteriaBuilder.class);
@@ -210,7 +211,7 @@ class RoadmapSpecificationBuilderTest {
 		// Given:
 		RoadmapSpecificationBuilder builder = new RoadmapSpecificationBuilder(tagsFilterSupport);
 		RoadmapListQuery filter = new RoadmapListQuery(
-				null, null, null, false, RoadmapSortField.UPDATED_AT, Sort.Direction.ASC
+				null, null, null, false, null, RoadmapSortField.UPDATED_AT, Sort.Direction.ASC
 		);
 
 		CriteriaBuilder cb = mock(CriteriaBuilder.class);

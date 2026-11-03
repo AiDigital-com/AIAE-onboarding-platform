@@ -48,6 +48,24 @@ public class RoadmapEnrollmentServiceImpl implements RoadmapEnrollmentService {
 
 	@Override
 	public List<UserRoadmap> enrollUsersInRoadmap(Collection<Long> userIds, Long roadmapId) {
+		return enrollUsersInRoadmap(userIds, roadmapId, false);
+	}
+
+	@Override
+	public List<UserRoadmap> enrollUsersInRoadmapAsAutoAssigned(Collection<Long> userIds, Long roadmapId) {
+		return enrollUsersInRoadmap(userIds, roadmapId, true);
+	}
+
+	/**
+	 * Shared enrollment path: creates the missing {@link UserRoadmap} rows (flagged with the
+	 * given source), leaves existing rows untouched, and fans the roadmap's lessons out.
+	 *
+	 * @param userIds      learners to enroll
+	 * @param roadmapId    roadmap identifier
+	 * @param autoAssigned whether new rows come from the "auto-assign to new users" rule
+	 * @return roadmap enrollment rows ordered like {@code userIds}
+	 */
+	List<UserRoadmap> enrollUsersInRoadmap(Collection<Long> userIds, Long roadmapId, boolean autoAssigned) {
 		List<Long> targetUserIds = normalizedUserIds(userIds);
 		if (targetUserIds.isEmpty()) {
 			return List.of();
@@ -70,6 +88,7 @@ public class RoadmapEnrollmentServiceImpl implements RoadmapEnrollmentService {
 			row.setUser(userEntityService.getReference(userId));
 			row.setRoadmap(roadmap);
 			row.setEnrolledAt(enrolledAt);
+			row.setAutoAssigned(autoAssigned);
 			toSave.add(row);
 			resultByUserId.put(userId, row);
 		}

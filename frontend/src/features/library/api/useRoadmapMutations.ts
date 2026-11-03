@@ -58,7 +58,8 @@ function replaceRoadmapInArrayCache(current: RoadmapV1[] | undefined, roadmap: R
     return current?.map((item) => (item.id === roadmap.id ? { ...item, ...roadmap } : item)) ?? current;
 }
 
-function writeRoadmapIntoCaches(
+/** Writes an authoritative roadmap from a mutation response into every roadmap list cache. */
+export function writeRoadmapIntoCaches(
     queryClient: ReturnType<typeof useQueryClient>,
     roadmap: RoadmapV1,
 ) {

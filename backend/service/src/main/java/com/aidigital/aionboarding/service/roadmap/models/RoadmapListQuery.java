@@ -11,6 +11,7 @@ import java.util.List;
  * @param tags restricts results to roadmaps tagged with every given value; {@code null} or empty to skip
  * @param createdByUserId restricts results to roadmaps authored by this internal user id; {@code null} to skip
  * @param assignedToMe when {@code true}, restricts results to roadmaps the viewer is enrolled in
+ * @param autoAssignNewUsers when {@code true}, restricts results to roadmaps that are auto-assigned to new users
  * @param sortField whitelisted field to sort by
  * @param direction sort direction
  */
@@ -19,6 +20,7 @@ public record RoadmapListQuery(
     List<String> tags,
     Long createdByUserId,
     Boolean assignedToMe,
+    Boolean autoAssignNewUsers,
     RoadmapSortField sortField,
     Sort.Direction direction
 ) {

@@ -1,0 +1,679 @@
+/* ── Assign roadmap dialog ─────────────────────────────────────────────────── */
+
+.roadmap-assign-dialog .ui-dialog__header {
+    align-items: flex-start;
+}
+
+.roadmap-assign-dialog__heading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-inline-size: 0;
+}
+
+.roadmap-assign-dialog__eyebrow {
+    color: var(--text-label);
+    font-size: var(--text-body);
+    font-weight: 600;
+}
+
+.roadmap-assign-dialog__title {
+    color: var(--text-heading);
+    font-size: var(--text-section);
+    font-weight: 800;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.roadmap-assign-dialog__body {
+    display: flex;
+    flex-direction: column;
+    padding: 0 clamp(1.25rem, 4vw, 2rem) var(--space-4);
+}
+
+.roadmap-assign-dialog__section {
+    padding: var(--space-4) 0;
+    border-bottom: 0.0625rem solid var(--border-default);
+}
+
+.roadmap-assign-dialog__section:last-child {
+    border-bottom: 0;
+}
+
+.roadmap-assign-dialog__label {
+    margin: 0 0 var(--space-2);
+    color: var(--text-label);
+    font-size: var(--text-pill);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.roadmap-assign-dialog__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    inline-size: 100%;
+}
+
+.roadmap-assign-dialog__hint {
+    flex: 1 1 12rem;
+    min-inline-size: 0;
+    margin: 0;
+    color: var(--text-label);
+    font-size: var(--text-body);
+    overflow-wrap: anywhere;
+}
+
+.roadmap-assign-dialog__actions {
+    display: flex;
+    gap: var(--space-2);
+}
+
+/* ── Picker ─────────────────────────────────────────────────────────────────── */
+
+.roadmap-assign-picker {
+    position: relative;
+}
+
+.roadmap-assign-picker__field {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1-5);
+    min-block-size: 3.25rem;
+    padding: var(--space-2) var(--space-3);
+    border: 0.0625rem solid var(--border-default);
+    border-radius: var(--radius-lg);
+    background: var(--surface-default);
+    color: var(--text-label);
+    cursor: text;
+}
+
+.roadmap-assign-picker__field:focus-within {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 0.25rem var(--focus-ring);
+}
+
+.roadmap-assign-picker__field > svg {
+    flex-shrink: 0;
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.roadmap-assign-picker__field input {
+    flex: 1 1 10rem;
+    min-inline-size: 8rem;
+    padding: var(--space-1) 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-default);
+    font-size: var(--text-subhead);
+}
+
+.roadmap-assign-picker__field input:focus {
+    outline: none;
+}
+
+.roadmap-assign-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    max-inline-size: 100%;
+    padding: var(--space-1) var(--space-1-5) var(--space-1) var(--space-1);
+    border-radius: var(--radius-full);
+    background: var(--surface-accent);
+    color: var(--accent-primary);
+    font-size: var(--text-body);
+    font-weight: 600;
+}
+
+.roadmap-assign-chip__label {
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.roadmap-assign-chip__grades {
+    padding: 0.125rem var(--space-2);
+    border: 0.0625rem solid hsl(var(--primary) / 25%);
+    border-radius: var(--radius-full);
+    background: var(--surface-default);
+    color: inherit;
+    font: inherit;
+    font-size: var(--text-badge);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.roadmap-assign-chip__remove {
+    display: inline-grid;
+    place-items: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.roadmap-assign-chip__remove:hover:not(:disabled) {
+    background: hsl(var(--primary) / 15%);
+}
+
+.roadmap-assign-chip__remove svg {
+    width: 0.875rem;
+    height: 0.875rem;
+}
+
+.roadmap-assign-picker__list {
+    position: absolute;
+    top: calc(100% + var(--space-1-5));
+    right: 0;
+    left: 0;
+    z-index: 30;
+    max-block-size: 20rem;
+    margin: 0;
+    padding: var(--space-1-5) 0;
+    overflow-y: auto;
+    list-style: none;
+    border-radius: var(--radius-lg);
+    background: var(--surface-elevated);
+    box-shadow: 0 1rem 3rem hsl(var(--foreground) / 18%);
+}
+
+.roadmap-assign-picker__group,
+.roadmap-assign-list__group {
+    margin: 0;
+    padding: var(--space-2) var(--space-4) var(--space-1);
+    color: var(--text-label);
+    font-size: var(--text-badge);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.roadmap-assign-picker__option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-4);
+    cursor: pointer;
+}
+
+.roadmap-assign-picker__option--active {
+    background: var(--surface-muted);
+}
+
+.roadmap-assign-picker__option--disabled {
+    opacity: 0.7;
+    cursor: default;
+}
+
+.roadmap-assign-picker__who,
+.roadmap-assign-row__who {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-inline-size: 0;
+}
+
+.roadmap-assign-picker__who strong,
+.roadmap-assign-row__who strong {
+    color: var(--text-heading);
+    font-size: var(--text-body);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.roadmap-assign-picker__who span,
+.roadmap-assign-row__who span {
+    color: var(--text-label);
+    font-size: var(--text-pill);
+    overflow-wrap: anywhere;
+}
+
+.roadmap-assign-picker__empty,
+.roadmap-assign-list__empty {
+    margin: 0;
+    padding: var(--space-4);
+    color: var(--text-label);
+    font-size: var(--text-body);
+    overflow-wrap: anywhere;
+}
+
+.roadmap-assign-status {
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-full);
+    font-size: var(--text-pill);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.roadmap-assign-status--assigned {
+    background: hsl(var(--status-success) / 15%);
+    color: var(--accent-success);
+}
+
+.roadmap-assign-status--selected {
+    background: var(--surface-accent);
+    color: var(--accent-primary);
+}
+
+/* ── Grade filter for a picked team ────────────────────────────────────────── */
+
+.roadmap-assign-grades {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    border: 0.0625rem solid var(--border-default);
+    border-radius: var(--radius-lg);
+    background: var(--surface-muted);
+}
+
+.roadmap-assign-grades__title {
+    margin: 0;
+    font-size: var(--text-body);
+    font-weight: 700;
+}
+
+.roadmap-assign-grades__options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.roadmap-assign-grades__option {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    padding: var(--space-1) var(--space-2);
+    border: 0.0625rem solid var(--border-default);
+    border-radius: var(--radius-full);
+    background: var(--surface-default);
+    font-size: var(--text-pill);
+}
+
+.roadmap-assign-grades__hint {
+    margin: 0;
+    color: var(--text-label);
+    font-size: var(--text-pill);
+}
+
+.roadmap-assign-grades__done {
+    align-self: flex-start;
+    padding: var(--space-1) var(--space-3);
+    border: 0;
+    border-radius: var(--radius-full);
+    background: var(--accent-primary);
+    color: var(--text-on-accent);
+    font: inherit;
+    font-size: var(--text-pill);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* ── Auto-assign toggle ─────────────────────────────────────────────────────── */
+
+.roadmap-assign-auto__row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.roadmap-assign-auto__icon {
+    display: inline-grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: var(--radius-lg);
+    background: var(--surface-accent);
+    color: var(--accent-primary);
+}
+
+.roadmap-assign-auto__text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-inline-size: 0;
+}
+
+.roadmap-assign-auto__text strong {
+    color: var(--text-heading);
+    font-size: var(--text-subhead);
+}
+
+.roadmap-assign-auto__text span {
+    color: var(--text-label);
+    font-size: var(--text-body);
+}
+
+.roadmap-assign-auto__hint {
+    margin: var(--space-2) 0 0;
+    color: var(--text-label);
+    font-size: var(--text-pill);
+}
+
+.roadmap-assign-switch {
+    position: relative;
+    flex-shrink: 0;
+    width: 3.25rem;
+    height: 1.875rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: hsl(var(--muted-foreground) / 35%);
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.roadmap-assign-switch::after {
+    content: "";
+    position: absolute;
+    top: 0.1875rem;
+    left: 0.1875rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    background: var(--surface-default);
+    box-shadow: var(--shadow-soft);
+    transition: transform 0.15s ease;
+}
+
+.roadmap-assign-switch[aria-checked="true"] {
+    background: var(--accent-primary);
+}
+
+.roadmap-assign-switch[aria-checked="true"]::after {
+    transform: translateX(1.375rem);
+}
+
+.roadmap-assign-switch:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.roadmap-assign-switch:focus-visible {
+    outline: 0.1875rem solid var(--focus-ring);
+    outline-offset: 0.125rem;
+}
+
+.roadmap-assign-auto__confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    border-radius: var(--radius-lg);
+    background: hsl(var(--status-orange) / 12%);
+    color: var(--accent-orange);
+    font-size: var(--text-body);
+}
+
+.roadmap-assign-auto__confirm > span {
+    flex: 1 1 14rem;
+    min-inline-size: 0;
+}
+
+.roadmap-assign-auto__confirm button {
+    padding: var(--space-1-5) var(--space-3);
+    border: 0.0625rem solid hsl(var(--status-orange) / 45%);
+    border-radius: var(--radius-full);
+    background: var(--surface-default);
+    color: var(--accent-orange);
+    font: inherit;
+    font-size: var(--text-pill);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.roadmap-assign-auto__confirm-danger {
+    background: var(--accent-orange) !important;
+    color: var(--text-on-accent) !important;
+}
+
+/* ── Summary + assigned list ──────────────────────────────────────────────── */
+
+.roadmap-assign-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    inline-size: 100%;
+    padding: var(--space-1) 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-default);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.roadmap-assign-summary__text {
+    flex: 1;
+    min-inline-size: 0;
+    font-size: var(--text-body);
+}
+
+.roadmap-assign-summary__text strong {
+    color: var(--text-heading);
+}
+
+.roadmap-assign-summary__manage {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--accent-primary);
+    font-size: var(--text-body);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.roadmap-assign-summary__manage svg {
+    width: 1rem;
+    height: 1rem;
+    transition: transform 0.15s ease;
+}
+
+.roadmap-assign-summary[aria-expanded="true"] .roadmap-assign-summary__manage svg {
+    transform: rotate(90deg);
+}
+
+.roadmap-assign-summary__empty {
+    margin: 0;
+    color: var(--text-label);
+    font-size: var(--text-body);
+}
+
+.roadmap-assign-avatars {
+    display: inline-flex;
+}
+
+.roadmap-assign-avatars > * + * {
+    margin-left: -0.375rem;
+}
+
+.roadmap-assign-avatars .user-avatar {
+    border: 0.125rem solid var(--surface-default);
+}
+
+.roadmap-assign-avatar {
+    display: inline-grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-md);
+    background: var(--surface-accent);
+    color: var(--accent-primary);
+    font-size: var(--text-body);
+    font-weight: 700;
+}
+
+.roadmap-assign-avatar--chip {
+    width: 1.375rem;
+    height: 1.375rem;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-badge);
+}
+
+.roadmap-assign-avatar--more {
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 0.125rem solid var(--surface-default);
+    border-radius: 50%;
+    background: var(--surface-muted);
+    color: var(--text-default);
+    font-size: var(--text-badge);
+}
+
+.roadmap-assign-list {
+    margin-top: var(--space-3);
+    border: 0.0625rem solid var(--border-default);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.roadmap-assign-list__filter {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 0.0625rem solid var(--border-default);
+    color: var(--text-label);
+}
+
+.roadmap-assign-list__filter svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+.roadmap-assign-list__filter input {
+    flex: 1;
+    min-inline-size: 0;
+    padding: var(--space-1) 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-default);
+    font-size: var(--text-body);
+}
+
+.roadmap-assign-list__filter input:focus {
+    outline: none;
+}
+
+.roadmap-assign-list__rows {
+    max-block-size: 17.5rem;
+    overflow-y: auto;
+}
+
+.roadmap-assign-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+}
+
+.roadmap-assign-row + .roadmap-assign-row {
+    border-top: 0.0625rem solid var(--border-default);
+}
+
+.roadmap-assign-row--removing {
+    opacity: 0.5;
+}
+
+.roadmap-assign-row--removing .roadmap-assign-row__who strong {
+    text-decoration: line-through;
+}
+
+.roadmap-assign-row--flash {
+    animation: roadmap-assign-flash 1.2s ease-out;
+}
+
+@keyframes roadmap-assign-flash {
+    0%,
+    40% {
+        background: hsl(var(--status-orange) / 18%);
+    }
+    100% {
+        background: transparent;
+    }
+}
+
+.roadmap-assign-row__tags {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--space-1);
+}
+
+.roadmap-assign-source {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-full);
+    background: var(--surface-muted);
+    color: var(--text-label);
+    font-size: var(--text-pill);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.roadmap-assign-source--auto {
+    background: var(--surface-accent);
+    color: var(--accent-primary);
+}
+
+.roadmap-assign-source svg {
+    width: 0.875rem;
+    height: 0.875rem;
+}
+
+.roadmap-assign-row__remove {
+    display: inline-grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-label);
+    cursor: pointer;
+}
+
+.roadmap-assign-row__remove svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+.roadmap-assign-row__remove:hover:not(:disabled) {
+    background: hsl(var(--status-error) / 10%);
+    color: var(--accent-danger);
+}
+
+.roadmap-assign-row__remove:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.roadmap-assign-row__undo {
+    flex-shrink: 0;
+    padding: var(--space-1-5);
+    border: 0;
+    background: transparent;
+    color: var(--accent-primary);
+    font: inherit;
+    font-size: var(--text-pill);
+    font-weight: 600;
+    cursor: pointer;
+}

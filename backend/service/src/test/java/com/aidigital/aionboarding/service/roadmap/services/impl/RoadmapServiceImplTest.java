@@ -52,6 +52,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.instancio.Select.field;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -106,16 +107,19 @@ class RoadmapServiceImplTest {
 
 	private RoadmapRecord baseRecord(Long id, String title) {
 		return new RoadmapRecord(id, title, "desc", List.of(), List.of(), List.of(), null, null, null,
+				false, null, List.of(),
 				"creator", LocalDateTime.now(), LocalDateTime.now());
 	}
 
 	private RoadmapRecord recordWithManageable(Long id, String title, boolean viewerCanManage) {
 		return new RoadmapRecord(id, title, "desc", List.of(), List.of(), List.of(), null, null, viewerCanManage,
+				false, null, List.of(),
 				"creator", LocalDateTime.now(), LocalDateTime.now());
 	}
 
 	private RoadmapRecord recordWithEnrollment(Long id, String title, boolean isEnrolled, LocalDateTime enrolledAt) {
 		return new RoadmapRecord(id, title, "desc", List.of(), List.of(), List.of(), isEnrolled, enrolledAt, null,
+				false, null, List.of(),
 				"creator", LocalDateTime.now(), LocalDateTime.now());
 	}
 
@@ -125,6 +129,7 @@ class RoadmapServiceImplTest {
 						lessonId, "Lesson " + lessonId, "desc", "READY", LocalDateTime.now(), 0, isCompleted);
 		return new RoadmapRecord(id, title, "desc", List.of(), List.of(lessonId), List.of(lessonRecord), null, null,
 				null,
+				false, null, List.of(),
 				"creator", LocalDateTime.now(), LocalDateTime.now());
 	}
 
@@ -132,7 +137,7 @@ class RoadmapServiceImplTest {
 	class GetAllRoadmaps {
 
 		private final RoadmapListQuery defaultQuery = new RoadmapListQuery(
-				null, null, null, null, RoadmapSortField.CREATED_AT, Sort.Direction.DESC
+				null, null, null, null, null, RoadmapSortField.CREATED_AT, Sort.Direction.DESC
 		);
 
 		@Test
@@ -167,7 +172,7 @@ class RoadmapServiceImplTest {
 			when(roadmapEntityService.findAllByRoadmapIdsWithLessons(List.of(10L))).thenReturn(List.of());
 			when(roadmapRecordAssembler.lessonCompletionMap(viewer, List.of())).thenReturn(Map.of());
 			when(roadmapRecordAssembler.toRecord(eq(roadmap), eq((Set<Long>) null), eq(null), eq(List.of()),
-					eq(Map.of())))
+					eq(Map.of()), any()))
 					.thenReturn(recordWithManageable(10L, "Roadmap 10", true));
 
 			// When:
@@ -200,10 +205,10 @@ class RoadmapServiceImplTest {
 			when(roadmapEntityService.findAllByRoadmapIdsWithLessons(List.of(20L, 21L))).thenReturn(List.of());
 			when(roadmapRecordAssembler.lessonCompletionMap(viewer, List.of())).thenReturn(Map.of());
 			when(roadmapRecordAssembler.toRecord(eq(manageable), eq(Set.of(20L)), eq(null), eq(List.of()),
-					eq(Map.of())))
+					eq(Map.of()), any()))
 					.thenReturn(recordWithManageable(20L, "Manageable", true));
 			when(roadmapRecordAssembler.toRecord(eq(notManageable), eq(Set.of(20L)), eq(null), eq(List.of()),
-					eq(Map.of())))
+					eq(Map.of()), any()))
 					.thenReturn(recordWithManageable(21L, "NotManageable", false));
 
 			// When:
@@ -244,7 +249,7 @@ class RoadmapServiceImplTest {
 			when(roadmapEntityService.findAllByRoadmapIdsWithLessons(List.of(30L))).thenReturn(List.of());
 			when(roadmapRecordAssembler.lessonCompletionMap(viewer, List.of())).thenReturn(Map.of());
 			when(roadmapRecordAssembler.toRecord(eq(roadmap), eq((Set<Long>) null), eq(enrollment), eq(List.of()),
-					eq(Map.of())))
+					eq(Map.of()), any()))
 					.thenReturn(recordWithEnrollment(30L, "Roadmap 30", true, enrolledAt));
 
 			// When:
@@ -302,10 +307,10 @@ class RoadmapServiceImplTest {
 					.thenReturn(List.of(roadmapLessonOne, roadmapLessonTwo));
 			when(roadmapRecordAssembler.lessonCompletionMap(viewer, List.of(100L))).thenReturn(Map.of(100L, true));
 			when(roadmapRecordAssembler.toRecord(eq(roadmapOne), eq((Set<Long>) null), eq(null),
-					eq(List.of(roadmapLessonOne)), eq(Map.of(100L, true))))
+					eq(List.of(roadmapLessonOne)), eq(Map.of(100L, true)), any()))
 					.thenReturn(recordWithLessonCompletion(40L, "Roadmap 40", 100L, true));
 			when(roadmapRecordAssembler.toRecord(eq(roadmapTwo), eq((Set<Long>) null), eq(null),
-					eq(List.of(roadmapLessonTwo)), eq(Map.of(100L, true))))
+					eq(List.of(roadmapLessonTwo)), eq(Map.of(100L, true)), any()))
 					.thenReturn(recordWithLessonCompletion(41L, "Roadmap 41", 100L, true));
 
 			// When:
@@ -350,7 +355,7 @@ class RoadmapServiceImplTest {
 			when(roadmapEntityService.findAllByRoadmapIdsWithLessons(List.of(50L))).thenReturn(List.of(roadmapLesson));
 			when(roadmapRecordAssembler.lessonCompletionMap(viewer, List.of(200L))).thenReturn(Map.of());
 			when(roadmapRecordAssembler.toRecord(eq(roadmap), eq((Set<Long>) null), eq(null),
-					eq(List.of(roadmapLesson)), eq(Map.of())))
+					eq(List.of(roadmapLesson)), eq(Map.of()), any()))
 					.thenReturn(recordWithLessonCompletion(50L, "Roadmap 50", 200L, null));
 
 			// When:
@@ -370,7 +375,7 @@ class RoadmapServiceImplTest {
 			// Given:
 			AppUser viewer = adminViewer();
 			RoadmapListQuery query = new RoadmapListQuery(
-					null, null, null, null, RoadmapSortField.CREATED_AT, Sort.Direction.DESC
+					null, null, null, null, null, RoadmapSortField.CREATED_AT, Sort.Direction.DESC
 			);
 			when(roadmapEntityService.countRoadmaps(query, visibilityFilter(viewer))).thenReturn(9L);
 
@@ -740,6 +745,50 @@ class RoadmapServiceImplTest {
 			assertThat(roadmap.getTags()).isEqualTo(List.of("only-tag"));
 			verify(roadmapLessonValidator, never()).validateReadyPublishedLessons(viewer, List.of(5L));
 			verify(roadmapEntityService, never()).deleteByIdRoadmapId(id);
+		}
+	}
+
+	@Nested
+	class SetAutoAssignNewUsers {
+
+		@Test
+		void shouldTurnTheSettingOnForAnAdminTest() {
+			// Given:
+			AppUser viewer = adminViewer();
+			Long id = 90L;
+			Roadmap roadmap = Instancio.of(Roadmap.class).set(field(Roadmap::getId), id)
+					.set(field(Roadmap::isAutoAssignNewUsers), false).create();
+			when(roadmapAccessPolicy.requireManageable(viewer, id)).thenReturn(roadmap);
+			when(roadmapEntityService.save(roadmap)).thenReturn(roadmap);
+			when(roadmapEntityService.findByIdRoadmapIdOrderBySortOrderAsc(id)).thenReturn(List.of());
+			RoadmapRecord expected = baseRecord(id, "Roadmap");
+			when(roadmapRecordAssembler.toRecord(eq(roadmap), eq(viewer), eq(Set.of(id)), eq(null), eq(List.of())))
+					.thenReturn(expected);
+
+			// When:
+			RoadmapRecord result = service.setAutoAssignNewUsers(viewer, id, true);
+
+			// Then:
+			assertThat(result).isEqualTo(expected);
+			assertThat(roadmap.isAutoAssignNewUsers()).isTrue();
+			verify(roadmapEntityService).save(roadmap);
+		}
+
+		@Test
+		void shouldRefuseANonAdminEvenWhenTheyManageTheRoadmapTest() {
+			// Given: a team lead who authored the roadmap passes the manage gate but is not an admin
+			AppUser viewer = new AppUser(3L, "clerk-lead", "lead@test.com", "Lead", "teamlead", "Lead", null, null,
+					null);
+			Long id = 91L;
+			Roadmap roadmap = Instancio.of(Roadmap.class).set(field(Roadmap::getId), id)
+					.set(field(Roadmap::isAutoAssignNewUsers), false).create();
+			when(roadmapAccessPolicy.requireManageable(viewer, id)).thenReturn(roadmap);
+
+			// When / Then:
+			assertThatThrownBy(() -> service.setAutoAssignNewUsers(viewer, id, true))
+					.isInstanceOf(AppException.class);
+			assertThat(roadmap.isAutoAssignNewUsers()).isFalse();
+			verify(roadmapEntityService, never()).save(roadmap);
 		}
 	}
 

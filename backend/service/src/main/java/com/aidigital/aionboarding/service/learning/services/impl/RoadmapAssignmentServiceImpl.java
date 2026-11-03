@@ -15,10 +15,12 @@ import com.aidigital.aionboarding.service.learning.support.LearningAssignmentAcc
 import com.aidigital.aionboarding.service.learning.support.LearningEnrollmentSupport;
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
+import com.aidigital.aionboarding.service.roadmap.services.RoadmapGroupAssignmentService;
 import com.aidigital.aionboarding.service.roadmap.services.entity.RoadmapEntityService;
 import com.aidigital.aionboarding.service.roadmap.support.RoadmapAccessPolicy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,7 @@ public class RoadmapAssignmentServiceImpl implements RoadmapAssignmentService {
     private final RoadmapEntityService roadmapEntityService;
     private final LearningAssignmentAccessPolicy learningAssignmentAccessPolicy;
     private final RoadmapAccessPolicy roadmapAccessPolicy;
+    private final RoadmapGroupAssignmentService roadmapGroupAssignmentService;
 
     @Override
     @Transactional
@@ -64,6 +67,9 @@ public class RoadmapAssignmentServiceImpl implements RoadmapAssignmentService {
      * assignment itself to manageable targets — because otherwise a {@code learning.assign}
      * holder with no connection to a given roadmap could read the names, emails, and enrollment
      * dates of every one of its enrollees, including users well outside their own team.
+     * <p>
+     * Each assignee also carries how they got the roadmap: the auto-assign flag stored on the
+     * enrollment, and the names of groups whose standing assignment currently covers them.
      */
     @Override
     @Transactional(readOnly = true)
@@ -71,6 +77,7 @@ public class RoadmapAssignmentServiceImpl implements RoadmapAssignmentService {
         permissionService.requirePermission(actor, PermissionKeys.LEARNING_ASSIGN);
         roadmapEntityService.getReference(roadmapId);
         Set<Long> assignableUserIds = learningAssignmentAccessPolicy.assignableUserIds(actor);
+        Map<Long, List<String>> groupNamesByUserId = roadmapGroupAssignmentService.groupNamesByCoveredUserId(roadmapId);
         return learningEnrollmentEntityService.findByRoadmapIdWithUser(roadmapId).stream()
             .filter(enrollment -> assignableUserIds.contains(enrollment.getId().getUserId()))
             .map(enrollment -> new LearningAssigneeRecord(
@@ -78,7 +85,9 @@ public class RoadmapAssignmentServiceImpl implements RoadmapAssignmentService {
                 enrollment.getUser().getName(),
                 enrollment.getUser().getEmail(),
                 enrollment.getEnrolledAt(),
-                null
+                null,
+                enrollment.isAutoAssigned(),
+                groupNamesByUserId.getOrDefault(enrollment.getId().getUserId(), List.of())
             ))
             .toList();
     }

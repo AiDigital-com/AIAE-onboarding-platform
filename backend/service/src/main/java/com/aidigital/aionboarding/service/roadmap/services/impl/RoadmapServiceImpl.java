@@ -11,6 +11,7 @@ import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
 import com.aidigital.aionboarding.service.roadmap.models.CreateRoadmapInput;
+import com.aidigital.aionboarding.service.roadmap.models.RoadmapAssignees;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapListQuery;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapRecord;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapVisibilityFilter;
@@ -79,12 +80,16 @@ public class RoadmapServiceImpl implements RoadmapService {
 				.toList();
 		Map<Long, Boolean> allCompletions = roadmapRecordAssembler.lessonCompletionMap(viewer, allLessonIds);
 
+		// Two grouped queries for assignee counts and avatar previews across the page's roadmaps
+		RoadmapAssignees assignees = roadmapRecordAssembler.roadmapAssignees(roadmapIds);
+
 		return roadmapsPage.map(roadmap -> roadmapRecordAssembler.toRecord(
 				roadmap,
 				manageableIds,
 				enrollmentsByRoadmapId.get(roadmap.getId()),
 				lessonsByRoadmapId.getOrDefault(roadmap.getId(), List.of()),
-				allCompletions));
+				allCompletions,
+				assignees));
 	}
 
 	/**
@@ -181,6 +186,23 @@ public class RoadmapServiceImpl implements RoadmapService {
 	public void deleteRoadmap(AppUser viewer, Long id) {
 		Roadmap roadmap = roadmapAccessPolicy.requireManageable(viewer, id);
 		roadmapEntityService.delete(roadmap);
+	}
+
+	/**
+	 * {@inheritDoc}
+	 */
+	@Override
+	@Transactional
+	public RoadmapRecord setAutoAssignNewUsers(AppUser viewer, Long id, boolean enabled) {
+		Roadmap roadmap = roadmapAccessPolicy.requireManageable(viewer, id);
+		if (!viewer.isAdmin()) {
+			throw new AppException(ErrorReason.C004, "Only an admin can change auto-assignment to new users.");
+		}
+		roadmap.setAutoAssignNewUsers(enabled);
+		roadmap.setUpdatedAt(currentTime.utcDateTime());
+		Roadmap saved = roadmapEntityService.save(roadmap);
+		return roadmapRecordAssembler.toRecord(saved, viewer, Set.of(saved.getId()), null,
+				roadmapEntityService.findByIdRoadmapIdOrderBySortOrderAsc(saved.getId()));
 	}
 
 	/**

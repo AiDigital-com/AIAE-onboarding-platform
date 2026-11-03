@@ -1514,6 +1514,26 @@ paths:
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
         '403': { $ref: '#/components/responses/ForbiddenV1' }
         '404': { $ref: '#/components/responses/NotFoundV1' }
+  /api/v1/roadmaps/{id}/auto-assign:
+    put:
+      summary: Set roadmap auto-assignment to new users
+      description: Turns the roadmap's "automatically assign to new users" setting on or off. Admin only. Turning it on affects only users created afterwards; turning it off keeps existing enrollments.
+      tags: [ roadmaps ]
+      operationId: setRoadmapAutoAssign
+      security: [ { bearerAuth: [ ] } ]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+      requestBody:
+        description: Request payload for the setRoadmapAutoAssign.
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoadmapAutoAssignRequestV1' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/RoadmapResponseV1' } } } }
+        '401': { $ref: '#/components/responses/UnauthorizedV1' }
+        '403': { $ref: '#/components/responses/ForbiddenV1' }
+        '404': { $ref: '#/components/responses/NotFoundV1' }
   /api/v1/roadmaps/{id}/assignments:
     post:
       summary: Assign roadmap
@@ -2005,6 +2025,10 @@ components:
           format: int64
         assignedToMe:
           description: When true, restricts results to roadmaps the current viewer is enrolled in.
+          type: boolean
+          x-unconstrained-reason: Boolean type already constrains the value domain to true/false; no additional bound applies.
+        autoAssignNewUsers:
+          description: When true, restricts results to roadmaps that are automatically assigned to new users at their first login.
           type: boolean
           x-unconstrained-reason: Boolean type already constrains the value domain to true/false; no additional bound applies.
     UserRoleCodeV1:
@@ -4680,6 +4704,13 @@ components:
           description: Whether the learner has completed the item, when known.
           type: boolean
           nullable: true
+        autoAssigned:
+          description: Whether the enrollment was created by the roadmap's "automatically assign to new users" rule. Always false for lessons.
+          type: boolean
+        viaGroupNames:
+          description: Names of the roadmap's assigned groups whose standing assignment currently covers this learner. Empty for lessons and for learners assigned directly.
+          type: array
+          items: { type: string }
     LearningAssigneesResponseV1:
       description: Learning Assignees Response payload.
       type: object
@@ -5103,6 +5134,18 @@ components:
         viewerCanManage:
           description: Whether the viewer can manage the roadmap.
           type: boolean
+        autoAssignNewUsers:
+          description: Whether every user created at their first login is enrolled in this roadmap automatically.
+          type: boolean
+        assigneeCount:
+          description: Number of learners currently enrolled; present only for a viewer who can manage the roadmap.
+          type: integer
+          format: int64
+          nullable: true
+        assigneePreview:
+          description: The most recently enrolled learners (at most four); empty unless the viewer can manage the roadmap.
+          type: array
+          items: { $ref: '#/components/schemas/RoadmapAssigneePreviewV1' }
         createdBy:
           description: Display name of the creator.
           type: string
@@ -5114,6 +5157,41 @@ components:
           description: Last update timestamp.
           type: string
           format: date-time
+    RoadmapAssigneePreviewV1:
+      description: One enrolled learner shown in a roadmap card's avatar stack.
+      type: object
+      additionalProperties: false
+      required: [ userId, email ]
+      properties:
+        userId:
+          description: Enrolled user identifier.
+          type: integer
+          format: int64
+        name:
+          description: Display name.
+          type: string
+        email:
+          description: Email address.
+          type: string
+          format: email
+        avatarColor:
+          description: Avatar background color, when set.
+          type: string
+          nullable: true
+        avatarStorageKey:
+          description: Avatar image storage key, when set.
+          type: string
+          nullable: true
+    RoadmapAutoAssignRequestV1:
+      description: New value of a roadmap's "automatically assign to new users" setting.
+      type: object
+      additionalProperties: false
+      required: [ enabled ]
+      properties:
+        enabled:
+          description: True to enroll every future first-login user in the roadmap; false to stop. Existing enrollments are never changed.
+          type: boolean
+          x-unconstrained-reason: Boolean type already constrains the value domain to true/false; no additional bound applies.
     RoadmapLessonV1:
       description: Lesson summary inside a roadmap.
       type: object

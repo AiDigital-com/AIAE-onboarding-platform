@@ -6,13 +6,18 @@ import com.aidigital.aionboarding.domain.roadmap.entities.Roadmap;
 import com.aidigital.aionboarding.domain.roadmap.entities.RoadmapLesson;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.learning.services.entity.LearningEnrollmentEntityService;
+import com.aidigital.aionboarding.domain.learning.repositories.RoadmapAssigneePreviewProjection;
 import com.aidigital.aionboarding.service.mappers.roadmap.RoadmapMapper;
+import com.aidigital.aionboarding.service.roadmap.models.RoadmapAssigneePreviewRecord;
+import com.aidigital.aionboarding.service.roadmap.models.RoadmapAssignees;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapLessonRecord;
 import com.aidigital.aionboarding.service.roadmap.models.RoadmapRecord;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,6 +30,9 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class RoadmapRecordAssembler {
+
+    /** Learners shown in a card's avatar stack before the "+N" overflow. */
+    public static final int ASSIGNEE_PREVIEW_SIZE = 4;
 
     private final RoadmapMapper roadmapMapper;
     private final LearningEnrollmentEntityService learningEnrollmentEntityService;
@@ -53,7 +61,8 @@ public class RoadmapRecordAssembler {
             .map(rl -> rl.getId().getLessonId())
             .toList();
         Map<Long, Boolean> completionMap = lessonCompletionMap(viewer, lessonIds);
-        return toRecord(roadmap, manageableIds, enrollment, roadmapLessons, completionMap);
+        RoadmapAssignees assignees = roadmapAssignees(List.of(roadmap.getId()));
+        return toRecord(roadmap, manageableIds, enrollment, roadmapLessons, completionMap, assignees);
     }
 
     /**
@@ -67,6 +76,7 @@ public class RoadmapRecordAssembler {
      * @param enrollment     the viewer's enrollment in this roadmap, or {@code null} if not enrolled
      * @param roadmapLessons the roadmap's lesson join rows, in sort order
      * @param allCompletions the pre-computed lesson-ID-to-completion map, shared across roadmaps
+     * @param assignees      pre-fetched assignee counts and previews, shared across roadmaps
      * @return the assembled {@link RoadmapRecord}
      */
     public RoadmapRecord toRecord(
@@ -74,7 +84,8 @@ public class RoadmapRecordAssembler {
         Set<Long> manageableIds,
         UserRoadmap enrollment,
         List<RoadmapLesson> roadmapLessons,
-        Map<Long, Boolean> allCompletions
+        Map<Long, Boolean> allCompletions,
+        RoadmapAssignees assignees
     ) {
         RoadmapRecord base = roadmapMapper.toRecord(roadmap);
         List<Long> lessonIds = roadmapLessons.stream()
@@ -86,11 +97,36 @@ public class RoadmapRecordAssembler {
         boolean isEnrolled = enrollment != null;
         LocalDateTime enrolledAt = enrollment != null ? enrollment.getEnrolledAt() : null;
         boolean viewerCanManage = manageableIds == null || manageableIds.contains(roadmap.getId());
+        // Who else is enrolled is assignment-management data: only a manager of the roadmap sees it.
+        Long assigneeCount = viewerCanManage ? assignees.countByRoadmapId().getOrDefault(roadmap.getId(), 0L) : null;
+        List<RoadmapAssigneePreviewRecord> preview = viewerCanManage
+            ? assignees.previewByRoadmapId().getOrDefault(roadmap.getId(), List.of())
+            : List.of();
         return new RoadmapRecord(
             base.id(), base.title(), base.description(), base.tags(),
             lessonIds, lessonRecords, isEnrolled, enrolledAt, viewerCanManage,
+            base.autoAssignNewUsers(), assigneeCount, preview,
             base.createdBy(), base.createdAt(), base.updatedAt()
         );
+    }
+
+    /**
+     * Loads assignee counts and the first few enrolled learners for a set of roadmaps in two
+     * grouped queries, so a list page never issues one enrollment query per roadmap.
+     *
+     * @param roadmapIds roadmaps to load assignees for
+     * @return counts and bounded previews keyed by roadmap id
+     */
+    public RoadmapAssignees roadmapAssignees(List<Long> roadmapIds) {
+        Map<Long, Long> counts = learningEnrollmentEntityService.countUserRoadmapsByRoadmapIds(roadmapIds);
+        Map<Long, List<RoadmapAssigneePreviewRecord>> previews = new HashMap<>();
+        for (RoadmapAssigneePreviewProjection row
+            : learningEnrollmentEntityService.findAssigneePreviews(roadmapIds, ASSIGNEE_PREVIEW_SIZE)) {
+            previews.computeIfAbsent(row.getRoadmapId(), ignored -> new ArrayList<>())
+                .add(new RoadmapAssigneePreviewRecord(row.getUserId(), row.getName(), row.getEmail(),
+                    row.getAvatarColor(), row.getAvatarStorageKey()));
+        }
+        return new RoadmapAssignees(counts, previews);
     }
 
     /**

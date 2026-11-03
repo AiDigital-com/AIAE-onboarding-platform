@@ -15,6 +15,7 @@ import com.aidigital.aionboarding.service.learning.support.LearningAssignmentAcc
 import com.aidigital.aionboarding.service.learning.support.LearningEnrollmentSupport;
 import com.aidigital.aionboarding.service.permission.PermissionKeys;
 import com.aidigital.aionboarding.service.permission.services.PermissionService;
+import com.aidigital.aionboarding.service.roadmap.services.RoadmapGroupAssignmentService;
 import com.aidigital.aionboarding.service.roadmap.services.entity.RoadmapEntityService;
 import com.aidigital.aionboarding.service.roadmap.support.RoadmapAccessPolicy;
 import org.instancio.Instancio;
@@ -54,6 +55,8 @@ class RoadmapAssignmentServiceImplTest {
 	private LearningAssignmentAccessPolicy learningAssignmentAccessPolicy;
 	@Mock
 	private RoadmapAccessPolicy roadmapAccessPolicy;
+	@Mock
+	private RoadmapGroupAssignmentService roadmapGroupAssignmentService;
 
 	@InjectMocks
 	private RoadmapAssignmentServiceImpl service;
@@ -135,10 +138,39 @@ class RoadmapAssignmentServiceImplTest {
 
 			// Then:
 			assertThat(result).containsExactly(
-					new LearningAssigneeRecord(20L, user.getName(), user.getEmail(), enrolledAt, null)
+					new LearningAssigneeRecord(20L, user.getName(), user.getEmail(), enrolledAt, null, false, List.of())
 			);
 			verify(permissionService).requirePermission(actor, PermissionKeys.LEARNING_ASSIGN);
 			verify(roadmapEntityService).getReference(roadmapId);
+		}
+
+		@Test
+		void listRoadmapAssigneesShouldCarryHowEachLearnerGotTheRoadmapTest() {
+			// Given: one learner enrolled by the auto-assign rule, another covered by a group
+			AppUser actor = adminActor();
+			Long roadmapId = 10L;
+			User autoUser = Instancio.create(User.class);
+			User groupUser = Instancio.create(User.class);
+			LocalDateTime enrolledAt = LocalDateTime.of(2026, 1, 1, 0, 0);
+			UserRoadmap autoEnrollment = userRoadmap(20L, roadmapId, autoUser, enrolledAt);
+			autoEnrollment.setAutoAssigned(true);
+			UserRoadmap groupEnrollment = userRoadmap(21L, roadmapId, groupUser, enrolledAt);
+			when(learningEnrollmentEntityService.findByRoadmapIdWithUser(roadmapId))
+					.thenReturn(List.of(autoEnrollment, groupEnrollment));
+			when(learningAssignmentAccessPolicy.assignableUserIds(actor)).thenReturn(java.util.Set.of(20L, 21L));
+			when(roadmapGroupAssignmentService.groupNamesByCoveredUserId(roadmapId))
+					.thenReturn(java.util.Map.of(21L, List.of("Design")));
+
+			// When:
+			List<LearningAssigneeRecord> result = service.listRoadmapAssignees(actor, roadmapId);
+
+			// Then:
+			assertThat(result).containsExactly(
+					new LearningAssigneeRecord(20L, autoUser.getName(), autoUser.getEmail(), enrolledAt, null, true,
+							List.of()),
+					new LearningAssigneeRecord(21L, groupUser.getName(), groupUser.getEmail(), enrolledAt, null, false,
+							List.of("Design"))
+			);
 		}
 
 		@Test

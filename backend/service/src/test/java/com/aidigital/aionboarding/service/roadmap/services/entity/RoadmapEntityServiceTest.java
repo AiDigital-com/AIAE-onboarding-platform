@@ -82,7 +82,7 @@ class RoadmapEntityServiceTest {
 				.set(field(Roadmap::getId), 1L)
 				.create();
 		RoadmapListQuery query = new RoadmapListQuery(
-				null, null, null, null, RoadmapSortField.CREATED_AT, Sort.Direction.DESC
+				null, null, null, null, null, RoadmapSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		@SuppressWarnings("unchecked")
 		Specification<Roadmap> specification = (Specification<Roadmap>) org.mockito.Mockito.mock(Specification.class);
@@ -103,7 +103,7 @@ class RoadmapEntityServiceTest {
 	void countRoadmapsShouldBuildSpecificationAndDelegateToRepositoryCountTest() {
 		// Given:
 		RoadmapListQuery query = new RoadmapListQuery(
-				null, null, null, null, RoadmapSortField.CREATED_AT, Sort.Direction.DESC
+				null, null, null, null, null, RoadmapSortField.CREATED_AT, Sort.Direction.DESC
 		);
 		@SuppressWarnings("unchecked")
 		Specification<Roadmap> specification = (Specification<Roadmap>) org.mockito.Mockito.mock(Specification.class);

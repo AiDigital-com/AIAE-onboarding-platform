@@ -4,7 +4,6 @@ import com.aidigital.aionboarding.service.common.time.CurrentTime;
 import com.aidigital.aionboarding.domain.common.dictionary.UserRoleCode;
 import com.aidigital.aionboarding.domain.common.dictionary.entities.UserRole;
 import com.aidigital.aionboarding.domain.user.entities.User;
-import com.aidigital.aionboarding.service.common.dictionary.DictionaryLookupService;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.error.ErrorReason;
 import com.aidigital.aionboarding.service.common.security.AppUser;
@@ -18,6 +17,7 @@ import com.aidigital.aionboarding.service.user.models.UserRecord;
 import com.aidigital.aionboarding.service.user.services.UserService;
 import com.aidigital.aionboarding.service.user.services.entity.UserEntityService;
 import com.aidigital.aionboarding.service.user.support.UserGradeUpdateSupport;
+import com.aidigital.aionboarding.service.user.support.UserProvisioningSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -26,7 +26,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -37,12 +36,12 @@ import java.util.Optional;
 public class UserServiceImpl implements UserService {
 
     private final UserEntityService userEntityService;
-    private final DictionaryLookupService dictionaryLookupService;
     private final UserRecordMapper userMapper;
     private final TeamService teamService;
     private final PermissionService permissionService;
     private final StorageService storageService;
     private final UserGradeUpdateSupport userGradeUpdateSupport;
+    private final UserProvisioningSupport userProvisioningSupport;
     private final CurrentTime currentTime;
 
     @Override
@@ -53,7 +52,7 @@ public class UserServiceImpl implements UserService {
             .or(() -> userEntityService.findByEmail(normalizedEmail));
         if (existing.isEmpty()) {
             // createUser already persists the new row; nothing else to backfill on it.
-            return userMapper.toAppUser(createUser(clerkUserId, normalizedEmail, fullName));
+            return userMapper.toAppUser(userProvisioningSupport.createUser(clerkUserId, normalizedEmail, fullName));
         }
 
         User user = existing.get();
@@ -186,7 +185,7 @@ public class UserServiceImpl implements UserService {
         if (roleCode.equals(user.getRole().getCode())) {
             return userMapper.toRecord(user);
         }
-        UserRole role = dictionaryLookupService.getUserRoleReference(roleCode);
+        UserRole role = userProvisioningSupport.resolveRole(roleCode);
         user.setRole(role);
         user.setUpdatedAt(currentTime.utcDateTime());
         UserRecord updated = userMapper.toRecord(userEntityService.save(user));
@@ -195,22 +194,6 @@ public class UserServiceImpl implements UserService {
         // over and suppress or leak permissions under the new role's defaults.
         permissionService.resetOverrides(userId);
         return updated;
-    }
-
-    User createUser(String clerkUserId, String email, String fullName) {
-        UserRole memberRole = dictionaryLookupService.getUserRoleReference(UserRoleCode.MEMBER);
-        LocalDateTime now = currentTime.utcDateTime();
-        User user = new User();
-        user.setClerkUserId(clerkUserId);
-        user.setEmail(email);
-        user.setName(fullName == null || fullName.isBlank() ? email : fullName.trim());
-        user.setRole(memberRole);
-        user.setPosition("");
-        user.setAvatarStorageKey("");
-        user.setAvatarColor("");
-        user.setCreatedAt(now);
-        user.setUpdatedAt(now);
-        return userEntityService.save(user);
     }
 
     int roleOrder(String roleCode) {

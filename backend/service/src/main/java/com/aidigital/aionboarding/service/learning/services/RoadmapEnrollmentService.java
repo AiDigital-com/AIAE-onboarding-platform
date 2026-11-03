@@ -32,6 +32,17 @@ public interface RoadmapEnrollmentService {
     List<UserRoadmap> enrollUsersInRoadmap(Collection<Long> userIds, Long roadmapId);
 
     /**
+     * Enrolls several users in one roadmap, marking every enrollment this call creates as
+     * produced by the roadmap's "auto-assign to new users" rule. Enrollments that already exist
+     * keep their original source.
+     *
+     * @param userIds learners to enroll
+     * @param roadmapId roadmap identifier
+     * @return roadmap enrollment rows ordered like {@code userIds}
+     */
+    List<UserRoadmap> enrollUsersInRoadmapAsAutoAssigned(Collection<Long> userIds, Long roadmapId);
+
+    /**
      * Removes a user's roadmap enrollment when present.
      *
      * @param userId learner identifier

@@ -14,5 +14,7 @@ public interface RoadmapMapper {
 	@Mapping(target = "isEnrolled", ignore = true)
 	@Mapping(target = "enrolledAt", ignore = true)
 	@Mapping(target = "viewerCanManage", ignore = true)
+	@Mapping(target = "assigneeCount", ignore = true)
+	@Mapping(target = "assigneePreview", ignore = true)
 	RoadmapRecord toRecord(Roadmap entity);
 }
