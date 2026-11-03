@@ -5191,6 +5191,7 @@ components:
         enabled:
           description: True to enroll every future first-login user in the roadmap; false to stop. Existing enrollments are never changed.
           type: boolean
+          x-unconstrained-reason: Boolean type already constrains the value domain to true/false; no additional bound applies.
     RoadmapLessonV1:
       description: Lesson summary inside a roadmap.
       type: object

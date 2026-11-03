@@ -3,7 +3,6 @@ package com.aidigital.aionboarding.service.user.services.impl;
 import com.aidigital.aionboarding.domain.common.dictionary.UserRoleCode;
 import com.aidigital.aionboarding.domain.common.dictionary.entities.UserRole;
 import com.aidigital.aionboarding.domain.user.entities.User;
-import com.aidigital.aionboarding.service.common.dictionary.DictionaryLookupService;
 import com.aidigital.aionboarding.service.common.error.AppException;
 import com.aidigital.aionboarding.service.common.security.AppUser;
 import com.aidigital.aionboarding.service.common.time.CurrentTime;
@@ -15,9 +14,9 @@ import com.aidigital.aionboarding.service.storage.StorageService;
 import com.aidigital.aionboarding.service.team.services.TeamService;
 import com.aidigital.aionboarding.service.user.models.AdminUserStatsRecord;
 import com.aidigital.aionboarding.service.user.models.UserRecord;
-import com.aidigital.aionboarding.service.user.services.UserFirstLoginAssignmentSyncService;
 import com.aidigital.aionboarding.service.user.services.entity.UserEntityService;
 import com.aidigital.aionboarding.service.user.support.UserGradeUpdateSupport;
+import com.aidigital.aionboarding.service.user.support.UserProvisioningSupport;
 import org.instancio.Instancio;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -47,8 +46,6 @@ class UserServiceImplTest {
 	@Mock
 	private UserEntityService userEntityService;
 	@Mock
-	private DictionaryLookupService dictionaryLookupService;
-	@Mock
 	private UserRecordMapper userMapper;
 	@Mock
 	private TeamService teamService;
@@ -59,7 +56,7 @@ class UserServiceImplTest {
 	@Mock
 	private UserGradeUpdateSupport userGradeUpdateSupport;
 	@Mock
-	private UserFirstLoginAssignmentSyncService userFirstLoginAssignmentSyncService;
+	private UserProvisioningSupport userProvisioningSupport;
 
 	@Spy
 	private CurrentTime currentTime = new CurrentTimeImpl();
@@ -140,7 +137,7 @@ class UserServiceImplTest {
 			// Then:
 			assertThat(result).isEqualTo(expectedAppUser);
 			assertThat(existingUser.getClerkUserId()).isEqualTo("clerk-2");
-			verify(dictionaryLookupService, never()).getUserRoleReference(org.mockito.ArgumentMatchers.anyString());
+			verify(userProvisioningSupport, never()).resolveRole(org.mockito.ArgumentMatchers.anyString());
 		}
 
 		@Test
@@ -167,32 +164,26 @@ class UserServiceImplTest {
 		}
 
 		@Test
-		void shouldCreateNewUserWithMemberRoleWhenNoMatchFoundTest() {
+		void shouldProvisionANewUserWhenNoMatchFoundTest() {
 			// Given:
-			UserRole memberRole = Instancio.create(UserRole.class);
+			User created = Instancio.of(User.class)
+					.set(field(User::getClerkUserId), "clerk-4")
+					.set(field(User::getEmail), "new@test.com")
+					.create();
 			AppUser expectedAppUser = new AppUser(2L, "clerk-4", "new@test.com", "New User", "member", "New User",
 					null, null, null);
 			when(userEntityService.findByClerkUserId("clerk-4")).thenReturn(Optional.empty());
 			when(userEntityService.findByEmail("new@test.com")).thenReturn(Optional.empty());
-			when(dictionaryLookupService.getUserRoleReference(UserRoleCode.MEMBER)).thenReturn(memberRole);
-			ArgumentCaptor<User> savedUserCaptor = ArgumentCaptor.forClass(User.class);
-			when(userEntityService.save(savedUserCaptor.capture())).thenAnswer(invocation -> savedUserCaptor.getValue());
-			when(userMapper.toAppUser(org.mockito.ArgumentMatchers.any(User.class))).thenReturn(expectedAppUser);
+			when(userProvisioningSupport.createUser("clerk-4", "new@test.com", "New User")).thenReturn(created);
+			when(userMapper.toAppUser(created)).thenReturn(expectedAppUser);
 
 			// When:
 			AppUser result = service.resolveOrCreateFromClerk("clerk-4", "new@test.com", "New User");
 
-			// Then: exactly one save (the creation insert) — no redundant follow-up update
-			// for a brand-new user whose fields already match what was just written.
-			assertThat(savedUserCaptor.getAllValues()).hasSize(1);
-			User created = savedUserCaptor.getAllValues().get(0);
+			// Then: provisioning owns the insert; no redundant follow-up save for a brand-new user
 			assertThat(result).isEqualTo(expectedAppUser);
-			assertThat(created.getClerkUserId()).isEqualTo("clerk-4");
-			assertThat(created.getEmail()).isEqualTo("new@test.com");
-			assertThat(created.getName()).isEqualTo("New User");
-			assertThat(created.getRole()).isEqualTo(memberRole);
-			// A first-login user is handed to the standing "auto-assign to new users" rule once.
-			verify(userFirstLoginAssignmentSyncService).onUserCreated(created.getId());
+			verify(userProvisioningSupport).createUser("clerk-4", "new@test.com", "New User");
+			verify(userEntityService, never()).save(org.mockito.ArgumentMatchers.any());
 		}
 	}
 
@@ -315,7 +306,7 @@ class UserServiceImplTest {
 					Instancio.of(UserRole.class).set(field(UserRole::getCode), UserRoleCode.TEAMLEAD).create();
 			User user = Instancio.of(User.class).set(field(User::getRole), memberRole).create();
 			when(userEntityService.findById(5L)).thenReturn(Optional.of(user));
-			when(dictionaryLookupService.getUserRoleReference(UserRoleCode.TEAMLEAD)).thenReturn(teamLeadRole);
+			when(userProvisioningSupport.resolveRole(UserRoleCode.TEAMLEAD)).thenReturn(teamLeadRole);
 			when(userEntityService.save(user)).thenReturn(user);
 			UserRecord updatedRecord = new UserRecord(5L, "clerk-5", "Name", "user@test.com", "teamlead", null, null,
 					null, null, null, null);
@@ -350,7 +341,7 @@ class UserServiceImplTest {
 			// Then:
 			assertThat(result.roleCode()).isEqualTo("member");
 			verify(userEntityService, never()).save(org.mockito.ArgumentMatchers.any());
-			verify(dictionaryLookupService, never()).getUserRoleReference(org.mockito.ArgumentMatchers.anyString());
+			verify(userProvisioningSupport, never()).resolveRole(org.mockito.ArgumentMatchers.anyString());
 			verify(permissionService, never()).resetOverrides(org.mockito.ArgumentMatchers.anyLong());
 		}
 	}

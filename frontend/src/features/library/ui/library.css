@@ -1333,7 +1333,7 @@
 }
 
 .library-roadmap-card__avatars .user-avatar {
-    border: 2px solid var(--surface-default);
+    border: 0.125rem solid var(--surface-default);
 }
 
 .library-roadmap-card__avatar-more {
@@ -1341,7 +1341,7 @@
     place-items: center;
     width: 1.625rem;
     height: 1.625rem;
-    border: 2px solid var(--surface-default);
+    border: 0.125rem solid var(--surface-default);
     border-radius: 50%;
     background: var(--surface-muted);
     color: var(--text-default);
