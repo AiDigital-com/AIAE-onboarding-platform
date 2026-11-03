@@ -108,6 +108,13 @@
   border-radius: 0.5rem;
 }
 
+/* blockquote-node.css draws TipTap's default dark quote bar as ::before; the border-left above
+   replaces it, so hide the pseudo-element or both bars show side by side in edit mode. */
+.simple-editor-content .tiptap.ProseMirror.simple-editor blockquote::before,
+.simple-editor-content .tiptap.ProseMirror.simple-editor blockquote.is-empty::before {
+  content: none;
+}
+
 .simple-editor-content .tiptap.ProseMirror.simple-editor a {
   color: #0009dc;
   font-weight: 750;
