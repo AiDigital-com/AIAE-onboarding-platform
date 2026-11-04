@@ -22,8 +22,8 @@ export interface PickedTeam {
     name: string;
     membersCount: number;
     gradeIds: number[];
-    /** Members matching the grade filter, once the preview has resolved; undefined = whole team. */
-    matchedMembersCount?: number;
+    /** Ids of the members the (grade-filtered) team brings, once the preview has resolved. */
+    matchedUserIds?: number[];
 }
 
 export type PickedItem = PickedPerson | PickedTeam;
@@ -54,9 +54,10 @@ export type PickerResult =
       };
 
 /**
- * What Save will do, derived from the picked items and staged removals. `newPeopleCount` adds
- * explicitly picked people who do not have the roadmap yet and the (grade-filtered) size of each
- * picked team; whether some team members already hold it is only known server-side.
+ * What Save will do, derived from the picked items and staged removals. `newPeopleCount` is the
+ * number of distinct people who do not have the roadmap yet, across explicitly picked people and
+ * the (grade-filtered) members of every picked team. A team whose members are still being
+ * previewed counts as its full size.
  */
 export interface AssignmentPlan {
     newPeopleCount: number;
@@ -76,7 +77,7 @@ export interface RoadmapAssignPickerProps {
     onPick: (result: PickerResult) => void;
     onUnpick: (index: number) => void;
     onTeamGradesChange: (groupId: number, gradeIds: number[]) => void;
-    onTeamPreview: (groupId: number, matchedMembersCount: number | undefined) => void;
+    onTeamPreview: (groupId: number, matchedUserIds: number[] | undefined) => void;
 }
 
 export interface RoadmapAssignedListProps {

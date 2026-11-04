@@ -36,6 +36,7 @@ import {
     isRemovalCovering,
     planHint,
     primaryActionLabel,
+    sameUserIds,
     teamRemovalKey,
 } from "../lib/roadmapAssignment";
 import type {
@@ -282,11 +283,11 @@ export function RoadmapAssignDialog({
                                 ),
                             )
                         }
-                        onTeamPreview={(groupId, matchedMembersCount) =>
+                        onTeamPreview={(groupId, matchedUserIds) =>
                             setPicked((items) =>
                                 items.map((item) =>
-                                    item.type === "team" && item.id === groupId && item.matchedMembersCount !== matchedMembersCount
-                                        ? { ...item, matchedMembersCount }
+                                    item.type === "team" && item.id === groupId && !sameUserIds(item.matchedUserIds, matchedUserIds)
+                                        ? { ...item, matchedUserIds }
                                         : item,
                                 ),
                             )

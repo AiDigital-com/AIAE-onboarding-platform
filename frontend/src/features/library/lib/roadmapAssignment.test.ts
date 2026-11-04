@@ -4,6 +4,7 @@ import type { LearningAssigneeV1, PickedItem, RemovalKey } from "../model/roadma
 import {
     assigneeSources,
     buildAssignmentPlan,
+    sameUserIds,
     canRemoveAssignee,
     isRemovalCovering,
     planHint,
@@ -98,9 +99,9 @@ describe("buildAssignmentPlan and labels", () => {
 
     it("should count team members in the plan, narrowed by the grade preview when known test", () => {
         // Given: a whole team of 3 plus one new person, then the same team narrowed to 1 by grade
-        const wholeTeam = buildAssignmentPlan([design, bob], new Set(), new Set());
+        const wholeTeam = buildAssignmentPlan([{ ...design, matchedUserIds: [3, 4, 5] }, bob], new Set(), new Set());
         const narrowed = buildAssignmentPlan(
-            [{ ...design, gradeIds: [2], matchedMembersCount: 1 }, bob],
+            [{ ...design, gradeIds: [2], matchedUserIds: [3] }, bob],
             new Set(),
             new Set(),
         );
@@ -111,5 +112,33 @@ describe("buildAssignmentPlan and labels", () => {
         expect(planHint(wholeTeam)).toBe("4 people (incl. 1 team) will get this roadmap");
         expect(narrowed.newPeopleCount).toBe(2);
         expect(pending.newPeopleCount).toBe(3);
+    });
+
+    it("should count a person once when picked directly and through a team test", () => {
+        // Given: Bob is picked and is also one of the team's 2 members; Ann in the team already has it
+        const plan = buildAssignmentPlan(
+            [bob, { ...design, membersCount: 2, matchedUserIds: [1, 2] }],
+            new Set(),
+            new Set([1]),
+        );
+        const everyoneHasIt = buildAssignmentPlan(
+            [{ ...design, membersCount: 1, matchedUserIds: [1] }],
+            new Set(),
+            new Set([1]),
+        );
+
+        // Then:
+        expect(plan).toEqual({ newPeopleCount: 1, pickedTeamCount: 1, removalCount: 0 });
+        expect(planHint(plan)).toBe("1 person (incl. 1 team) will get this roadmap");
+        expect(planHint(everyoneHasIt)).toBe("1 team will be assigned, everyone in it already has this roadmap");
+        expect(primaryActionLabel(everyoneHasIt)).toBe("Assign");
+    });
+
+    it("should compare preview id lists by content test", () => {
+        // Then:
+        expect(sameUserIds([1, 2], [1, 2])).toBe(true);
+        expect(sameUserIds([1, 2], [2, 1])).toBe(false);
+        expect(sameUserIds(undefined, undefined)).toBe(true);
+        expect(sameUserIds([], undefined)).toBe(false);
     });
 });

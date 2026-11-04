@@ -29,30 +29,46 @@ function teamGradeLabel(team: PickedTeam, grades: GradeV1[]): string {
         .join(", ");
 }
 
+/**
+ * Headless companion of a picked team chip: keeps the team's member preview loaded and reports
+ * the matched user ids upward so the plan can de-duplicate them against picked people.
+ */
+function PickedTeamPreview({
+    roadmapId,
+    team,
+    onPreview,
+}: {
+    roadmapId: number;
+    team: PickedTeam;
+    onPreview: (matchedUserIds: number[] | undefined) => void;
+}) {
+    const previewQuery = useRoadmapGroupAssignmentPreviewQuery(roadmapId, team.id, team.gradeIds, true);
+    const matchedUserIds = previewQuery.data?.matchedUserIds;
+
+    useEffect(() => {
+        // Re-run only when the preview result changes; the parent callback is recreated per render.
+        onPreview(matchedUserIds);
+    }, [matchedUserIds]);
+
+    return null;
+}
+
 /** Grade filter for one picked team, with the live "N of M members match" preview. */
 function TeamGradeFilter({
     roadmapId,
     team,
     grades,
     onChange,
-    onPreview,
     onDone,
 }: {
     roadmapId: number;
     team: PickedTeam;
     grades: GradeV1[];
     onChange: (gradeIds: number[]) => void;
-    onPreview: (matchedMembersCount: number | undefined) => void;
     onDone: () => void;
 }) {
     const previewQuery = useRoadmapGroupAssignmentPreviewQuery(roadmapId, team.id, team.gradeIds, true);
     const preview = previewQuery.data;
-    const matchedMembersCount = preview?.membersMatchedCount;
-
-    useEffect(() => {
-        // Re-run only when the preview result changes; the parent callback is recreated per render.
-        onPreview(team.gradeIds.length === 0 ? undefined : matchedMembersCount);
-    }, [matchedMembersCount, team.gradeIds.length]);
 
     return (
         <div className="roadmap-assign-grades" role="group" aria-label={`Grades for ${team.name}`}>
@@ -337,10 +353,19 @@ export function RoadmapAssignPicker({
                     team={editingTeam}
                     grades={grades}
                     onChange={(gradeIds) => onTeamGradesChange(editingTeam.id, gradeIds)}
-                    onPreview={(count) => onTeamPreview(editingTeam.id, count)}
                     onDone={() => setEditingTeamId(null)}
                 />
             )}
+            {picked
+                .filter((item): item is PickedTeam => item.type === "team")
+                .map((team) => (
+                    <PickedTeamPreview
+                        key={team.id}
+                        roadmapId={roadmapId}
+                        team={team}
+                        onPreview={(matchedUserIds) => onTeamPreview(team.id, matchedUserIds)}
+                    />
+                ))}
         </div>
     );
 }

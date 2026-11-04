@@ -120,6 +120,32 @@ describe("RoadmapAssignDialog", () => {
         expect(within(listbox).queryByText("Design")).not.toBeNull();
     });
 
+    it("should count a person once when picked directly and as a member of a picked team test", async () => {
+        // Given: Bob is picked on his own and is also one of Design's two members
+        mockGets({
+            users: [ann(), bob()],
+            groups: [{ id: 7, name: "Design", description: "", leads: [], membersCount: 2, membersWithoutGradeCount: 0, createdAt: "", updatedAt: "" }],
+        });
+        vi.spyOn(apiClient, "POST").mockResolvedValue({
+            data: { preview: { groupMembersCount: 2, membersMatchedCount: 2, membersWithoutGradeCount: 0, matchedUserIds: [1, 2] } },
+            error: undefined,
+        } as never);
+        renderDialog();
+        const combobox = screen.getByRole("combobox", { name: "Search people or teams" });
+
+        // When: Bob and then Design are picked
+        fireEvent.focus(combobox);
+        const listbox = await screen.findByRole("listbox", { name: "People and teams" });
+        fireEvent.click(await within(listbox).findByText("Bob Jones"));
+        fireEvent.focus(combobox);
+        fireEvent.click(await within(listbox).findByText("Design"));
+
+        // Then: two distinct people, not three
+        await waitFor(() =>
+            expect(screen.getByRole("status").textContent).toBe("2 people (incl. 1 team) will get this roadmap"),
+        );
+    });
+
     it("should mark an already assigned person and show how each assignee got the roadmap test", async () => {
         // Given: Ann holds it via a team only, Bob by the new-user rule
         mockGets({

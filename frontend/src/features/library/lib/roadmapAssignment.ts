@@ -4,7 +4,6 @@ import type {
     AssignmentPlan,
     LearningAssigneeV1,
     PickedItem,
-    PickedTeam,
     RemovalKey,
 } from "../model/roadmapAssignment";
 
@@ -62,34 +61,50 @@ export function isRemovalCovering(
     });
 }
 
-/** How many people a picked team brings: the grade-filtered match when known, else the whole team. */
-export function teamPeopleCount(team: PickedTeam): number {
-    if (team.gradeIds.length === 0) {
-        return team.membersCount;
+/** Whether two id lists hold the same ids in the same order; treats two undefined lists as equal. */
+export function sameUserIds(left: readonly number[] | undefined, right: readonly number[] | undefined): boolean {
+    if (left === undefined || right === undefined) {
+        return left === right;
     }
-    return team.matchedMembersCount ?? team.membersCount;
+    return left.length === right.length && left.every((id, index) => id === right[index]);
 }
 
 /**
- * Counts what Save will change: explicitly picked people who do not have the roadmap yet plus
- * the members of every picked team. Team members already holding the roadmap are only known
- * server-side, so the team size is used as is.
+ * Counts what Save will change: the distinct people who will newly get the roadmap, whether
+ * picked directly or brought in by a picked team. A person picked directly and also a member
+ * of a picked team counts once; people who already hold the roadmap are skipped unless their
+ * removal is staged. A team whose member preview has not resolved yet counts as its full size.
  */
 export function buildAssignmentPlan(
     picked: readonly PickedItem[],
     removing: ReadonlySet<RemovalKey>,
     assignedUserIds: ReadonlySet<number>,
 ): AssignmentPlan {
-    const newDirectPeopleCount = picked.filter(
-        (item) =>
-            item.type === "person" &&
-            (!assignedUserIds.has(item.id) || removing.has(personRemovalKey(item.id))),
-    ).length;
-    const teams = picked.filter((item): item is PickedTeam => item.type === "team");
-    const teamPeople = teams.reduce((sum, team) => sum + teamPeopleCount(team), 0);
+    const willGet = (userId: number) => !assignedUserIds.has(userId) || removing.has(personRemovalKey(userId));
+    const newPeople = new Set<number>();
+    let unresolvedTeamPeople = 0;
+    let pickedTeamCount = 0;
+    for (const item of picked) {
+        if (item.type === "person") {
+            if (willGet(item.id)) {
+                newPeople.add(item.id);
+            }
+            continue;
+        }
+        pickedTeamCount += 1;
+        if (item.matchedUserIds === undefined) {
+            unresolvedTeamPeople += item.membersCount;
+            continue;
+        }
+        for (const userId of item.matchedUserIds) {
+            if (willGet(userId)) {
+                newPeople.add(userId);
+            }
+        }
+    }
     return {
-        newPeopleCount: newDirectPeopleCount + teamPeople,
-        pickedTeamCount: teams.length,
+        newPeopleCount: newPeople.size + unresolvedTeamPeople,
+        pickedTeamCount,
         removalCount: removing.size,
     };
 }
@@ -120,13 +135,12 @@ export function planHint(plan: AssignmentPlan): string {
         return "Pick people or teams to assign.";
     }
     const parts: string[] = [];
-    if (plan.newPeopleCount > 0 || plan.pickedTeamCount > 0) {
+    const teams = `${plan.pickedTeamCount} team${plan.pickedTeamCount === 1 ? "" : "s"}`;
+    if (plan.newPeopleCount > 0) {
         const people = `${plan.newPeopleCount} ${plan.newPeopleCount === 1 ? "person" : "people"}`;
-        const teams =
-            plan.pickedTeamCount > 0
-                ? ` (incl. ${plan.pickedTeamCount} team${plan.pickedTeamCount === 1 ? "" : "s"})`
-                : "";
-        parts.push(`${people}${teams} will get this roadmap`);
+        parts.push(`${people}${plan.pickedTeamCount > 0 ? ` (incl. ${teams})` : ""} will get this roadmap`);
+    } else if (plan.pickedTeamCount > 0) {
+        parts.push(`${teams} will be assigned, everyone in it already has this roadmap`);
     }
     if (plan.removalCount > 0) {
         parts.push(`${plan.removalCount} will be removed`);

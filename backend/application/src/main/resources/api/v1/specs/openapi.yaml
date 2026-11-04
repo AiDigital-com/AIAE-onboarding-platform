@@ -4954,7 +4954,7 @@ components:
       description: A dry-run preview of what a grade filter would match within a group.
       type: object
       additionalProperties: false
-      required: [ groupMembersCount, membersMatchedCount, membersWithoutGradeCount ]
+      required: [ groupMembersCount, membersMatchedCount, membersWithoutGradeCount, matchedUserIds ]
       properties:
         groupMembersCount:
           description: Total current members in the group.
@@ -4968,6 +4968,12 @@ components:
           description: Members with no grade, who would be skipped when a filter is set.
           type: integer
           format: int64
+        matchedUserIds:
+          description: User ids of the members who would be enrolled, so a client can de-duplicate them against explicitly picked people and other teams.
+          type: array
+          items:
+            type: integer
+            format: int64
     RoadmapGroupAssignmentPreviewResponseV1:
       description: Roadmap Group Assignment Preview Response payload.
       type: object
