@@ -23,3 +23,7 @@ export const PICKER_PLACEHOLDER = "Search by name, email or team…";
 export const PICKER_PLACEHOLDER_MORE = "Add more…";
 export const ASSIGNED_FILTER_PLACEHOLDER = "Find in assigned list…";
 export const DISCARD_CHANGES_PROMPT = "Discard your unsaved changes?";
+
+export const PRIMARY_ACTION_ASSIGN = "Assign";
+export const PRIMARY_ACTION_SAVE = "Save changes";
+export const PRIMARY_ACTION_REMOVE = "Remove";

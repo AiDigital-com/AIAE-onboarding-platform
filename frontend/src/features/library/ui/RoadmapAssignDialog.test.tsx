@@ -116,7 +116,7 @@ describe("RoadmapAssignDialog", () => {
         // Then: Bob is a chip, the footer describes the change, and the primary button is enabled
         expect(screen.getByRole("button", { name: "Remove Bob Jones" })).not.toBeNull();
         expect(screen.getByRole("status").textContent).toBe("1 person will get this roadmap");
-        expect((screen.getByRole("button", { name: "Assign to 1 person" }) as HTMLButtonElement).disabled).toBe(false);
+        expect((screen.getByRole("button", { name: "Assign" }) as HTMLButtonElement).disabled).toBe(false);
         expect(within(listbox).queryByText("Design")).not.toBeNull();
     });
 
@@ -161,11 +161,12 @@ describe("RoadmapAssignDialog", () => {
 
         // When: Bob is removed, then undone, then removed again and saved
         fireEvent.click(screen.getByRole("button", { name: "Remove Bob Jones" }));
-        expect(screen.getByRole("button", { name: "Remove 1" })).not.toBeNull();
+        expect(screen.getByRole("button", { name: "Remove" })).not.toBeNull();
+        expect(screen.getByRole("status").textContent).toBe("1 will be removed");
         fireEvent.click(screen.getByRole("button", { name: "Undo" }));
         expect(screen.getByRole("button", { name: "Assign" })).not.toBeNull();
         fireEvent.click(screen.getByRole("button", { name: "Remove Bob Jones" }));
-        fireEvent.click(screen.getByRole("button", { name: "Remove 1" }));
+        fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 
         // Then:
         await waitFor(() => expect(onClose).toHaveBeenCalled());

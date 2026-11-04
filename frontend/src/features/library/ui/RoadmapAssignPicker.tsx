@@ -35,16 +35,24 @@ function TeamGradeFilter({
     team,
     grades,
     onChange,
+    onPreview,
     onDone,
 }: {
     roadmapId: number;
     team: PickedTeam;
     grades: GradeV1[];
     onChange: (gradeIds: number[]) => void;
+    onPreview: (matchedMembersCount: number | undefined) => void;
     onDone: () => void;
 }) {
     const previewQuery = useRoadmapGroupAssignmentPreviewQuery(roadmapId, team.id, team.gradeIds, true);
     const preview = previewQuery.data;
+    const matchedMembersCount = preview?.membersMatchedCount;
+
+    useEffect(() => {
+        // Re-run only when the preview result changes; the parent callback is recreated per render.
+        onPreview(team.gradeIds.length === 0 ? undefined : matchedMembersCount);
+    }, [matchedMembersCount, team.gradeIds.length]);
 
     return (
         <div className="roadmap-assign-grades" role="group" aria-label={`Grades for ${team.name}`}>
@@ -101,6 +109,7 @@ export function RoadmapAssignPicker({
     onPick,
     onUnpick,
     onTeamGradesChange,
+    onTeamPreview,
 }: RoadmapAssignPickerProps) {
     const listboxId = useId();
     const rootRef = useRef<HTMLDivElement>(null);
@@ -328,6 +337,7 @@ export function RoadmapAssignPicker({
                     team={editingTeam}
                     grades={grades}
                     onChange={(gradeIds) => onTeamGradesChange(editingTeam.id, gradeIds)}
+                    onPreview={(count) => onTeamPreview(editingTeam.id, count)}
                     onDone={() => setEditingTeamId(null)}
                 />
             )}

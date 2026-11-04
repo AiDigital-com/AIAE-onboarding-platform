@@ -92,14 +92,14 @@ export function RoadmapsGrid({
                                         (canAssign ? (
                                             <button
                                                 type="button"
-                                                className="library-chip library-chip--accent library-roadmap-card__auto-badge"
+                                                className="library-chip library-chip--accent library-roadmap-card__auto-chip library-roadmap-card__auto-badge"
                                                 title="Open assignment settings"
                                                 onClick={openAssign}
                                             >
                                                 <BoltOutlinedIcon /> {AUTO_ASSIGN_BADGE_LABEL}
                                             </button>
                                         ) : (
-                                            <span className="library-chip library-chip--accent">
+                                            <span className="library-chip library-chip--accent library-roadmap-card__auto-chip">
                                                 <BoltOutlinedIcon /> {AUTO_ASSIGN_BADGE_LABEL}
                                             </span>
                                         ))}
