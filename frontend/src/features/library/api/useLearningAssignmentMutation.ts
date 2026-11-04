@@ -35,6 +35,10 @@ export function useLearningAssignmentMutation(itemType: "lesson" | "roadmap") {
                     ? libraryQueryKeys.roadmapAssignees(itemId)
                     : libraryQueryKeys.lessonAssignees(itemId);
             void queryClient.invalidateQueries({ queryKey });
+            // The list cards and the assign dialog headline carry the item's assignee count.
+            void queryClient.invalidateQueries({
+                queryKey: itemType === "roadmap" ? libraryQueryKeys.roadmaps : libraryQueryKeys.lessons,
+            });
         },
     });
 }

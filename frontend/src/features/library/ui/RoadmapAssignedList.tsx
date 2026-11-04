@@ -29,6 +29,7 @@ function gradeFilterLabel(team: RoadmapGroupAssignmentV1): string {
  */
 export function RoadmapAssignedList({
     assignees,
+    totalPeopleCount = null,
     teams,
     removing,
     isLoading,
@@ -48,7 +49,10 @@ export function RoadmapAssignedList({
         }
     }, [highlightedUserId]);
 
-    const peopleCount = assignees.length;
+    // The listed rows are bounded to people the viewer may manage, so the headline count comes
+    // from the roadmap's full enrollment count whenever it is known.
+    const peopleCount = Math.max(totalPeopleCount ?? 0, assignees.length);
+    const hiddenPeopleCount = peopleCount - assignees.length;
     const teamCount = teams.length;
     const visibleTeams = teams.filter((team) => matchesPersonQuery(team.groupName, "", filter));
     const visiblePeople = assignees
@@ -210,6 +214,13 @@ export function RoadmapAssignedList({
                         {visibleTeams.length === 0 && visiblePeople.length === 0 && (
                             <p className="roadmap-assign-list__empty">
                                 No one named “{filter.trim()}” has this roadmap.
+                            </p>
+                        )}
+                        {hiddenPeopleCount > 0 && (
+                            <p className="roadmap-assign-list__hidden">
+                                {hiddenPeopleCount} more {hiddenPeopleCount === 1 ? "person has" : "people have"} this
+                                roadmap but {hiddenPeopleCount === 1 ? "is" : "are"} not listed here: only people you
+                                can manage are shown.
                             </p>
                         )}
                     </div>

@@ -344,6 +344,7 @@ export function RoadmapAssignDialog({
                 <section className="roadmap-assign-dialog__section">
                     <RoadmapAssignedList
                         assignees={assignees}
+                        totalPeopleCount={roadmap?.assigneeCount}
                         teams={teams}
                         removing={removing}
                         isLoading={assigneesQuery.isLoading || teamAssignmentsQuery.isLoading}
