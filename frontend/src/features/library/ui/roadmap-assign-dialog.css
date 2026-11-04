@@ -1,5 +1,11 @@
 /* ── Assign roadmap dialog ─────────────────────────────────────────────────── */
 
+/* Taller than the content needs, so the search dropdown and the assigned list get room to show
+   more people and teams before scrolling; still capped by the viewport. */
+.roadmap-assign-dialog {
+    min-block-size: min(44rem, calc(100vh - 2rem));
+}
+
 .roadmap-assign-dialog .ui-dialog__header {
     align-items: flex-start;
 }
@@ -29,6 +35,11 @@
     display: flex;
     flex-direction: column;
     padding: 0 clamp(1.25rem, 4vw, 2rem) var(--space-4);
+}
+
+/* The assigned list takes whatever height the taller dialog leaves over. */
+.roadmap-assign-dialog__section:last-child {
+    flex: 1 1 auto;
 }
 
 .roadmap-assign-dialog__section {
@@ -177,7 +188,7 @@
     right: 0;
     left: 0;
     z-index: 30;
-    max-block-size: 20rem;
+    max-block-size: min(26rem, 55vh);
     margin: 0;
     padding: var(--space-1-5) 0;
     overflow-y: auto;
@@ -571,7 +582,7 @@
 }
 
 .roadmap-assign-list__rows {
-    max-block-size: 17.5rem;
+    max-block-size: min(28rem, 50vh);
     overflow-y: auto;
 }
 
