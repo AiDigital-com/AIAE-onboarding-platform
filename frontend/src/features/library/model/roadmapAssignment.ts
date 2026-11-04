@@ -81,7 +81,10 @@ export interface RoadmapAssignPickerProps {
 }
 
 export interface RoadmapAssignedListProps {
+    /** Assignees the viewer may manage; the backend omits everyone else, including the viewer. */
     assignees: LearningAssigneeV1[];
+    /** Every enrolled person, including those not in `assignees`; null/undefined = unknown. */
+    totalPeopleCount?: number | null;
     teams: RoadmapGroupAssignmentV1[];
     removing: ReadonlySet<RemovalKey>;
     isLoading: boolean;

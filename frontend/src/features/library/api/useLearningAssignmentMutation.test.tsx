@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiClient } from "@/shared/api/client";
 import { libraryQueryKeys } from "./queryKeys";
-import { useRevokeLearningAssignmentMutation } from "./useLearningAssignmentMutation";
+import { useLearningAssignmentMutation, useRevokeLearningAssignmentMutation } from "./useLearningAssignmentMutation";
 
 function createWrapper() {
     const queryClient = new QueryClient();
@@ -63,6 +63,25 @@ describe("useRevokeLearningAssignmentMutation", () => {
                 body: { userIds: [1, 2, 3] },
             }),
         );
+    });
+
+    it("should invalidate the roadmap list and its assignees, not the lesson list, on roadmap assign test", async () => {
+        // Given: the cards and the dialog headline carry a per-roadmap assignee count
+        vi.spyOn(apiClient, "POST").mockResolvedValue({ data: { ok: true }, error: undefined } as never);
+        const { Wrapper, queryClient } = createWrapper();
+        queryClient.setQueryData(libraryQueryKeys.roadmaps, { stale: "roadmaps" });
+        queryClient.setQueryData(libraryQueryKeys.lessons, { stale: "lessons" });
+        queryClient.setQueryData(libraryQueryKeys.roadmapAssignees(5), []);
+        const { result } = renderHook(() => useLearningAssignmentMutation("roadmap"), { wrapper: Wrapper });
+
+        // When:
+        result.current.mutate({ itemId: 5, userIds: [10] });
+        await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+        // Then:
+        expect(queryClient.getQueryState(libraryQueryKeys.roadmaps)?.isInvalidated).toBe(true);
+        expect(queryClient.getQueryState(libraryQueryKeys.roadmapAssignees(5))?.isInvalidated).toBe(true);
+        expect(queryClient.getQueryState(libraryQueryKeys.lessons)?.isInvalidated).toBe(false);
     });
 
     it("should invalidate only the roadmap list, not the lesson list, on roadmap revoke test", async () => {

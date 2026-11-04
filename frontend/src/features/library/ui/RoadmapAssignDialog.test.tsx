@@ -174,6 +174,22 @@ describe("RoadmapAssignDialog", () => {
         expect(within(listbox).getAllByText("✓ Assigned")).toHaveLength(2);
     });
 
+    it("should count every enrolled person in the headline, not only the manageable rows test", async () => {
+        // Given: three people hold the roadmap but the viewer may manage only Bob
+        mockGets({
+            assignees: [
+                { userId: 2, name: "Bob Jones", email: "bob@example.com", enrolledAt: "2026-11-01T00:00:00Z", autoAssigned: false, viaGroupNames: [] },
+            ],
+        });
+        renderDialog({ roadmap: roadmap({ assigneeCount: 3 }) });
+
+        // When: the assigned list is opened
+        fireEvent.click(await screen.findByRole("button", { name: /Assigned to 3 people/ }));
+
+        // Then: the hidden rows are explained
+        expect(screen.getByText(/2 more people have this roadmap/)).not.toBeNull();
+    });
+
     it("should stage a removal with undo and apply it through one bulk revoke on save test", async () => {
         // Given:
         mockGets({

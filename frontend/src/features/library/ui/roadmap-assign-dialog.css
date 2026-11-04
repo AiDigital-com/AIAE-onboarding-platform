@@ -250,7 +250,8 @@
 }
 
 .roadmap-assign-picker__empty,
-.roadmap-assign-list__empty {
+.roadmap-assign-list__empty,
+.roadmap-assign-list__hidden {
     margin: 0;
     padding: var(--space-4);
     color: var(--text-label);
