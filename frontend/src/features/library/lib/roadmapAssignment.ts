@@ -1,3 +1,4 @@
+import { PRIMARY_ACTION_ASSIGN, PRIMARY_ACTION_REMOVE, PRIMARY_ACTION_SAVE } from "../constants/roadmapAssignment";
 import type {
     AssigneeSources,
     AssignmentPlan,
@@ -61,22 +62,36 @@ export function isRemovalCovering(
     });
 }
 
+/** How many people a picked team brings: the grade-filtered match when known, else the whole team. */
+export function teamPeopleCount(team: PickedTeam): number {
+    if (team.gradeIds.length === 0) {
+        return team.membersCount;
+    }
+    return team.matchedMembersCount ?? team.membersCount;
+}
+
 /**
- * Counts what Save will change. A picked team counts as one team; its not-yet-assigned members
- * are only known server-side, so people are counted from explicit picks.
+ * Counts what Save will change: explicitly picked people who do not have the roadmap yet plus
+ * the members of every picked team. Team members already holding the roadmap are only known
+ * server-side, so the team size is used as is.
  */
 export function buildAssignmentPlan(
     picked: readonly PickedItem[],
     removing: ReadonlySet<RemovalKey>,
     assignedUserIds: ReadonlySet<number>,
 ): AssignmentPlan {
-    const newPeopleCount = picked.filter(
+    const newDirectPeopleCount = picked.filter(
         (item) =>
             item.type === "person" &&
             (!assignedUserIds.has(item.id) || removing.has(personRemovalKey(item.id))),
     ).length;
-    const pickedTeamCount = picked.filter((item): item is PickedTeam => item.type === "team").length;
-    return { newPeopleCount, pickedTeamCount, removalCount: removing.size };
+    const teams = picked.filter((item): item is PickedTeam => item.type === "team");
+    const teamPeople = teams.reduce((sum, team) => sum + teamPeopleCount(team), 0);
+    return {
+        newPeopleCount: newDirectPeopleCount + teamPeople,
+        pickedTeamCount: teams.length,
+        removalCount: removing.size,
+    };
 }
 
 /** Whether the dialog has anything to save. */
@@ -84,22 +99,19 @@ export function hasPlannedChanges(plan: AssignmentPlan): boolean {
     return plan.newPeopleCount > 0 || plan.pickedTeamCount > 0 || plan.removalCount > 0;
 }
 
-/** Primary button label describing the planned change, matching the prototype wording. */
+/**
+ * Primary button label for the planned change. Counts stay in the footer hint so the button
+ * keeps a fixed width however many people are involved.
+ */
 export function primaryActionLabel(plan: AssignmentPlan): string {
     const adds = plan.newPeopleCount > 0 || plan.pickedTeamCount > 0;
     if (adds && plan.removalCount > 0) {
-        return "Save changes";
+        return PRIMARY_ACTION_SAVE;
     }
     if (plan.removalCount > 0) {
-        return `Remove ${plan.removalCount}`;
+        return PRIMARY_ACTION_REMOVE;
     }
-    if (plan.newPeopleCount > 0) {
-        return `Assign to ${plan.newPeopleCount} ${plan.newPeopleCount === 1 ? "person" : "people"}`;
-    }
-    if (plan.pickedTeamCount > 0) {
-        return plan.pickedTeamCount === 1 ? "Assign team" : `Assign ${plan.pickedTeamCount} teams`;
-    }
-    return "Assign";
+    return PRIMARY_ACTION_ASSIGN;
 }
 
 /** Footer hint sentence summarising the planned change. */

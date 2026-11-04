@@ -282,6 +282,15 @@ export function RoadmapAssignDialog({
                                 ),
                             )
                         }
+                        onTeamPreview={(groupId, matchedMembersCount) =>
+                            setPicked((items) =>
+                                items.map((item) =>
+                                    item.type === "team" && item.id === groupId && item.matchedMembersCount !== matchedMembersCount
+                                        ? { ...item, matchedMembersCount }
+                                        : item,
+                                ),
+                            )
+                        }
                     />
                 </section>
 

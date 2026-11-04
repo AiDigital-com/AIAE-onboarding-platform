@@ -72,7 +72,7 @@ describe("buildAssignmentPlan and labels", () => {
 
         // Then:
         expect(plan).toEqual({ newPeopleCount: 1, pickedTeamCount: 0, removalCount: 0 });
-        expect(primaryActionLabel(plan)).toBe("Assign to 1 person");
+        expect(primaryActionLabel(plan)).toBe("Assign");
         expect(planHint(plan)).toBe("1 person will get this roadmap");
     });
 
@@ -81,16 +81,35 @@ describe("buildAssignmentPlan and labels", () => {
         const plan = buildAssignmentPlan([bob, design], new Set<RemovalKey>(["p:1"]), new Set([1]));
 
         // Then:
-        expect(plan).toEqual({ newPeopleCount: 1, pickedTeamCount: 1, removalCount: 1 });
+        expect(plan).toEqual({ newPeopleCount: 4, pickedTeamCount: 1, removalCount: 1 });
         expect(primaryActionLabel(plan)).toBe("Save changes");
-        expect(planHint(plan)).toBe("1 person (incl. 1 team) will get this roadmap · 1 will be removed");
+        expect(planHint(plan)).toBe("4 people (incl. 1 team) will get this roadmap · 1 will be removed");
     });
 
-    it("should describe a pure removal and an empty plan test", () => {
+    it("should keep counts out of the button for removals, empty plans and team picks test", () => {
         // When / Then:
-        expect(primaryActionLabel(buildAssignmentPlan([], new Set<RemovalKey>(["p:1", "t:7"]), new Set()))).toBe("Remove 2");
+        const removal = buildAssignmentPlan([], new Set<RemovalKey>(["p:1", "t:7"]), new Set());
+        expect(primaryActionLabel(removal)).toBe("Remove");
+        expect(planHint(removal)).toBe("2 will be removed");
         expect(primaryActionLabel(buildAssignmentPlan([], new Set(), new Set()))).toBe("Assign");
         expect(planHint(buildAssignmentPlan([], new Set(), new Set()))).toBe("Pick people or teams to assign.");
-        expect(primaryActionLabel(buildAssignmentPlan([design], new Set(), new Set()))).toBe("Assign team");
+        expect(primaryActionLabel(buildAssignmentPlan([design], new Set(), new Set()))).toBe("Assign");
+    });
+
+    it("should count team members in the plan, narrowed by the grade preview when known test", () => {
+        // Given: a whole team of 3 plus one new person, then the same team narrowed to 1 by grade
+        const wholeTeam = buildAssignmentPlan([design, bob], new Set(), new Set());
+        const narrowed = buildAssignmentPlan(
+            [{ ...design, gradeIds: [2], matchedMembersCount: 1 }, bob],
+            new Set(),
+            new Set(),
+        );
+        const pending = buildAssignmentPlan([{ ...design, gradeIds: [2] }], new Set(), new Set());
+
+        // Then:
+        expect(wholeTeam.newPeopleCount).toBe(4);
+        expect(planHint(wholeTeam)).toBe("4 people (incl. 1 team) will get this roadmap");
+        expect(narrowed.newPeopleCount).toBe(2);
+        expect(pending.newPeopleCount).toBe(3);
     });
 });
