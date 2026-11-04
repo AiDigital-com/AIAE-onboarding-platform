@@ -189,7 +189,7 @@ class RoadmapGroupAssignmentServiceImplTest {
 			AppUser admin = new AppUser(1L, "clerk-admin", "admin@test.com", "Admin", "admin", "Admin", null, null,
 					null);
 			when(groupAccessPolicy.canManageGroup(admin, 20L)).thenReturn(true);
-			RoadmapGroupAssignmentPreviewRecord previewRecord = new RoadmapGroupAssignmentPreviewRecord(10L, 5L, 2L);
+			RoadmapGroupAssignmentPreviewRecord previewRecord = new RoadmapGroupAssignmentPreviewRecord(10L, 5L, 2L, List.of(1L, 2L, 3L, 4L, 5L));
 			when(roadmapGroupAssignmentRecordAssembler.previewAssignment(20L, List.of(5L))).thenReturn(previewRecord);
 
 			// When:

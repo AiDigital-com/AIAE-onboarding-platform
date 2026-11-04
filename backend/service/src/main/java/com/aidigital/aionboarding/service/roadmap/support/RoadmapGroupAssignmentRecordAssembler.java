@@ -3,6 +3,7 @@ package com.aidigital.aionboarding.service.roadmap.support;
 import com.aidigital.aionboarding.domain.grade.entities.Grade;
 import com.aidigital.aionboarding.domain.group.entities.Group;
 import com.aidigital.aionboarding.domain.group.entities.GroupLead;
+import com.aidigital.aionboarding.domain.group.entities.GroupMember;
 import com.aidigital.aionboarding.domain.roadmap.entities.Roadmap;
 import com.aidigital.aionboarding.domain.roadmap.entities.RoadmapGroupAssignment;
 import com.aidigital.aionboarding.domain.roadmap.entities.RoadmapGroupAssignmentGrade;
@@ -176,22 +177,26 @@ public class RoadmapGroupAssignmentRecordAssembler {
     }
 
     /**
-     * Computes how many of a group's members would be matched by a prospective grade filter,
-     * without creating or modifying any assignment.
+     * Computes which of a group's members would be matched by a prospective grade filter,
+     * without creating or modifying any assignment. The matched user ids are returned alongside
+     * the counts so a client can de-duplicate team members against explicitly picked people.
      *
      * @param groupId  the group being previewed
      * @param gradeIds requested grade filter ids, or {@code null}/empty for no filter
-     * @return the preview counts
+     * @return the preview counts and matched user ids
      * @throws AppException with reason {@code C001} when any grade id does not exist
      */
     public RoadmapGroupAssignmentPreviewRecord previewAssignment(Long groupId, List<Long> gradeIds) {
         Map<Long, Grade> grades = requireExistingGrades(gradeIds);
         long groupMembersCount = groupMemberEntityService.countByGroupId(groupId);
         long membersWithoutGradeCount = groupMemberEntityService.countMembersWithoutGrade(groupId);
-        long membersMatchedCount = grades.isEmpty()
-                ? groupMembersCount
-                : groupMemberEntityService.findByGroupIdAndMemberGradeIdIn(groupId, grades.keySet()).size();
-        return new RoadmapGroupAssignmentPreviewRecord(groupMembersCount, membersMatchedCount,
-                membersWithoutGradeCount);
+        List<GroupMember> matchedMembers = grades.isEmpty()
+                ? groupMemberEntityService.findByGroupId(groupId)
+                : groupMemberEntityService.findByGroupIdAndMemberGradeIdIn(groupId, grades.keySet());
+        List<Long> matchedUserIds = matchedMembers.stream()
+                .map(member -> member.getId().getMemberUserId())
+                .toList();
+        return new RoadmapGroupAssignmentPreviewRecord(groupMembersCount, matchedUserIds.size(),
+                membersWithoutGradeCount, matchedUserIds);
     }
 }

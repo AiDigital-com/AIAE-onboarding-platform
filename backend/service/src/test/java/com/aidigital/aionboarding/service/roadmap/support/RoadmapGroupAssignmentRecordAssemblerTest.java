@@ -270,7 +270,7 @@ class RoadmapGroupAssignmentRecordAssemblerTest {
 			when(groupMemberEntityService.countByGroupId(20L)).thenReturn(10L);
 			when(groupMemberEntityService.countMembersWithoutGrade(20L)).thenReturn(2L);
 			when(groupMemberEntityService.findByGroupIdAndMemberGradeIdIn(20L, Set.of(5L)))
-					.thenReturn(List.of(new GroupMember()));
+					.thenReturn(List.of(member(20L, 101L)));
 
 			// When:
 			RoadmapGroupAssignmentPreviewRecord result = assembler.previewAssignment(20L, List.of(5L));
@@ -279,19 +279,32 @@ class RoadmapGroupAssignmentRecordAssemblerTest {
 			assertThat(result.groupMembersCount()).isEqualTo(10L);
 			assertThat(result.membersMatchedCount()).isEqualTo(1L);
 			assertThat(result.membersWithoutGradeCount()).isEqualTo(2L);
+			assertThat(result.matchedUserIds()).containsExactly(101L);
 		}
 
 		@Test
 		void shouldMatchAllMembersWhenNoGradeFilterTest() {
 			// Given:
-			when(groupMemberEntityService.countByGroupId(20L)).thenReturn(10L);
+			when(groupMemberEntityService.countByGroupId(20L)).thenReturn(3L);
 			when(groupMemberEntityService.countMembersWithoutGrade(20L)).thenReturn(2L);
+			when(groupMemberEntityService.findByGroupId(20L))
+					.thenReturn(List.of(member(20L, 101L), member(20L, 102L), member(20L, 103L)));
 
 			// When:
 			RoadmapGroupAssignmentPreviewRecord result = assembler.previewAssignment(20L, List.of());
 
 			// Then:
-			assertThat(result.membersMatchedCount()).isEqualTo(10L);
+			assertThat(result.membersMatchedCount()).isEqualTo(3L);
+			assertThat(result.matchedUserIds()).containsExactly(101L, 102L, 103L);
+		}
+
+		private GroupMember member(Long groupId, Long memberUserId) {
+			GroupMember.GroupMemberId id = new GroupMember.GroupMemberId();
+			id.setGroupId(groupId);
+			id.setMemberUserId(memberUserId);
+			GroupMember member = new GroupMember();
+			member.setId(id);
+			return member;
 		}
 	}
 }
