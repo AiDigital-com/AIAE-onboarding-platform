@@ -1366,6 +1366,12 @@
     background: hsl(var(--primary) / 12%);
 }
 
+/* The auto-assign badge is longer than the generic chip cap, so it keeps its full label. */
+.library-roadmap-card__auto-chip {
+    max-width: none;
+    flex: 0 0 auto;
+}
+
 .library-roadmap-card__auto-badge svg,
 .library-chip--accent svg {
     width: 0.875rem;
