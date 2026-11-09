@@ -32,6 +32,10 @@ export interface LessonAttachmentAsset {
 interface Props {
     attachments?: LessonAttachmentAsset[];
     sourceReferences?: Array<Record<string, unknown>>;
+    /** Drops files that come from source materials. The backend only lets lessons.manage holders
+     * open those (StorageKeyAuthorizationService), so learners would get "access forbidden".
+     * Source links and YouTube videos are public URLs and stay visible. */
+    hideSourceFiles?: boolean;
     layout?: "grid" | "list" | "column";
     showTitle?: boolean;
     canDelete?: boolean;
@@ -350,6 +354,7 @@ function AttachmentCard({
 export function LessonAttachments({
     attachments = [],
     sourceReferences = [],
+    hideSourceFiles = false,
     layout = "grid",
     showTitle = true,
     canDelete = false,
@@ -360,7 +365,10 @@ export function LessonAttachments({
     // Assets attached directly to the lesson and materials used to generate it are independent,
     // non-overlapping populations — both render, matching the editor's own Assets panel (see
     // LessonDetailsDialog's `allAssets = [...lessonAssets, ...sourceAttachments]`).
-    const resolvedAttachments = [...attachments, ...getSourceAttachments(sourceReferences)];
+    const sourceAttachments = getSourceAttachments(sourceReferences).filter(
+        (attachment) => !hideSourceFiles || attachment.kind === "link" || attachment.kind === "youtube",
+    );
+    const resolvedAttachments = [...attachments, ...sourceAttachments];
 
     const previewStorageKeys = resolvedAttachments
         .filter((attachment) => (isImageAttachment(attachment) || isVideoAttachment(attachment)) && attachment.storageKey && !attachment.previewUrl)
