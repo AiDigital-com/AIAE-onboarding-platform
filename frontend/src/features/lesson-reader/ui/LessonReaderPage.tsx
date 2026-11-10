@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { useParams } from "react-router-dom";
+import { useHasPermission } from "@/shared/auth/useHasPermission";
 import { ErrorAlert } from "@/shared/ui/ErrorAlert";
 import { LoadingBlock } from "@/shared/ui/LoadingBlock";
 import { markdownToHtml } from "@/shared/lib/lessonContent";
@@ -17,6 +18,7 @@ export function LessonReaderPage() {
     const { id = "" } = useParams();
     const { data, isLoading } = useLessonReaderQuery(id);
     const completionMutation = useSetLessonCompletionMutation();
+    const canManageLessons = useHasPermission()("lessons.manage");
     const initialIsCompletedFlag = data?.initialIsCompleted ?? false;
     const lessonId = data?.lesson?.id ?? null;
     const hasActivities = Boolean(data?.activities?.length);
@@ -86,6 +88,7 @@ export function LessonReaderPage() {
                         normalizeLessonAsset(asset as unknown as Record<string, unknown>),
                     )}
                     sourceReferences={sourceReferences}
+                    hideSourceFiles={!canManageLessons}
                 />
                 <LessonActivityGate
                     lessonId={lesson.id}

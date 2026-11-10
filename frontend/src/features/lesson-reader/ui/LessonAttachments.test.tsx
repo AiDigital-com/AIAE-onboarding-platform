@@ -127,6 +127,27 @@ describe("LessonAttachments", () => {
         expect(screen.getByText("Source material video")).toBeTruthy();
     });
 
+    it("should hide source material files but keep source links and videos when hideSourceFiles is set test", () => {
+        // Given: a source with a file (forbidden for learners), a link and a YouTube video
+        const sourceReferences = [
+            {
+                id: "source-1",
+                youtubeUrls: ["https://youtu.be/xyz"],
+                youtubeVideos: [{ url: "https://youtu.be/xyz", title: "Source video" }],
+                links: [{ url: "https://site.example.com", title: "Source link" }],
+                attachments: [{ id: 5, name: "Forbidden.pdf", kind: "file", mimeType: "application/pdf", storageKey: "k" }],
+            },
+        ];
+
+        // When:
+        render(<LessonAttachments sourceReferences={sourceReferences} hideSourceFiles />, { wrapper: createWrapper() });
+
+        // Then:
+        expect(screen.getByText("Source video")).toBeTruthy();
+        expect(screen.getByText("Source link")).toBeTruthy();
+        expect(screen.queryByText("Forbidden.pdf")).toBeNull();
+    });
+
     it("should render nothing when there are no attachments and no source references test", () => {
         // Given / When:
         const { container } = render(<LessonAttachments />, { wrapper: createWrapper() });
