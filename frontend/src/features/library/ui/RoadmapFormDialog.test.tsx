@@ -1,5 +1,5 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { LibraryLesson, LibraryRoadmap } from "../api/types";
 import { RoadmapFormDialog } from "./RoadmapFormDialog";
@@ -122,5 +122,71 @@ describe("RoadmapFormDialog", () => {
         // Then: the selected lesson row shows the Private label, never the Public one
         expect(screen.getByLabelText("Private — visible in the Library only to assigned users")).toBeTruthy();
         expect(screen.queryByLabelText("Public — visible to everyone in the Library")).toBeNull();
+    });
+    describe("duplicate mode", () => {
+        const original = {
+            id: 5,
+            title: "Company Essentials",
+            description: "Start here",
+            tags: ["onboarding"],
+            lessonIds: [2, 1],
+            lessons: [],
+            isEnrolled: false,
+            viewerCanManage: true,
+        } as unknown as LibraryRoadmap;
+
+        function renderDuplicate(onSave = vi.fn(), onDelete = vi.fn()) {
+            render(
+                <RoadmapFormDialog
+                    open
+                    mode="duplicate"
+                    initialRoadmap={original}
+                    lessons={[publishedLesson(), privateLesson()]}
+                    onClose={() => {}}
+                    onSave={onSave}
+                    onDelete={onDelete}
+                />,
+            );
+            return { onSave, onDelete };
+        }
+
+        it("should pre-fill Copy of title and describe what is and is not copied test", () => {
+            // Given / When:
+            renderDuplicate();
+
+            // Then:
+            expect(screen.getByRole("heading", { name: "Duplicate roadmap" })).toBeTruthy();
+            expect(screen.getByText("Based on Company Essentials")).toBeTruthy();
+            expect(screen.getByRole("note").textContent).toMatch(/auto-assign to new users \(always off\)/);
+            expect((screen.getByDisplayValue("Copy of Company Essentials") as HTMLInputElement).value).toBe(
+                "Copy of Company Essentials",
+            );
+            expect(screen.getByDisplayValue("Start here")).toBeTruthy();
+        });
+
+        it("should show Create copy and no Delete button test", () => {
+            // Given / When:
+            renderDuplicate();
+
+            // Then:
+            expect(screen.getByRole("button", { name: "Create copy" })).toBeTruthy();
+            expect(screen.queryByText(/Delete Roadmap/)).toBeNull();
+        });
+
+        it("should save the copy with the same lessons in the same order test", () => {
+            // Given:
+            const { onSave } = renderDuplicate();
+
+            // When:
+            fireEvent.click(screen.getByRole("button", { name: "Create copy" }));
+
+            // Then: nothing but the title differs, and the lesson order is preserved
+            expect(onSave).toHaveBeenCalledWith({
+                title: "Copy of Company Essentials",
+                description: "Start here",
+                tags: ["onboarding"],
+                lessonIds: [2, 1],
+            });
+        });
     });
 });

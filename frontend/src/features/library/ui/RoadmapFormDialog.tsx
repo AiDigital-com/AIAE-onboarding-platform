@@ -106,10 +106,14 @@ function resolveSelectedLessons(
         .filter((lesson): lesson is RoadmapFormLesson => lesson !== null);
 }
 
-function buildInitialForm(initialRoadmap: LibraryRoadmap | null, lessons: LibraryLesson[]): RoadmapFormState {
+function buildInitialForm(
+    initialRoadmap: LibraryRoadmap | null,
+    lessons: LibraryLesson[],
+    mode: "create" | "edit" | "duplicate" = "edit",
+): RoadmapFormState {
     if (initialRoadmap) {
         return {
-            title: clampEntityTitle(initialRoadmap.title || ""),
+            title: clampEntityTitle(mode === "duplicate" ? `Copy of ${initialRoadmap.title || ""}` : initialRoadmap.title || ""),
             description: initialRoadmap.description || "",
             tags: normalizeLessonTagInput(initialRoadmap.tags || []),
             selectedLessons: resolveSelectedLessons(initialRoadmap, lessons),
@@ -133,7 +137,8 @@ interface RoadmapFormDialogProps {
     lessons: LibraryLesson[];
     isSaving?: boolean;
     isDeleting?: boolean;
-    mode?: "create" | "edit";
+    /** "duplicate" pre-fills the form from {@link initialRoadmap} and creates a new roadmap on save. */
+    mode?: "create" | "edit" | "duplicate";
     initialRoadmap?: LibraryRoadmap | null;
     onClose: () => void;
     onSave: (formData: { title: string; description: string; tags: string[]; lessonIds: number[] }) => void;
@@ -153,14 +158,18 @@ export function RoadmapFormDialog({
     onDelete,
     onValidationError,
 }: RoadmapFormDialogProps) {
-    const [form, setForm] = useState(() => buildInitialForm(initialRoadmap, lessons));
+    const [form, setForm] = useState(() => buildInitialForm(initialRoadmap, lessons, mode));
     const [baselineForm, setBaselineForm] = useState(() =>
-        serializeRoadmapForm(buildInitialForm(initialRoadmap, lessons)),
+        serializeRoadmapForm(buildInitialForm(initialRoadmap, lessons, mode)),
     );
+    const titleInputRef = useRef<HTMLInputElement>(null);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [pendingLessonId, setPendingLessonId] = useState("");
     const [isDiscardOpen, setIsDiscardOpen] = useState(false);
     const isEditMode = mode === "edit";
+    const isDuplicateMode = mode === "duplicate";
+    // Edit and duplicate both start from an existing roadmap whose lessons load lazily.
+    const hasSourceRoadmap = isEditMode || isDuplicateMode;
     const expectedLessonCount = getRoadmapLessonIds(initialRoadmap).length;
     const isDirty = serializeRoadmapForm(form) !== baselineForm;
     const baselineFormRef = useRef(baselineForm);
@@ -172,7 +181,7 @@ export function RoadmapFormDialog({
             setIsDiscardOpen(false);
             return;
         }
-        const nextForm = buildInitialForm(initialRoadmap, lessons);
+        const nextForm = buildInitialForm(initialRoadmap, lessons, mode);
         setForm(nextForm);
         setBaselineForm(serializeRoadmapForm(nextForm));
         setErrors({});
@@ -180,10 +189,22 @@ export function RoadmapFormDialog({
         setIsDiscardOpen(false);
     }, [open, initialRoadmap?.id]);
 
+    // A copy's name is pre-selected so typing replaces it.
+    useEffect(() => {
+        if (!open || !isDuplicateMode) {
+            return undefined;
+        }
+        const frame = window.requestAnimationFrame(() => {
+            titleInputRef.current?.focus();
+            titleInputRef.current?.select();
+        });
+        return () => window.cancelAnimationFrame(frame);
+    }, [open, isDuplicateMode, initialRoadmap?.id]);
+
     // Enrich selected lessons when the lazy picker catalog arrives (or grows).
     // When the form is still at baseline, also move the baseline so hydration is not "dirty".
     useEffect(() => {
-        if (!open || !isEditMode || lessons.length === 0 || expectedLessonCount === 0) {
+        if (!open || !hasSourceRoadmap || lessons.length === 0 || expectedLessonCount === 0) {
             return;
         }
         setForm((prev) => {
@@ -205,7 +226,7 @@ export function RoadmapFormDialog({
             }
             return nextForm;
         });
-    }, [open, isEditMode, lessons, initialRoadmap, expectedLessonCount]);
+    }, [open, hasSourceRoadmap, lessons, initialRoadmap, expectedLessonCount]);
 
     const requestClose = () => {
         if (isSaving || isDeleting) {
@@ -283,7 +304,7 @@ export function RoadmapFormDialog({
             onClose={isSaving || isDeleting ? undefined : requestClose}
             size="md"
             flushBody
-            title={isEditMode ? "Edit roadmap" : "Create roadmap"}
+            title={isEditMode ? "Edit roadmap" : isDuplicateMode ? "Duplicate roadmap" : "Create roadmap"}
             closeDisabled={isSaving || isDeleting}
             closeLabel="Close roadmap dialog"
             footer={
@@ -312,22 +333,39 @@ export function RoadmapFormDialog({
                                 : "Creating..."
                             : isEditMode
                               ? "Save Roadmap"
-                              : "Create Roadmap"}
+                              : isDuplicateMode
+                                ? "Create copy"
+                                : "Create Roadmap"}
                     </Button>
                 </>
             }
         >
             <div className="library-form-body">
                 <div>
-                    <h2 className="library-form-hero-title">{isEditMode ? "Edit roadmap" : "Create roadmap"}</h2>
+                    <h2 className="library-form-hero-title">
+                        {isEditMode ? "Edit roadmap" : isDuplicateMode ? "Duplicate roadmap" : "Create roadmap"}
+                    </h2>
                     <p className="library-form-hero-copy">
-                        Assemble a learning path from ready lessons and set the order learners will follow.
+                        {isDuplicateMode
+                            ? `Based on ${initialRoadmap?.title ?? "the original roadmap"}`
+                            : "Assemble a learning path from ready lessons and set the order learners will follow."}
                     </p>
                 </div>
+
+                {isDuplicateMode && (
+                    <p className="library-duplicate-note" role="note">
+                        <b>Copied:</b> description, tags and lesson order. The copy uses the same lessons; no lesson
+                        copies are created.
+                        <br />
+                        <b>Not copied:</b> assignees, auto-assign to new users (always off) and progress. You become
+                        the creator. Nothing is created until you click Create copy.
+                    </p>
+                )}
 
                 <label className="library-field">
                     <span className="library-field__label">Title</span>
                     <input
+                        ref={titleInputRef}
                         className="library-field__control"
                         value={form.title}
                         onChange={(event) =>

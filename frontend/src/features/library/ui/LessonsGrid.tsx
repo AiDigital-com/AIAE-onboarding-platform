@@ -12,6 +12,7 @@ import { getLessonCoverBackground } from "@/shared/lib/brandColors";
 import { lessonPreviewText } from "@/shared/lib/lessonPreviewText";
 import { useFilePreviewUrls } from "@/shared/api/files";
 import type { LibraryLesson } from "../api/types";
+import { DuplicateMenuButton } from "./DuplicateMenuButton";
 
 /** Rough height of the 3-item enrollment menu, used to flip it upward when there's no room below. */
 const ENROLLMENT_MENU_ESTIMATED_HEIGHT = 160;
@@ -97,6 +98,11 @@ interface LessonsGridProps {
     onAssignLesson?: (lesson: LibraryLesson) => void;
     showEnrollmentAction?: boolean;
     canAssignLearning?: boolean;
+    /** Shows the ⋯ menu with Duplicate on Ready lessons. */
+    canDuplicate?: boolean;
+    onDuplicateLesson?: (lesson: LibraryLesson) => void;
+    /** Id of a just-duplicated lesson: its card is scrolled into view and briefly highlighted. */
+    highlightedLessonId?: number | null;
 }
 
 export function LessonsGrid({
@@ -107,6 +113,9 @@ export function LessonsGrid({
     onAssignLesson,
     showEnrollmentAction = false,
     canAssignLearning = false,
+    canDuplicate = false,
+    onDuplicateLesson,
+    highlightedLessonId = null,
 }: LessonsGridProps) {
     const enrollmentMenuRef = useRef<HTMLDivElement>(null);
     const [enrollmentMenu, setEnrollmentMenu] = useState<{
@@ -172,6 +181,16 @@ export function LessonsGrid({
         };
     }, [enrollmentMenu.lesson]);
 
+    // Bring a just-duplicated lesson into view once its card is rendered.
+    useEffect(() => {
+        if (highlightedLessonId == null) {
+            return;
+        }
+        document
+            .querySelector(`[data-library-lesson-id="${highlightedLessonId}"]`)
+            ?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    }, [highlightedLessonId, lessons]);
+
     return (
         <>
             <div className="library-grid library-grid--lessons">
@@ -199,7 +218,8 @@ export function LessonsGrid({
                     return (
                         <article
                             key={lesson.id}
-                            className="library-card"
+                            className={`library-card${lesson.id === highlightedLessonId ? " library-card--just-added" : ""}`}
+                            data-library-lesson-id={lesson.id}
                             onClick={() => onOpenLesson?.(lesson)}
                         >
                             <div className="library-card__preview-wrap">
@@ -335,6 +355,12 @@ export function LessonsGrid({
                                             : getEnrollmentActionLabel(lesson, "Remove from My Lessons", "Add to My Lessons")}
                                         {canAssignLearning && <ArrowDropDownOutlinedIcon />}
                                     </Button>
+                                )}
+                                {canDuplicate && lesson.status === "ready" && (
+                                    <DuplicateMenuButton
+                                        label={`More actions for ${lesson.title}`}
+                                        onDuplicate={() => onDuplicateLesson?.(lesson)}
+                                    />
                                 )}
                             </footer>
                         </article>

@@ -1352,6 +1352,7 @@
 .library-roadmap-card__actions {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: var(--space-2);
 }
 
@@ -1381,4 +1382,81 @@
 .library-filters-grid__checkbox {
     align-self: center;
     margin: 0;
+}
+
+/* ---------- Duplicate (lessons) ---------- */
+.library-duplicate-note {
+    margin: 0;
+    color: #80808e;
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.library-duplicate-note b {
+    color: #33344a;
+    font-weight: 700;
+}
+
+.library-menu__icon {
+    margin-right: 8px;
+    vertical-align: -2px;
+}
+
+.library-card__more {
+    display: inline-grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid #e5e5fa;
+    border-radius: 50%;
+    background: #fff;
+    color: #0b0b0b;
+    cursor: pointer;
+}
+
+.library-card__more:hover,
+.library-card__more[aria-expanded="true"] {
+    border-color: #e3e5ff;
+    background: #f5f5fe;
+    color: #0009dc;
+}
+
+.library-card__more:focus-visible {
+    outline: 3px solid #e3e5ff;
+    outline-offset: 2px;
+}
+
+.library-card--just-added {
+    animation: library-card-just-added 2.4s ease-out;
+}
+
+@keyframes library-card-just-added {
+    0%,
+    35% {
+        box-shadow: 0 0 0 3px #0009dc, 0 12px 28px rgba(0, 9, 220, 0.16);
+    }
+
+    100% {
+        box-shadow: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .library-card--just-added {
+        animation: none;
+        box-shadow: 0 0 0 3px #0009dc;
+    }
+}
+
+.library-roadmap-card--just-added {
+    animation: library-card-just-added 2.4s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .library-roadmap-card--just-added {
+        animation: none;
+        box-shadow: 0 0 0 3px #0009dc;
+    }
 }

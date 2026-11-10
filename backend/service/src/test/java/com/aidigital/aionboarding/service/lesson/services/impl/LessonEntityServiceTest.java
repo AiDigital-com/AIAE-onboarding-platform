@@ -34,6 +34,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import com.aidigital.aionboarding.domain.lesson.entities.LessonAsset;
+import com.aidigital.aionboarding.domain.lesson.entities.LessonMaterial;
+import com.aidigital.aionboarding.domain.lessonactivity.entities.LessonActivity;
+import com.aidigital.aionboarding.service.lesson.services.entity.LessonAssetEntityService;
+import com.aidigital.aionboarding.service.lessonactivity.services.impl.LessonActivityPersistenceHelper;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -64,6 +70,10 @@ class LessonEntityServiceTest {
 	private LessonRepository lessonRepository;
 	@Mock
 	private LessonMaterialEntityService lessonMaterialEntityService;
+	@Mock
+	private LessonAssetEntityService lessonAssetEntityService;
+	@Mock
+	private LessonActivityPersistenceHelper lessonActivityPersistenceHelper;
 	@Mock
 	private UserEntityService userEntityService;
 	@Mock
@@ -107,6 +117,104 @@ class LessonEntityServiceTest {
 
 		// Then:
 		assertThat(result).containsExactly(m2, m1);
+	}
+
+	@Test
+	void duplicateLessonShouldCopyContentAssetsActivitiesAndSourcesAsReadyPrivateOwnedByViewerTest() {
+		// Given: a published lesson with a teacher video, a file asset, a quiz and one source material
+		AppUser viewer = appUser(7L);
+		User owner = user(7L);
+		owner.setName("Copier");
+		Lesson source = new Lesson();
+		source.setId(10L);
+		source.setTitle("Original");
+		source.setDescription("desc");
+		source.setContentFormat(format("markdown"));
+		source.setContentMarkdown("md");
+		source.setContentHtml("<p>html</p>");
+		source.setCoverImageStorageKey("uploads/cover");
+		source.setCoverImageOriginalName("cover.png");
+		source.setCoverImageMimeType("image/png");
+		source.setTags(List.of("a", "b"));
+		source.setGenerationMetadata(new java.util.HashMap<>(java.util.Map.of("teacherVideo", "x", "keep", "y")));
+		source.setStatus(status("ready"));
+		source.setPublicationStatus(publication("published"));
+		source.setPublishedAt(LocalDateTime.parse("2026-01-01T00:00:00"));
+		source.setRevisionHistory(List.of("rev"));
+
+		LessonAsset asset = new LessonAsset();
+		asset.setStorageKey("uploads/file");
+		asset.setTitle("File");
+		asset.setCreatedAt(LocalDateTime.parse("2026-02-01T00:00:00"));
+		LessonActivity quiz = new LessonActivity();
+		quiz.setTitle("Quiz");
+		quiz.setItemCount(3);
+		quiz.setPayload(new java.util.HashMap<>(java.util.Map.of("questions", List.of("q1"))));
+		quiz.setGenerationMetadata(new java.util.HashMap<>());
+		quiz.setCreatedBy("Someone");
+		quiz.setCreatedAt(LocalDateTime.parse("2026-02-02T00:00:00"));
+
+		Material material = material(5L);
+		LessonMaterial sourceLink = new LessonMaterial();
+		LessonMaterial.LessonMaterialId sourceLinkId = new LessonMaterial.LessonMaterialId();
+		sourceLinkId.setLessonId(10L);
+		sourceLinkId.setMaterialId(5L);
+		sourceLink.setId(sourceLinkId);
+		sourceLink.setMaterial(material);
+		sourceLink.setSortOrder(4);
+
+		when(userEntityService.findById(7L)).thenReturn(Optional.of(owner));
+		when(lessonStatusEntityService.getReferenceByCode("ready")).thenReturn(status("ready"));
+		when(lessonPublicationStatusEntityService.getReferenceByCode("private")).thenReturn(publication("private"));
+		when(lessonRepository.save(any(Lesson.class))).thenAnswer(invocation -> {
+			Lesson lesson = invocation.getArgument(0);
+			lesson.setId(11L);
+			return lesson;
+		});
+		when(lessonMaterialEntityService.findByLessonIdOrderBySortOrderAsc(10L)).thenReturn(List.of(sourceLink));
+		when(lessonAssetEntityService.findByLessonIdOrderByCreatedAtAsc(10L)).thenReturn(List.of(asset));
+		when(lessonActivityPersistenceHelper.findByLessonIdOrderByCreatedAtAsc(10L)).thenReturn(List.of(quiz));
+
+		// When:
+		Lesson copy = lessonEntityService.duplicateLesson(viewer, source, "Copy of Original");
+
+		// Then: a new Ready + Private lesson owned by the viewer with the content copied
+		assertThat(copy.getId()).isEqualTo(11L);
+		assertThat(copy.getTitle()).isEqualTo("Copy of Original");
+		assertThat(copy.getStatus().getCode()).isEqualTo("ready");
+		assertThat(copy.getPublicationStatus().getCode()).isEqualTo("private");
+		assertThat(copy.getPublishedAt()).isNull();
+		assertThat(copy.getCreatedByUser()).isSameAs(owner);
+		assertThat(copy.getCreatedBy()).isEqualTo("Copier");
+		assertThat(copy.getContentMarkdown()).isEqualTo("md");
+		assertThat(copy.getContentHtml()).isEqualTo("<p>html</p>");
+		assertThat(copy.getCoverImageStorageKey()).isEqualTo("uploads/cover");
+		assertThat(copy.getTags()).containsExactly("a", "b");
+		assertThat(copy.getRevisionHistory()).isEmpty();
+		// ...without the provider-side teacher video, and without mutating the original's metadata
+		assertThat(copy.getGenerationMetadata()).containsEntry("keep", "y").doesNotContainKey("teacherVideo");
+		assertThat(source.getGenerationMetadata()).containsKey("teacherVideo");
+
+		ArgumentCaptor<LessonAsset> assetCaptor = ArgumentCaptor.forClass(LessonAsset.class);
+		verify(lessonAssetEntityService).save(assetCaptor.capture());
+		assertThat(assetCaptor.getValue().getLesson()).isSameAs(copy);
+		assertThat(assetCaptor.getValue().getStorageKey()).isEqualTo("uploads/file");
+		assertThat(assetCaptor.getValue().getCreatedAt()).isEqualTo(asset.getCreatedAt());
+
+		ArgumentCaptor<LessonActivity> activityCaptor = ArgumentCaptor.forClass(LessonActivity.class);
+		verify(lessonActivityPersistenceHelper).save(activityCaptor.capture());
+		assertThat(activityCaptor.getValue().getLesson()).isSameAs(copy);
+		assertThat(activityCaptor.getValue().getTitle()).isEqualTo("Quiz");
+		assertThat(activityCaptor.getValue().getPayload()).containsKey("questions");
+		assertThat(activityCaptor.getValue().getId()).isNull();
+
+		ArgumentCaptor<List<LessonMaterial>> linkCaptor = ArgumentCaptor.forClass(List.class);
+		verify(lessonMaterialEntityService).saveAll(linkCaptor.capture());
+		assertThat(linkCaptor.getValue()).singleElement().satisfies(link -> {
+			assertThat(link.getId().getLessonId()).isEqualTo(11L);
+			assertThat(link.getId().getMaterialId()).isEqualTo(5L);
+			assertThat(link.getSortOrder()).isEqualTo(4);
+		});
 	}
 
 	@Test

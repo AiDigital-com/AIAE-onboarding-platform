@@ -6,7 +6,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
-import java.util.Optional;
 
 public interface LessonAssetRepository extends JpaRepository<LessonAsset, Long> {
 
@@ -22,6 +21,10 @@ public interface LessonAssetRepository extends JpaRepository<LessonAsset, Long> 
         """)
     List<LessonAsset> findByLessonIdsOrderByLessonIdAscCreatedAtAsc(@Param("lessonIds") java.util.Collection<Long> lessonIds);
 
-    @Query("SELECT a.lesson.id FROM LessonAsset a WHERE a.storageKey = :storageKey")
-    Optional<Long> findLessonIdByStorageKey(@Param("storageKey") String storageKey);
+    /**
+     * Ids of every lesson that owns an asset with this storage key. More than one lesson can own
+     * the same key, because a duplicated lesson shares the original's uploaded files.
+     */
+    @Query("SELECT DISTINCT a.lesson.id FROM LessonAsset a WHERE a.storageKey = :storageKey")
+    List<Long> findLessonIdsByStorageKey(@Param("storageKey") String storageKey);
 }

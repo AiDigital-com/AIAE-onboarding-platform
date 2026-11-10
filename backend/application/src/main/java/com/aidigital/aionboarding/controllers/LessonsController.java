@@ -127,6 +127,15 @@ public class LessonsController implements LessonsApi {
     }
 
     @Override
+    @PreAuthorize("@perm.has('" + PermissionKeys.LESSONS_CREATE + "')")
+    public ResponseEntity<LessonResponseV1> duplicateLesson(Long id, DuplicateLessonRequestV1 request) {
+        AppUser viewer = currentUser.requireUser();
+        String title = request == null ? null : request.getTitle();
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(lessonApiMapper.toLessonResponseV1(lessonService.duplicateLesson(viewer, id, title)));
+    }
+
+    @Override
     @PreAuthorize("@perm.has('" + PermissionKeys.LESSONS_MANAGE + "')")
     @Transactional
     public ResponseEntity<LessonResponseV1> updateLessonContent(Long id, UpdateLessonContentRequestV1 request) {

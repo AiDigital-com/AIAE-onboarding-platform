@@ -75,6 +75,19 @@ public interface LessonService {
 	LessonSummaryRecord createLesson(AppUser viewer, CreateLessonInput input);
 
 	/**
+	 * Duplicates a lesson the viewer can see into a new READY + PRIVATE lesson owned by the viewer.
+	 * Copies content, cover, tags, sources, assets and activities; does not copy assignees or progress.
+	 *
+	 * @param viewer authenticated user with {@code lessons.create}
+	 * @param id     lesson to duplicate
+	 * @param title  title of the copy, or {@code null}/blank for "Copy of &lt;title&gt;"
+	 * @return the copy as a lesson detail
+	 * @throws com.aidigital.aionboarding.service.common.error.AppException when the lesson is missing
+	 *                                                                      or not visible
+	 */
+	LessonDetailRecord duplicateLesson(AppUser viewer, Long id, String title);
+
+	/**
 	 * Updates editable lesson content fields.
 	 *
 	 * @param viewer authenticated manager allowed to manage the lesson

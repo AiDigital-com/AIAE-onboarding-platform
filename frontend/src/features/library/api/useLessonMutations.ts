@@ -83,6 +83,29 @@ export function useCreateLessonMutation() {
     });
 }
 
+/** Duplicates a lesson into a Ready + Private copy owned by the caller (see POST /lessons/{id}/duplicate). */
+export function useDuplicateLessonMutation() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, title }: { id: number; title: string }) => {
+            const { data, error } = await apiClient.POST("/api/v1/lessons/{id}/duplicate", {
+                params: { path: { id } },
+                body: { title },
+            });
+
+            if (error || !data?.lesson) {
+                throw new Error(getApiErrorMessage(error, "Failed to duplicate lesson."));
+            }
+
+            return data.lesson as unknown as LibraryLesson;
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: libraryQueryKeys.lessons });
+        },
+    });
+}
+
 export function useUpdateLessonContentMutation() {
     const queryClient = useQueryClient();
 

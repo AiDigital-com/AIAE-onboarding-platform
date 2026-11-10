@@ -1,4 +1,4 @@
-import type { CSSProperties, MouseEvent } from "react";
+import { useEffect, type CSSProperties, type MouseEvent } from "react";
 import { Link } from "react-router-dom";
 
 import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
@@ -14,6 +14,7 @@ import type { LibraryRoadmap } from "../api/types";
 import { ASSIGNEE_AVATAR_STACK_SIZE, AUTO_ASSIGN_BADGE_LABEL } from "../constants/roadmapAssignment";
 import { ROADMAP_CARD_ACCENTS } from "../constants/roadmapCard";
 import type { LibraryRoadmapsGridProps } from "../model/roadmapAssignment";
+import { DuplicateMenuButton } from "./DuplicateMenuButton";
 import { formatDate } from "./library-utils";
 
 function getRoadmapProgress(roadmap: LibraryRoadmap) {
@@ -41,7 +42,20 @@ export function RoadmapsGrid({
     onAssignRoadmap,
     onOpenRoadmap,
     canAssignLearning = false,
+    canDuplicate = false,
+    onDuplicateRoadmap,
+    highlightedRoadmapId = null,
 }: LibraryRoadmapsGridProps) {
+    // Bring a just-duplicated roadmap into view once its card is rendered.
+    useEffect(() => {
+        if (highlightedRoadmapId == null) {
+            return;
+        }
+        document
+            .querySelector(`[data-library-roadmap-id="${highlightedRoadmapId}"]`)
+            ?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    }, [highlightedRoadmapId, roadmaps]);
+
     return (
         <div className="library-roadmaps">
             {roadmaps.map((roadmap, roadmapIndex) => {
@@ -70,9 +84,11 @@ export function RoadmapsGrid({
                         className={[
                             "library-roadmap-card",
                             canOpenRoadmap ? "library-roadmap-card--clickable" : "",
+                            roadmap.id === highlightedRoadmapId ? "library-roadmap-card--just-added" : "",
                         ]
                             .filter(Boolean)
                             .join(" ")}
+                        data-library-roadmap-id={roadmap.id}
                         style={{ "--roadmap-accent": accentColor } as CSSProperties}
                         onClick={canOpenRoadmap ? () => onOpenRoadmap?.(roadmap) : undefined}
                     >
@@ -246,6 +262,12 @@ export function RoadmapsGrid({
                                     >
                                         Assign
                                     </Button>
+                                )}
+                                {canDuplicate && (
+                                    <DuplicateMenuButton
+                                        label={`More actions for ${roadmap.title}`}
+                                        onDuplicate={() => onDuplicateRoadmap?.(roadmap)}
+                                    />
                                 )}
                             </div>
                         </footer>

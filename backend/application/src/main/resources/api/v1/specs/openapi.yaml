@@ -1011,6 +1011,27 @@ paths:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/LessonGenerationStatusResponseV1' } } } }
         '401': { $ref: '#/components/responses/UnauthorizedV1' }
         '404': { $ref: '#/components/responses/NotFoundV1' }
+  /api/v1/lessons/{id}/duplicate:
+    post:
+      summary: Duplicate lesson
+      description: Creates a Ready, Private copy of a visible lesson owned by the caller. Copies content, cover, tags, source materials, assets and activities; does not copy assignees or progress.
+      tags: [ lessons ]
+      operationId: duplicateLesson
+      security: [ { bearerAuth: [ ] } ]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+      requestBody:
+        description: Request payload for the duplicateLesson.
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DuplicateLessonRequestV1' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/LessonResponseV1' } } } }
+        '400': { $ref: '#/components/responses/BadRequestV1' }
+        '401': { $ref: '#/components/responses/UnauthorizedV1' }
+        '403': { $ref: '#/components/responses/ForbiddenV1' }
+        '404': { $ref: '#/components/responses/NotFoundV1' }
   /api/v1/lessons/{id}/revisions:
     post:
       summary: Revise lesson
@@ -4312,6 +4333,15 @@ components:
           description: Activity action type.
           allOf:
             - $ref: '#/components/schemas/LessonPublishActionV1'
+    DuplicateLessonRequestV1:
+      description: Duplicate Lesson Request payload.
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          description: Title of the copy, 1-100 characters. Defaults to "Copy of <original title>" when omitted or blank.
+          type: string
+          maxLength: 100
     ReviseLessonRequestV1:
       description: Revise Lesson Request payload.
       type: object

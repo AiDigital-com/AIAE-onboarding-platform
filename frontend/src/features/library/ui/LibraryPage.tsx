@@ -26,7 +26,7 @@ import {
 } from "../api/useMaterialMutations";
 import { useMaterialsQuery } from "../api/useMaterialsQuery";
 import { useMaterialsCountQuery } from "../api/useMaterialsCountQuery";
-import { useLessonEnrollmentMutation } from "../api/useLessonMutations";
+import { useDuplicateLessonMutation, useLessonEnrollmentMutation } from "../api/useLessonMutations";
 import { useLessonsQuery } from "../api/useLessonsQuery";
 import { useLessonsCountQuery } from "../api/useLessonsCountQuery";
 import { useGeneratingLessonsPolling } from "../api/useGeneratingLessonsPolling";
@@ -54,6 +54,9 @@ import { LibraryTabs } from "./LibraryTabs";
 import { LibraryToolbar } from "./LibraryToolbar";
 import { MaterialDetailsDialog } from "./MaterialDetailsDialog";
 import { MaterialLibrarySearch } from "./MaterialLibrarySearch";
+import { normalizeRoadmap } from "../api/normalizers";
+import { DuplicateLessonDialog } from "./DuplicateLessonDialog";
+import { placeItemAfter } from "./library-utils";
 import { RoadmapFormDialog } from "./RoadmapFormDialog";
 import { RoadmapLibraryFilters } from "./RoadmapLibraryFilters";
 import { RoadmapAssignDialog } from "./RoadmapAssignDialog";
@@ -149,6 +152,13 @@ export function LibraryPage() {
     const updateMaterial = useUpdateMaterialMutation();
     const deleteMaterial = useDeleteMaterialMutation();
     const lessonEnrollment = useLessonEnrollmentMutation();
+    const duplicateLessonM = useDuplicateLessonMutation();
+    const [duplicateTarget, setDuplicateTarget] = useState<LibraryLesson | null>(null);
+    const [duplicateError, setDuplicateError] = useState("");
+    // The copy and the lesson it was made from: the server sorts only by date/title, so the copy
+    // is placed right after its original on the client. Highlight is cleared after a moment.
+    const [duplicatedLesson, setDuplicatedLesson] = useState<{ id: number; afterId: number } | null>(null);
+    const [highlightedLessonId, setHighlightedLessonId] = useState<number | null>(null);
     const createRoadmap = useCreateRoadmapMutation();
     const updateRoadmap = useUpdateRoadmapMutation();
     const deleteRoadmap = useDeleteRoadmapMutation();
@@ -157,6 +167,10 @@ export function LibraryPage() {
     const [isRoadmapDialogOpen, setIsRoadmapDialogOpen] = useState(false);
     const [editingMaterial, setEditingMaterial] = useState<LibraryMaterial | null>(null);
     const [editingRoadmap, setEditingRoadmap] = useState<LibraryRoadmap | null>(null);
+    // Roadmap being duplicated: the Edit modal opens in "Duplicate roadmap" mode, filled from it.
+    const [duplicatingRoadmap, setDuplicatingRoadmap] = useState<LibraryRoadmap | null>(null);
+    const [duplicatedRoadmap, setDuplicatedRoadmap] = useState<{ id: number; afterId: number } | null>(null);
+    const [highlightedRoadmapId, setHighlightedRoadmapId] = useState<number | null>(null);
     const [selectedMaterial, setSelectedMaterial] = useState<LibraryMaterial | null>(null);
     const [selectedLesson, setSelectedLesson] = useState<LibraryLesson | null>(null);
     const [materialSearchQuery, setMaterialSearchQuery] = useState("");
@@ -195,6 +209,7 @@ export function LibraryPage() {
         message: string;
         severity: ToastSeverity;
         action?: { label: string; onClick: () => void };
+        secondaryAction?: { label: string; onClick: () => void };
     }>({
         open: false,
         message: "",
@@ -368,10 +383,16 @@ export function LibraryPage() {
     // The server has no "not enrolled" negation filter; approximate it over loaded items.
     const visibleLessons =
         lessonEnrollmentFilter === "not-enrolled" ? lessons.filter((lesson) => !lesson.isEnrolled) : lessons;
-    const visibleRoadmaps =
+    const displayedLessons = duplicatedLesson
+        ? placeItemAfter(visibleLessons, duplicatedLesson.id, duplicatedLesson.afterId)
+        : visibleLessons;
+    const enrollmentFilteredRoadmaps =
         roadmapEnrollmentFilter === "not-enrolled"
             ? roadmaps.filter((roadmap) => !roadmap.isEnrolled)
             : roadmaps;
+    const visibleRoadmaps = duplicatedRoadmap
+        ? placeItemAfter(enrollmentFilteredRoadmaps, duplicatedRoadmap.id, duplicatedRoadmap.afterId)
+        : enrollmentFilteredRoadmaps;
 
     // Sourced from the cheap count-only queries (accurate on every tab) rather than the active
     // tab's full-search total, so switching tabs never shows a stale count as if it were exact.
@@ -386,9 +407,26 @@ export function LibraryPage() {
         message: string,
         severity: ToastSeverity = "success",
         action?: { label: string; onClick: () => void },
+        secondaryAction?: { label: string; onClick: () => void },
     ) => {
-        setToast({ open: true, message, severity, action });
+        setToast({ open: true, message, severity, action, secondaryAction });
     };
+
+    useEffect(() => {
+        if (highlightedLessonId === null) {
+            return undefined;
+        }
+        const timer = window.setTimeout(() => setHighlightedLessonId(null), 2600);
+        return () => window.clearTimeout(timer);
+    }, [highlightedLessonId]);
+
+    useEffect(() => {
+        if (highlightedRoadmapId === null) {
+            return undefined;
+        }
+        const timer = window.setTimeout(() => setHighlightedRoadmapId(null), 2600);
+        return () => window.clearTimeout(timer);
+    }, [highlightedRoadmapId]);
 
     useEffect(() => {
         if (materialsQuery.error) {
@@ -548,6 +586,46 @@ export function LibraryPage() {
         setLessonStatusFilter(isVisibleAsReady ? "published" : "private");
     };
 
+    // A copy is Ready + Private, so it must not be hidden by the filters that were active when its
+    // original was shown (e.g. "Public" only, or an enrollment filter).
+    const showDuplicateInFilters = () => {
+        setLessonSearchQuery("");
+        setLessonSelectedTags([]);
+        setLessonActivityFilter("all");
+        setLessonEnrollmentFilter("all");
+        setLessonStatusFilter("all");
+    };
+
+    const handleRequestDuplicateLesson = (lesson: LibraryLesson) => {
+        setDuplicateError("");
+        setDuplicateTarget(lesson);
+    };
+
+    const handleConfirmDuplicateLesson = async (title: string) => {
+        if (!duplicateTarget) {
+            return;
+        }
+        const original = duplicateTarget;
+        try {
+            setDuplicateError("");
+            const copy = await duplicateLessonM.mutateAsync({ id: original.id, title });
+            setDuplicateTarget(null);
+            showDuplicateInFilters();
+            setDuplicatedLesson({ id: copy.id, afterId: original.id });
+            setHighlightedLessonId(copy.id);
+            showToast(
+                "Lesson duplicated",
+                "success",
+                { label: "Open", onClick: () => void handleOpenLesson(copy) },
+                canAssignLearning
+                    ? { label: "Assign", onClick: () => handleOpenAssignmentDialog("lesson", copy) }
+                    : undefined,
+            );
+        } catch (error) {
+            setDuplicateError(error instanceof Error ? error.message : "Failed to duplicate lesson.");
+        }
+    };
+
     const handlePrimaryAction = () => {
         if (activeTab === "materials") {
             if (!canCreateMaterials) {
@@ -574,6 +652,7 @@ export function LibraryPage() {
             }
 
             setEditingRoadmap(null);
+            setDuplicatingRoadmap(null);
             setIsRoadmapDialogOpen(true);
         }
     };
@@ -877,9 +956,31 @@ export function LibraryPage() {
         lessonIds: number[];
     }) => {
         const roadmapBeingEdited = editingRoadmap;
+        const roadmapBeingDuplicated = duplicatingRoadmap;
 
         try {
             setIsSavingRoadmap(true);
+
+            if (roadmapBeingDuplicated) {
+                const data = await createRoadmap.mutateAsync(formData);
+                setDuplicatingRoadmap(null);
+                setIsRoadmapDialogOpen(false);
+                // The copy is not auto-assigned, so an "auto-assign only" or enrollment filter
+                // would hide it from the list it should appear in.
+                resetRoadmapFilters();
+                if (data?.roadmap) {
+                    const created = normalizeRoadmap(data.roadmap);
+                    setDuplicatedRoadmap({ id: created.id, afterId: roadmapBeingDuplicated.id });
+                    setHighlightedRoadmapId(created.id);
+                    showToast("Roadmap duplicated", "success", {
+                        label: "Edit",
+                        onClick: () => handleOpenRoadmap(created),
+                    });
+                } else {
+                    showToast("Roadmap duplicated");
+                }
+                return;
+            }
 
             if (roadmapBeingEdited) {
                 await updateRoadmap.mutateAsync({
@@ -901,7 +1002,9 @@ export function LibraryPage() {
                     ? error.message
                     : roadmapBeingEdited
                       ? "Failed to update roadmap."
-                      : "Failed to create roadmap.",
+                      : roadmapBeingDuplicated
+                        ? "Failed to duplicate roadmap."
+                        : "Failed to create roadmap.",
                 "error",
             );
         } finally {
@@ -909,11 +1012,18 @@ export function LibraryPage() {
         }
     };
 
+    const handleDuplicateRoadmap = (roadmap: LibraryRoadmap) => {
+        setEditingRoadmap(null);
+        setDuplicatingRoadmap(roadmap);
+        setIsRoadmapDialogOpen(true);
+    };
+
     const handleOpenRoadmap = (roadmap: LibraryRoadmap) => {
         if (!roadmap?.viewerCanManage) {
             return;
         }
 
+        setDuplicatingRoadmap(null);
         setEditingRoadmap(roadmap);
         setIsRoadmapDialogOpen(true);
     };
@@ -1232,7 +1342,7 @@ export function LibraryPage() {
                     totalMaterials={materialsTotal}
                     hasActiveMaterialSearch={hasActiveMaterialSearch}
                     onResetMaterialSearch={resetMaterialFilters}
-                    lessons={visibleLessons}
+                    lessons={displayedLessons}
                     totalLessons={lessonsTotal}
                     hasActiveLessonFilters={hasActiveLessonFilters}
                     onResetLessonFilters={resetLessonFilters}
@@ -1275,8 +1385,14 @@ export function LibraryPage() {
                     onEnrollLesson={handleEnrollLesson}
                     onUnenrollLesson={handleUnenrollLesson}
                     onAssignLesson={(lesson) => handleOpenAssignmentDialog("lesson", lesson)}
+                    canDuplicateLesson={canCreateLessons}
+                    onDuplicateLesson={handleRequestDuplicateLesson}
+                    highlightedLessonId={highlightedLessonId}
                     onAssignRoadmap={handleOpenAssignRoadmapDialog}
                     onOpenRoadmap={handleOpenRoadmap}
+                    canDuplicateRoadmap={canCreateRoadmaps}
+                    onDuplicateRoadmap={handleDuplicateRoadmap}
+                    highlightedRoadmapId={highlightedRoadmapId}
                     canAssignLearning={canAssignLearning}
                 />
             </div>
@@ -1305,19 +1421,26 @@ export function LibraryPage() {
             )}
 
             <RoadmapFormDialog
-                key={editingRoadmap ? `edit-${editingRoadmap.id}` : "create-roadmap"}
+                key={
+                    editingRoadmap
+                        ? `edit-${editingRoadmap.id}`
+                        : duplicatingRoadmap
+                          ? `duplicate-${duplicatingRoadmap.id}`
+                          : "create-roadmap"
+                }
                 open={isRoadmapDialogOpen}
                 lessons={pickerLessons}
                 isSaving={isSavingRoadmap}
                 isDeleting={isDeletingRoadmap}
-                mode={editingRoadmap ? "edit" : "create"}
-                initialRoadmap={editingRoadmap}
+                mode={editingRoadmap ? "edit" : duplicatingRoadmap ? "duplicate" : "create"}
+                initialRoadmap={editingRoadmap ?? duplicatingRoadmap}
                 onClose={() => {
                     if (isSavingRoadmap) {
                         return;
                     }
 
                     setEditingRoadmap(null);
+                    setDuplicatingRoadmap(null);
                     setIsRoadmapDialogOpen(false);
                 }}
                 onSave={handleSaveRoadmap}
@@ -1397,11 +1520,22 @@ export function LibraryPage() {
                 }
             />
 
+            <DuplicateLessonDialog
+                open={duplicateTarget !== null}
+                lessonTitle={duplicateTarget?.title ?? ""}
+                isSaving={duplicateLessonM.isPending}
+                error={duplicateError}
+                onCancel={() => setDuplicateTarget(null)}
+                onConfirm={(title) => void handleConfirmDuplicateLesson(title)}
+            />
+
             <Toast
                 open={toast.open}
                 message={toast.message}
                 severity={toast.severity}
                 action={toast.action}
+                secondaryAction={toast.secondaryAction}
+                autoCloseMs={toast.secondaryAction ? 8000 : undefined}
                 onClose={() => setToast((prev) => ({ ...prev, open: false }))}
             />
         </div>

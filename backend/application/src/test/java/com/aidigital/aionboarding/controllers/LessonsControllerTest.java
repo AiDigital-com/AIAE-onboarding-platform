@@ -4,6 +4,7 @@ import com.aidigital.aionboarding.api.v1.model.ActivityProgressResponseV1;
 import com.aidigital.aionboarding.api.v1.model.ActivityResponseV1;
 import com.aidigital.aionboarding.api.v1.model.AddLessonAssetRequestV1;
 import com.aidigital.aionboarding.api.v1.model.AskLessonRequestV1;
+import com.aidigital.aionboarding.api.v1.model.DuplicateLessonRequestV1;
 import com.aidigital.aionboarding.api.v1.model.AskLessonResponseV1;
 import com.aidigital.aionboarding.api.v1.model.AssignmentRequestV1;
 import com.aidigital.aionboarding.api.v1.model.AssignmentResponseV1;
@@ -97,6 +98,7 @@ import static org.instancio.Select.field;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -305,6 +307,46 @@ class LessonsControllerTest {
 			// Then:
 			assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 			assertThat(response.getBody()).isSameAs(expected);
+		}
+	}
+
+	@Nested
+	class DuplicateLesson {
+
+		@Test
+		void shouldDelegateWithRequestedTitleAndReturnCreatedTest() {
+			// Given:
+			AppUser viewer = viewer();
+			DuplicateLessonRequestV1 request = new DuplicateLessonRequestV1().title("My copy");
+			LessonDetailRecord created = Instancio.create(LessonDetailRecord.class);
+			LessonResponseV1 expected = Instancio.create(LessonResponseV1.class);
+			when(currentUser.requireUser()).thenReturn(viewer);
+			when(lessonService.duplicateLesson(viewer, 3L, "My copy")).thenReturn(created);
+			when(lessonApiMapper.toLessonResponseV1(created)).thenReturn(expected);
+
+			// When:
+			ResponseEntity<LessonResponseV1> response = controller.duplicateLesson(3L, request);
+
+			// Then:
+			assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+			assertThat(response.getBody()).isSameAs(expected);
+		}
+
+		@Test
+		void shouldPassNullTitleWhenBodyIsOmittedTest() {
+			// Given:
+			AppUser viewer = viewer();
+			LessonDetailRecord created = Instancio.create(LessonDetailRecord.class);
+			when(currentUser.requireUser()).thenReturn(viewer);
+			when(lessonService.duplicateLesson(viewer, 3L, null)).thenReturn(created);
+			when(lessonApiMapper.toLessonResponseV1(created)).thenReturn(Instancio.create(LessonResponseV1.class));
+
+			// When:
+			ResponseEntity<LessonResponseV1> response = controller.duplicateLesson(3L, null);
+
+			// Then:
+			assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+			verify(lessonService).duplicateLesson(viewer, 3L, null);
 		}
 	}
 

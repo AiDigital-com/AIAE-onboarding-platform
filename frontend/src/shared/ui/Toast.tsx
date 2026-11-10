@@ -15,6 +15,8 @@ interface ToastProps {
     autoCloseMs?: number;
     /** Optional inline action such as "Undo"; clicking it also dismisses the toast. */
     action?: { label: string; onClick: () => void };
+    /** Optional second inline action shown after {@link action}, e.g. "Open" then "Assign". */
+    secondaryAction?: { label: string; onClick: () => void };
     onClose: () => void;
 }
 
@@ -24,6 +26,7 @@ export function Toast({
     severity = "success",
     autoCloseMs = DEFAULT_AUTO_CLOSE_MS,
     action,
+    secondaryAction,
     onClose,
 }: ToastProps) {
     const [shouldRender, setShouldRender] = useState(open && Boolean(message));
@@ -108,19 +111,23 @@ export function Toast({
             aria-live="polite"
         >
             <p className="ui-toast__message">{message}</p>
-            {action && (
-                <button
-                    type="button"
-                    className="ui-toast__action"
-                    onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        action.onClick();
-                        closeWithAnimation();
-                    }}
-                >
-                    {action.label}
-                </button>
+            {[action, secondaryAction].map(
+                (toastAction) =>
+                    toastAction && (
+                        <button
+                            key={toastAction.label}
+                            type="button"
+                            className="ui-toast__action"
+                            onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                toastAction.onClick();
+                                closeWithAnimation();
+                            }}
+                        >
+                            {toastAction.label}
+                        </button>
+                    ),
             )}
             <button
                 type="button"

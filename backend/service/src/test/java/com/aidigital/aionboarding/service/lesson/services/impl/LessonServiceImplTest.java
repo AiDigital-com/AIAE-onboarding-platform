@@ -41,6 +41,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -386,6 +387,69 @@ class LessonServiceImplTest {
 
 			// Then:
 			assertThat(lesson.getPublicationStatus()).isSameAs(privateStatus);
+		}
+	}
+
+	@Nested
+	class DuplicateLesson {
+
+		@Test
+		void shouldRequireLessonsCreateAndDelegateWithDefaultTitleWhenBlankTest() {
+			// Given:
+			AppUser viewer = learnerViewer();
+			Lesson source = new Lesson();
+			source.setId(5L);
+			source.setTitle("Original");
+			Lesson copy = new Lesson();
+			LessonDetailRecord record = mock(LessonDetailRecord.class);
+			when(lessonEntityService.getReference(5L)).thenReturn(source);
+			when(lessonMutationSupport.canView(viewer, source)).thenReturn(true);
+			when(lessonEntityService.duplicateLesson(viewer, source, "Copy of Original")).thenReturn(copy);
+			when(lessonMapper.toDetailRecord(copy)).thenReturn(record);
+
+			// When:
+			LessonDetailRecord result = service.duplicateLesson(viewer, 5L, "  ");
+
+			// Then:
+			assertThat(result).isSameAs(record);
+			verify(permissionService).requirePermission(viewer, PermissionKeys.LESSONS_CREATE);
+		}
+
+		@Test
+		void shouldTrimAndClampCustomTitleToOneHundredCharactersTest() {
+			// Given:
+			AppUser viewer = learnerViewer();
+			Lesson source = new Lesson();
+			source.setId(5L);
+			source.setTitle("Original");
+			when(lessonEntityService.getReference(5L)).thenReturn(source);
+			when(lessonMutationSupport.canView(viewer, source)).thenReturn(true);
+			when(lessonEntityService.duplicateLesson(org.mockito.ArgumentMatchers.eq(viewer),
+					org.mockito.ArgumentMatchers.eq(source), org.mockito.ArgumentMatchers.anyString()))
+					.thenReturn(new Lesson());
+
+			// When:
+			service.duplicateLesson(viewer, 5L, "  " + "x".repeat(150) + "  ");
+
+			// Then:
+			verify(lessonEntityService).duplicateLesson(viewer, source, "x".repeat(100));
+		}
+
+		@Test
+		void shouldThrowC001AndNotCopyWhenSourceIsNotVisibleToViewerTest() {
+			// Given: a private lesson the viewer cannot see
+			AppUser viewer = learnerViewer();
+			Lesson source = new Lesson();
+			source.setId(5L);
+			when(lessonEntityService.getReference(5L)).thenReturn(source);
+			when(lessonMutationSupport.canView(viewer, source)).thenReturn(false);
+
+			// When:
+			AppException ex = assertThrows(AppException.class, () -> service.duplicateLesson(viewer, 5L, "T"));
+
+			// Then:
+			assertThat(ex.getCode()).isEqualTo(ErrorReason.C001.getCode());
+			verify(lessonEntityService, org.mockito.Mockito.never()).duplicateLesson(any(), any(), any());
 		}
 	}
 }

@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { LibraryLesson } from "../api/types";
 import { LessonsGrid } from "./LessonsGrid";
@@ -110,5 +110,77 @@ describe("LessonsGrid (Library)", () => {
         expect(
             screen.queryByLabelText("Private — visible in the Library only to assigned users"),
         ).toBeNull();
+    });
+    describe("Duplicate", () => {
+        it("should not show the more-actions menu without the duplicate permission test", () => {
+            // Given / When:
+            renderGrid([libraryLesson()]);
+
+            // Then:
+            expect(screen.queryByLabelText("More actions for Onboarding basics")).toBeNull();
+        });
+
+        it("should offer Duplicate from the more-actions menu and pass the lesson on test", () => {
+            // Given:
+            const lesson = libraryLesson();
+            const onDuplicateLesson = vi.fn();
+            const onOpenLesson = vi.fn();
+            render(
+                <Wrapper>
+                    <LessonsGrid
+                        lessons={[lesson]}
+                        canDuplicate
+                        onDuplicateLesson={onDuplicateLesson}
+                        onOpenLesson={onOpenLesson}
+                    />
+                </Wrapper>,
+            );
+
+            // When:
+            fireEvent.click(screen.getByLabelText("More actions for Onboarding basics"));
+            fireEvent.click(screen.getByRole("menuitem", { name: /Duplicate/ }));
+
+            // Then: the copy flow starts, and the card itself was not opened by those clicks
+            expect(onDuplicateLesson).toHaveBeenCalledWith(lesson);
+            expect(onOpenLesson).not.toHaveBeenCalled();
+            expect(screen.queryByRole("menuitem")).toBeNull();
+        });
+
+        it("should hide the more-actions menu for lessons that are not ready test", () => {
+            // Given: a failed lesson has no content to copy
+            render(
+                <Wrapper>
+                    <LessonsGrid lessons={[libraryLesson({ status: "failed" })]} canDuplicate />
+                </Wrapper>,
+            );
+
+            // When / Then:
+            expect(screen.queryByLabelText("More actions for Onboarding basics")).toBeNull();
+        });
+
+        it("should keep the existing enrollment action next to the menu test", () => {
+            // Given / When:
+            render(
+                <Wrapper>
+                    <LessonsGrid lessons={[libraryLesson()]} showEnrollmentAction canDuplicate />
+                </Wrapper>,
+            );
+
+            // Then: nothing was removed from the card
+            expect(screen.getByText("Add to My Lessons")).toBeTruthy();
+            expect(screen.getByLabelText("More actions for Onboarding basics")).toBeTruthy();
+        });
+
+        it("should highlight the just-duplicated card test", () => {
+            // Given / When:
+            const { container } = render(
+                <Wrapper>
+                    <LessonsGrid lessons={[libraryLesson({ id: 7 })]} highlightedLessonId={7} />
+                </Wrapper>,
+            );
+
+            // Then:
+            expect(container.querySelector(".library-card--just-added")).not.toBeNull();
+        });
     });
 });

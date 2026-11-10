@@ -28,10 +28,16 @@ interface LibraryTabPanelProps {
     onEnrollLesson?: (lesson: LibraryLesson) => void;
     onUnenrollLesson?: (lesson: LibraryLesson) => void;
     onAssignLesson?: (lesson: LibraryLesson) => void;
+    canDuplicateLesson?: boolean;
+    onDuplicateLesson?: (lesson: LibraryLesson) => void;
+    highlightedLessonId?: number | null;
     onResetLessonFilters?: () => void;
     onResetRoadmapFilters?: () => void;
     onAssignRoadmap?: (roadmap: LibraryRoadmap) => void;
     onOpenRoadmap?: (roadmap: LibraryRoadmap) => void;
+    canDuplicateRoadmap?: boolean;
+    onDuplicateRoadmap?: (roadmap: LibraryRoadmap) => void;
+    highlightedRoadmapId?: number | null;
     canAssignLearning?: boolean;
 }
 
@@ -78,10 +84,16 @@ export function LibraryTabPanel({
     onEnrollLesson,
     onUnenrollLesson,
     onAssignLesson,
+    canDuplicateLesson = false,
+    onDuplicateLesson,
+    highlightedLessonId = null,
     onResetLessonFilters,
     onResetRoadmapFilters,
     onAssignRoadmap,
     onOpenRoadmap,
+    canDuplicateRoadmap = false,
+    onDuplicateRoadmap,
+    highlightedRoadmapId = null,
     canAssignLearning = false,
 }: LibraryTabPanelProps) {
     if (activeTab === "materials") {
@@ -152,6 +164,9 @@ export function LibraryTabPanel({
                     onAssignLesson={onAssignLesson}
                     showEnrollmentAction
                     canAssignLearning={canAssignLearning}
+                    canDuplicate={canDuplicateLesson}
+                    onDuplicateLesson={onDuplicateLesson}
+                    highlightedLessonId={highlightedLessonId}
                 />
                 <LoadMoreRow hasMore={hasMore} isLoadingMore={isLoadingMore} onLoadMore={onLoadMore} />
             </>
@@ -190,6 +205,9 @@ export function LibraryTabPanel({
                     onAssignRoadmap={onAssignRoadmap}
                     onOpenRoadmap={onOpenRoadmap}
                     canAssignLearning={canAssignLearning}
+                    canDuplicate={canDuplicateRoadmap}
+                    onDuplicateRoadmap={onDuplicateRoadmap}
+                    highlightedRoadmapId={highlightedRoadmapId}
                 />
                 <LoadMoreRow hasMore={hasMore} isLoadingMore={isLoadingMore} onLoadMore={onLoadMore} />
             </>

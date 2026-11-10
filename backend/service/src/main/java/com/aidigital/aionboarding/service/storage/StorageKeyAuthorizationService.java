@@ -15,7 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
+import java.util.List;
 
 /**
  * Authorizes access to a presigned storage key by looking up which entity
@@ -24,7 +24,7 @@ import java.util.Optional;
  * <p>Lookup order (first match wins):
  * <ol>
  *   <li>MaterialFile — requires LESSONS_MANAGE or admin
- *   <li>LessonAsset — requires LESSONS_MANAGE, admin, or enrollment in the owning lesson
+ *   <li>LessonAsset — requires LESSONS_MANAGE, admin, or enrollment in any lesson owning the key
  *   <li>User.avatarStorageKey — any authenticated user
  *   <li>Lesson.coverImageStorageKey — any authenticated user
  *   <li>Material.coverImageStorageKey — any authenticated user
@@ -65,12 +65,14 @@ public class StorageKeyAuthorizationService {
             return;
         }
 
-        // Step 2: LessonAsset — requires LESSONS_MANAGE, admin, or enrollment
-        Optional<Long> lessonId = lessonAssetRepository.findLessonIdByStorageKey(storageKey);
-        if (lessonId.isPresent()) {
+        // Step 2: LessonAsset — requires LESSONS_MANAGE, admin, or enrollment in ANY lesson that
+        // owns the key (a duplicated lesson shares the original's uploaded files)
+        List<Long> lessonIds = lessonAssetRepository.findLessonIdsByStorageKey(storageKey);
+        if (!lessonIds.isEmpty()) {
             if (!viewer.isAdmin() && !permissionService.userHasPermission(viewer, PermissionKeys.LESSONS_MANAGE)) {
-                // check enrollment
-                if (userLessonRepository.findByUserIdAndLessonId(viewer.internalId(), lessonId.get()).isEmpty()) {
+                boolean enrolled = lessonIds.stream()
+                    .anyMatch(lessonId -> userLessonRepository.findByUserIdAndLessonId(viewer.internalId(), lessonId).isPresent());
+                if (!enrolled) {
                     throw new AppException(ErrorReason.C004);
                 }
             }

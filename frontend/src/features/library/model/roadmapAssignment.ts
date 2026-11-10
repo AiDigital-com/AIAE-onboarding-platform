@@ -99,6 +99,11 @@ export interface LibraryRoadmapsGridProps {
     onAssignRoadmap?: (roadmap: LibraryRoadmap) => void;
     onOpenRoadmap?: (roadmap: LibraryRoadmap) => void;
     canAssignLearning?: boolean;
+    /** Shows the ⋯ menu with Duplicate on every card (including "View only" roadmaps). */
+    canDuplicate?: boolean;
+    onDuplicateRoadmap?: (roadmap: LibraryRoadmap) => void;
+    /** Id of a just-duplicated roadmap: its card is scrolled into view and briefly highlighted. */
+    highlightedRoadmapId?: number | null;
 }
 
 export interface RoadmapAssignDialogProps {

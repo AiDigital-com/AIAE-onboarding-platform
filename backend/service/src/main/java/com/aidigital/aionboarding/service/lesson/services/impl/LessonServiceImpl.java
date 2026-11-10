@@ -37,6 +37,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class LessonServiceImpl implements LessonService {
 
+    /** Mirrors the OpenAPI {@code maxLength} of lesson titles. */
+    private static final int MAX_TITLE_LENGTH = 100;
+
     private final CurrentTime currentTime;
     private final PermissionService permissionService;
     private final LessonRecordAssembler lessonMapper;
@@ -127,6 +130,26 @@ public class LessonServiceImpl implements LessonService {
         Lesson generatedLesson = lessonInitialGenerationService.generate(viewer, input);
         Lesson fullyLoaded = lessonEntityService.findByIdWithFetches(generatedLesson.getId());
         return lessonMapper.toSummaryRecord(fullyLoaded);
+    }
+
+    /**
+     * Duplicates a visible lesson into a READY + PRIVATE copy owned by the viewer. Needs only
+     * LESSONS_CREATE plus visibility of the source, not ownership of it.
+     */
+    @Override
+    @Transactional
+    public LessonDetailRecord duplicateLesson(AppUser viewer, Long id, String title) {
+        permissionService.requirePermission(viewer, PermissionKeys.LESSONS_CREATE);
+        Lesson source = lessonEntityService.getReference(id);
+        if (!lessonMutationSupport.canView(viewer, source)) {
+            throw new AppException(ErrorReason.C001, id);
+        }
+        String copyTitle = title == null || title.isBlank() ? "Copy of " + source.getTitle() : title.strip();
+        if (copyTitle.length() > MAX_TITLE_LENGTH) {
+            copyTitle = copyTitle.substring(0, MAX_TITLE_LENGTH);
+        }
+        Lesson copy = lessonEntityService.duplicateLesson(viewer, source, copyTitle);
+        return lessonMapper.toDetailRecord(copy);
     }
 
     /** Updates editable content fields of a lesson the viewer manages. */

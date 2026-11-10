@@ -6,10 +6,12 @@ import com.aidigital.aionboarding.domain.common.dictionary.entities.LessonConten
 import com.aidigital.aionboarding.domain.common.dictionary.entities.LessonPublicationStatus;
 import com.aidigital.aionboarding.domain.common.dictionary.entities.LessonStatus;
 import com.aidigital.aionboarding.domain.lesson.entities.Lesson;
+import com.aidigital.aionboarding.domain.lesson.entities.LessonAsset;
 import com.aidigital.aionboarding.domain.lesson.entities.LessonMaterial;
 import com.aidigital.aionboarding.domain.lesson.models.MaterialUsageCount;
 import com.aidigital.aionboarding.domain.lesson.repositories.LessonRepository;
 import com.aidigital.aionboarding.domain.lesson.repositories.LessonSearchSummaryProjection;
+import com.aidigital.aionboarding.domain.lessonactivity.entities.LessonActivity;
 import com.aidigital.aionboarding.domain.material.entities.Material;
 import com.aidigital.aionboarding.domain.user.entities.User;
 import com.aidigital.aionboarding.service.common.dictionary.services.entity.LessonContentFormatEntityService;
@@ -27,6 +29,7 @@ import com.aidigital.aionboarding.service.lesson.models.LessonVisibilityFilter;
 import com.aidigital.aionboarding.service.lesson.support.LessonGenerationMetadataFactory;
 import com.aidigital.aionboarding.service.lesson.support.LessonHtmlSanitizer;
 import com.aidigital.aionboarding.service.lesson.support.LessonSpecificationBuilder;
+import com.aidigital.aionboarding.service.lessonactivity.services.impl.LessonActivityPersistenceHelper;
 import com.aidigital.aionboarding.service.material.services.entity.MaterialEntityService;
 import com.aidigital.aionboarding.service.user.services.entity.UserEntityService;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +44,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 
@@ -67,6 +72,10 @@ public class LessonEntityService {
 	private final LessonRepository lessonRepository;
 
 	private final LessonMaterialEntityService lessonMaterialEntityService;
+
+	private final LessonAssetEntityService lessonAssetEntityService;
+
+	private final LessonActivityPersistenceHelper lessonActivityPersistenceHelper;
 
 	private final UserEntityService userEntityService;
 
@@ -236,6 +245,115 @@ public class LessonEntityService {
 		lesson = lessonRepository.save(lesson);
 		linkMaterials(lesson, materialIds);
 		return lesson;
+	}
+
+	/**
+	 * Duplicates a lesson into a new READY + PRIVATE lesson owned by the viewer.
+	 * <p>
+	 * Copied: title (caller-supplied), description, generation settings, content, cover image,
+	 * tags, source-material links, assets and activities (quiz / flashcards). Not copied: assignees
+	 * ({@code user_lessons}), learner progress, roadmap membership, assistant conversations,
+	 * revision history, and the teacher video (a provider-side artifact of the original).
+	 * <p>
+	 * Storage keys (cover image, file assets, inline {@code data-storage-key} references in the
+	 * HTML) are shared with the original, not re-uploaded; the key-to-lesson authorization lookup
+	 * tolerates a key owned by several lessons.
+	 *
+	 * @param viewer authenticated user who becomes owner of the copy
+	 * @param source lesson being duplicated (already checked as visible to the viewer)
+	 * @param title  title of the copy
+	 * @return the saved copy
+	 */
+	@Transactional
+	public Lesson duplicateLesson(AppUser viewer, Lesson source, String title) {
+		User owner = resolveOwner(viewer);
+		LocalDateTime now = currentTime.utcDateTime();
+		Lesson copy = new Lesson();
+		copy.setTitle(title);
+		copy.setDescription(source.getDescription());
+		copy.setUserInstructions(source.getUserInstructions());
+		copy.setDepth(source.getDepth());
+		copy.setTone(source.getTone());
+		copy.setDesiredFormat(source.getDesiredFormat());
+		copy.setContentFormat(source.getContentFormat());
+		copy.setContentMarkdown(source.getContentMarkdown());
+		copy.setContentHtml(source.getContentHtml());
+		copy.setCoverImageStorageKey(source.getCoverImageStorageKey());
+		copy.setCoverImageOriginalName(source.getCoverImageOriginalName());
+		copy.setCoverImageMimeType(source.getCoverImageMimeType());
+		copy.setTags(source.getTags() == null ? new ArrayList<>() : new ArrayList<>(source.getTags()));
+		copy.setGenerationMetadata(copyGenerationMetadataWithoutTeacherVideo(source.getGenerationMetadata()));
+		copy.setRevisionHistory(Collections.emptyList());
+		copy.setErrorMessage("");
+		copy.setStatus(requireStatus(LessonStatusCode.READY));
+		copy.setPublicationStatus(requirePublicationStatus(LessonPublicationStatusCode.PRIVATE));
+		copy.setCreatedBy(displayName(owner));
+		copy.setCreatedByUser(owner);
+		copy.setCreatedAt(now);
+		copy.setUpdatedAt(now);
+		Lesson saved = lessonRepository.save(copy);
+
+		List<LessonMaterial> materialLinks = new ArrayList<>();
+		for (LessonMaterial sourceLink : lessonMaterialEntityService.findByLessonIdOrderBySortOrderAsc(source.getId())) {
+			LessonMaterial link = new LessonMaterial();
+			LessonMaterial.LessonMaterialId id = new LessonMaterial.LessonMaterialId();
+			id.setLessonId(saved.getId());
+			id.setMaterialId(sourceLink.getId().getMaterialId());
+			link.setId(id);
+			link.setLesson(saved);
+			link.setMaterial(sourceLink.getMaterial());
+			link.setSortOrder(sourceLink.getSortOrder());
+			link.setCreatedAt(now);
+			materialLinks.add(link);
+		}
+		if (!materialLinks.isEmpty()) {
+			lessonMaterialEntityService.saveAll(materialLinks);
+		}
+		for (LessonAsset asset : lessonAssetEntityService.findByLessonIdOrderByCreatedAtAsc(source.getId())) {
+			lessonAssetEntityService.save(copyAsset(asset, saved));
+		}
+		for (LessonActivity activity : lessonActivityPersistenceHelper.findByLessonIdOrderByCreatedAtAsc(source.getId())) {
+			lessonActivityPersistenceHelper.save(copyActivity(activity, saved));
+		}
+		return saved;
+	}
+
+	private static Map<String, Object> copyGenerationMetadataWithoutTeacherVideo(Map<String, Object> metadata) {
+		Map<String, Object> copy = metadata == null ? new LinkedHashMap<>() : new LinkedHashMap<>(metadata);
+		copy.remove("teacherVideo");
+		return copy;
+	}
+
+	private static LessonAsset copyAsset(LessonAsset asset, Lesson target) {
+		LessonAsset copy = new LessonAsset();
+		copy.setLesson(target);
+		copy.setKind(asset.getKind());
+		copy.setTitle(asset.getTitle());
+		copy.setUrl(asset.getUrl());
+		copy.setDescription(asset.getDescription());
+		copy.setImageUrl(asset.getImageUrl());
+		copy.setSiteName(asset.getSiteName());
+		copy.setOriginalName(asset.getOriginalName());
+		copy.setStorageKey(asset.getStorageKey());
+		copy.setMimeType(asset.getMimeType());
+		copy.setSizeBytes(asset.getSizeBytes());
+		copy.setMetadata(asset.getMetadata() == null ? new LinkedHashMap<>() : new LinkedHashMap<>(asset.getMetadata()));
+		copy.setCreatedAt(asset.getCreatedAt());
+		return copy;
+	}
+
+	private static LessonActivity copyActivity(LessonActivity activity, Lesson target) {
+		LessonActivity copy = new LessonActivity();
+		copy.setLesson(target);
+		copy.setType(activity.getType());
+		copy.setTitle(activity.getTitle());
+		copy.setItemCount(activity.getItemCount());
+		copy.setPayload(activity.getPayload() == null ? new LinkedHashMap<>() : new LinkedHashMap<>(activity.getPayload()));
+		copy.setGenerationMetadata(activity.getGenerationMetadata() == null
+				? new LinkedHashMap<>() : new LinkedHashMap<>(activity.getGenerationMetadata()));
+		copy.setCreatedBy(activity.getCreatedBy());
+		copy.setCreatedAt(activity.getCreatedAt());
+		return copy;
 	}
 
 	/**

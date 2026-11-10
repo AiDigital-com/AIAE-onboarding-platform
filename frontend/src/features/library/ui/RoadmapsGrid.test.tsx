@@ -89,3 +89,63 @@ describe("RoadmapsGrid assignment summary", () => {
         expect(screen.getByText("Auto-assigned to new users")).not.toBeNull();
     });
 });
+
+describe("RoadmapsGrid duplicate", () => {
+    it("should not show the more-actions menu without the duplicate permission test", () => {
+        // Given / When:
+        renderGrid([roadmap()]);
+
+        // Then:
+        expect(screen.queryByLabelText("More actions for Company Essentials")).toBeNull();
+    });
+
+    it("should offer Duplicate next to Assign without opening the card test", () => {
+        // Given:
+        const original = roadmap();
+        const onDuplicateRoadmap = vi.fn();
+        const onOpenRoadmap = vi.fn();
+        renderGrid([original], { canDuplicate: true, onDuplicateRoadmap, onOpenRoadmap });
+
+        // When:
+        fireEvent.click(screen.getByLabelText("More actions for Company Essentials"));
+        fireEvent.click(screen.getByRole("menuitem", { name: /Duplicate/ }));
+
+        // Then: Assign is still there, the copy flow starts and the card (Edit) is not opened
+        expect(screen.getByRole("button", { name: "Assign" })).toBeTruthy();
+        expect(onDuplicateRoadmap).toHaveBeenCalledWith(original);
+        expect(onOpenRoadmap).not.toHaveBeenCalled();
+    });
+
+    it("should offer Duplicate on a View only roadmap that cannot be opened test", () => {
+        // Given: viewerCanManage=false means the card is not clickable and has no Editable chip
+        const onDuplicateRoadmap = vi.fn();
+        renderGrid([roadmap({ viewerCanManage: false })], { canDuplicate: true, onDuplicateRoadmap });
+
+        // When:
+        fireEvent.click(screen.getByLabelText("More actions for Company Essentials"));
+        fireEvent.click(screen.getByRole("menuitem", { name: /Duplicate/ }));
+
+        // Then:
+        expect(onDuplicateRoadmap).toHaveBeenCalledTimes(1);
+    });
+
+    it("should close the menu on Escape test", () => {
+        // Given:
+        renderGrid([roadmap()], { canDuplicate: true });
+        fireEvent.click(screen.getByLabelText("More actions for Company Essentials"));
+
+        // When:
+        fireEvent.keyDown(document, { key: "Escape" });
+
+        // Then:
+        expect(screen.queryByRole("menuitem")).toBeNull();
+    });
+
+    it("should highlight the just-duplicated card test", () => {
+        // Given / When:
+        const { container } = renderGrid([roadmap({ id: 8 })], { highlightedRoadmapId: 8 });
+
+        // Then:
+        expect(container.querySelector(".library-roadmap-card--just-added")).not.toBeNull();
+    });
+});
