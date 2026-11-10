@@ -85,6 +85,8 @@
     --border-default: hsl(var(--border));
     --focus-ring: hsl(var(--ring) / 40%);
     --shadow-soft: 0 2px 8px hsl(var(--foreground) / 6%);
+    --shadow-popover: 0 0.75rem 2rem hsl(var(--foreground) / 14%);
+    --surface-danger-soft: hsl(var(--status-error) / 8%);
 
     /* AI Digital brand palette */
     --brand-yves-klein-blue: #0009DC;

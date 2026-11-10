@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from "react";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
+import { lockBodyScroll } from "@/shared/lib/bodyScrollLock";
 import "./dialog.css";
 
 type DialogSize = "sm" | "md" | "lg";
@@ -33,13 +34,19 @@ export function Dialog({
     closeLabel = "Close dialog",
     className = "",
 }: DialogProps) {
+    // Kept apart from the key handler below: that one re-binds whenever `onClose` changes
+    // identity, and the scroll lock must be taken once per open, not once per render.
     useEffect(() => {
         if (!open) {
             return undefined;
         }
+        return lockBodyScroll();
+    }, [open]);
 
-        const previousOverflow = document.body.style.overflow;
-        document.body.style.overflow = "hidden";
+    useEffect(() => {
+        if (!open) {
+            return undefined;
+        }
 
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === "Escape" && onClose && !closeDisabled) {
@@ -50,7 +57,6 @@ export function Dialog({
         window.addEventListener("keydown", handleKeyDown);
 
         return () => {
-            document.body.style.overflow = previousOverflow;
             window.removeEventListener("keydown", handleKeyDown);
         };
     }, [closeDisabled, onClose, open]);

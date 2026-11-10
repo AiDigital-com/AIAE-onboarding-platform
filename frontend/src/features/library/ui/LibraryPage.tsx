@@ -32,7 +32,6 @@ import { useLessonsCountQuery } from "../api/useLessonsCountQuery";
 import { useGeneratingLessonsPolling } from "../api/useGeneratingLessonsPolling";
 import {
     useCreateRoadmapMutation,
-    useDeleteRoadmapMutation,
     useUpdateRoadmapMutation,
 } from "../api/useRoadmapMutations";
 import { useRoadmapsQuery } from "../api/useRoadmapsQuery";
@@ -47,6 +46,8 @@ import {
 } from "../api/queryParamMappers";
 import type { LibraryLesson, LibraryMaterial, LibraryRoadmap } from "../api/types";
 import { ALL_LIBRARY_TABS, DEFAULT_LIBRARY_TAB } from "../constants";
+import { ACTION_TOAST_DURATION_MS } from "../constants/cardActions";
+import { CardActionConfirmDialog } from "./CardActionConfirmDialog";
 import { LearningAssignmentDialog } from "./LearningAssignmentDialog";
 import { LessonLibraryFilters } from "./LessonLibraryFilters";
 import { LibraryTabPanel } from "./LibraryTabPanel";
@@ -58,6 +59,7 @@ import { RoadmapFormDialog } from "./RoadmapFormDialog";
 import { RoadmapLibraryFilters } from "./RoadmapLibraryFilters";
 import { RoadmapAssignDialog } from "./RoadmapAssignDialog";
 import { UploadMaterialDialog } from "./UploadMaterialDialog";
+import { useLibraryCardActions } from "./useLibraryCardActions";
 import "./library.css";
 
 // Lazy-loaded: both pull in the Tiptap editor (SimpleEditor), the single
@@ -151,7 +153,6 @@ export function LibraryPage() {
     const lessonEnrollment = useLessonEnrollmentMutation();
     const createRoadmap = useCreateRoadmapMutation();
     const updateRoadmap = useUpdateRoadmapMutation();
-    const deleteRoadmap = useDeleteRoadmapMutation();
     const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
     const [isLessonDialogOpen, setIsLessonDialogOpen] = useState(false);
     const [isRoadmapDialogOpen, setIsRoadmapDialogOpen] = useState(false);
@@ -179,7 +180,6 @@ export function LibraryPage() {
     const [isSavingMaterial, setIsSavingMaterial] = useState(false);
     const [isSavingRoadmap, setIsSavingRoadmap] = useState(false);
     const [isDeletingMaterial, setIsDeletingMaterial] = useState(false);
-    const [isDeletingRoadmap, setIsDeletingRoadmap] = useState(false);
     const [assignmentDialog, setAssignmentDialog] = useState<AssignmentDialogState>({
         open: false,
         itemType: "lesson",
@@ -714,18 +714,6 @@ export function LibraryPage() {
         }
     };
 
-    const handleUnenrollLesson = async (lesson: LibraryLesson) => {
-        try {
-            await lessonEnrollment.unenroll.mutateAsync(lesson.id);
-            showToast("Lesson removed from My Lessons.");
-        } catch (error) {
-            showToast(
-                error instanceof Error ? error.message : "Failed to remove lesson from My Lessons.",
-                "error",
-            );
-        }
-    };
-
     const handleOpenAssignmentDialog = (itemType: "lesson" | "roadmap", item: LibraryLesson | LibraryRoadmap) => {
         if (!canAssignLearning) {
             return;
@@ -918,31 +906,25 @@ export function LibraryPage() {
         setIsRoadmapDialogOpen(true);
     };
 
-    const handleDeleteRoadmap = async (roadmap: LibraryRoadmap) => {
-        if (isDeletingRoadmap) {
-            return;
-        }
-
-        const shouldDelete = window.confirm(
-            `Delete "${roadmap.title}"? This will remove the roadmap for everyone, but it will not delete the lessons.`,
-        );
-
-        if (!shouldDelete) {
-            return;
-        }
-
-        try {
-            setIsDeletingRoadmap(true);
-            await deleteRoadmap.mutateAsync(roadmap.id);
+    const cardActions = useLibraryCardActions({
+        notify: showToast,
+        getLessonAccess: (lesson) => {
+            const canManage = canManageLessonObject(currentUser, lesson, canManageLessons);
+            return { canManage, canChangeStatus: canPublishArchiveLessons && canManage };
+        },
+        getRoadmapAccess: () => ({ canManage: canManageRoadmaps, canDuplicate: canCreateRoadmaps }),
+        onOpenLesson: (lesson) => void handleOpenLesson(lesson),
+        onOpenRoadmap: handleOpenRoadmap,
+        onLessonDeleted: (lesson) => {
+            setSelectedLesson((current) => (current?.id === lesson.id ? null : current));
+        },
+        // Deleting from the Edit roadmap dialog closes that dialog too.
+        onRoadmapDeleted: () => {
             setEditingRoadmap(null);
             setIsRoadmapDialogOpen(false);
-            showToast("Roadmap deleted successfully.");
-        } catch (error) {
-            showToast(error instanceof Error ? error.message : "Failed to delete roadmap.", "error");
-        } finally {
-            setIsDeletingRoadmap(false);
-        }
-    };
+        },
+    });
+    const isDeletingRoadmap = cardActions.confirmation?.kind === "delete-roadmap" && cardActions.isConfirming;
 
     const hydrateLessonSourceAttachments = (lesson: LibraryLesson | null): LibraryLesson | null => {
         if (!lesson) {
@@ -1273,11 +1255,20 @@ export function LibraryPage() {
                     onOpenMaterial={handleOpenMaterial}
                     onOpenLesson={handleOpenLesson}
                     onEnrollLesson={handleEnrollLesson}
-                    onUnenrollLesson={handleUnenrollLesson}
+                    // Learners only see ready lessons, so the status tells them nothing.
+                    showLessonStatus={
+                        canCreateLessons || canManageLessons || canPublishArchiveLessons || canAssignLearning
+                    }
+                    canRestoreLesson={cardActions.canRestoreLesson}
+                    onRestoreLesson={cardActions.onRestoreLesson}
                     onAssignLesson={(lesson) => handleOpenAssignmentDialog("lesson", lesson)}
                     onAssignRoadmap={handleOpenAssignRoadmapDialog}
                     onOpenRoadmap={handleOpenRoadmap}
                     canAssignLearning={canAssignLearning}
+                    getLessonActions={cardActions.getLessonActions}
+                    onLessonAction={cardActions.onLessonAction}
+                    getRoadmapActions={cardActions.getRoadmapActions}
+                    onRoadmapAction={cardActions.onRoadmapAction}
                 />
             </div>
 
@@ -1321,7 +1312,7 @@ export function LibraryPage() {
                     setIsRoadmapDialogOpen(false);
                 }}
                 onSave={handleSaveRoadmap}
-                onDelete={handleDeleteRoadmap}
+                onDelete={cardActions.requestDeleteRoadmap}
                 onValidationError={(message) => showToast(message, "error")}
             />
 
@@ -1397,11 +1388,20 @@ export function LibraryPage() {
                 }
             />
 
+            <CardActionConfirmDialog
+                confirmation={cardActions.confirmation}
+                isPending={cardActions.isConfirming}
+                error={cardActions.confirmError}
+                onCancel={cardActions.cancelConfirmation}
+                onConfirm={cardActions.confirm}
+            />
+
             <Toast
                 open={toast.open}
                 message={toast.message}
                 severity={toast.severity}
                 action={toast.action}
+                autoCloseMs={toast.action ? ACTION_TOAST_DURATION_MS : undefined}
                 onClose={() => setToast((prev) => ({ ...prev, open: false }))}
             />
         </div>

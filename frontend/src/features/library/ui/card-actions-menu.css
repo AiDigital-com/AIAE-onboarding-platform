@@ -1,0 +1,146 @@
+/* "More actions" (⋯) button and popup menu on library lesson and roadmap cards. */
+
+.card-actions-button {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    inline-size: 2rem;
+    block-size: 2rem;
+    padding: 0;
+    border: 0.0625rem solid var(--border-default);
+    border-radius: var(--radius-full);
+    background: var(--surface-default);
+    color: var(--text-heading);
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.card-actions-button:hover,
+.card-actions-button--expanded {
+    border-color: var(--accent-primary);
+    background: var(--surface-muted);
+    color: var(--accent-primary);
+}
+
+.card-actions-button:focus-visible {
+    outline: 0.1875rem solid var(--focus-ring);
+    outline-offset: 0.125rem;
+}
+
+.card-actions-button__icon {
+    font-size: 1.125rem;
+}
+
+.card-actions-menu {
+    position: fixed;
+    inset-block-start: var(--card-actions-menu-top);
+    inset-inline-start: var(--card-actions-menu-left);
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 12.5rem;
+    max-inline-size: calc(100vw - 1rem);
+    padding: var(--space-1-5);
+    border: 0.0625rem solid var(--border-default);
+    border-radius: var(--radius-lg);
+    background: var(--surface-elevated);
+    box-shadow: var(--shadow-popover);
+    animation: card-actions-menu-pop 0.12s ease-out;
+}
+
+.card-actions-menu__item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    inline-size: 100%;
+    min-inline-size: 0;
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-heading);
+    font: inherit;
+    font-size: var(--text-body);
+    font-weight: 500;
+    text-align: start;
+    cursor: pointer;
+}
+
+.card-actions-menu__item:hover,
+.card-actions-menu__item:focus-visible {
+    outline: 0;
+    background: var(--surface-muted);
+}
+
+.card-actions-menu__item--danger {
+    color: var(--accent-danger);
+}
+
+.card-actions-menu__item--danger:hover,
+.card-actions-menu__item--danger:focus-visible {
+    background: var(--surface-danger-soft);
+}
+
+/* The divider is drawn by the item that follows it, so the menu holds only menu items. */
+.card-actions-menu__item--separated {
+    position: relative;
+    margin-block-start: calc(var(--space-1-5) * 2 + 0.0625rem);
+}
+
+.card-actions-menu__item--separated::before {
+    content: "";
+    position: absolute;
+    inset-inline: var(--space-1);
+    inset-block-start: calc((var(--space-1-5) + 0.0625rem) * -1);
+    border-block-start: 0.0625rem solid var(--border-default);
+}
+
+.card-actions-menu__icon {
+    flex: none;
+    font-size: 1.125rem;
+    color: var(--text-muted);
+}
+
+.card-actions-menu__icon--danger {
+    color: inherit;
+}
+
+.card-actions-menu__label {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+}
+
+.card-actions-confirm {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+}
+
+.card-actions-confirm__note {
+    color: var(--text-muted);
+}
+
+@keyframes card-actions-menu-pop {
+    from {
+        opacity: 0;
+        transform: translateY(-0.25rem);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .card-actions-menu {
+        animation: none;
+    }
+
+    .card-actions-button {
+        transition: none;
+    }
+}

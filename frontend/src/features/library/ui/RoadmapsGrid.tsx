@@ -14,7 +14,9 @@ import type { LibraryRoadmap } from "../api/types";
 import { ASSIGNEE_AVATAR_STACK_SIZE, AUTO_ASSIGN_BADGE_LABEL } from "../constants/roadmapAssignment";
 import { ROADMAP_CARD_ACCENTS } from "../constants/roadmapCard";
 import type { LibraryRoadmapsGridProps } from "../model/roadmapAssignment";
+import { CardActionsButton, CardActionsMenu } from "./CardActionsMenu";
 import { formatDate } from "./library-utils";
+import { useCardActionsMenu } from "./useCardActionsMenu";
 
 function getRoadmapProgress(roadmap: LibraryRoadmap) {
     const lessons = roadmap.lessons || [];
@@ -41,8 +43,17 @@ export function RoadmapsGrid({
     onAssignRoadmap,
     onOpenRoadmap,
     canAssignLearning = false,
+    getRoadmapActions,
+    onRoadmapAction,
 }: LibraryRoadmapsGridProps) {
+    const actionsMenu = useCardActionsMenu();
+    const actionsMenuRoadmap = actionsMenu.anchor
+        ? roadmaps.find((roadmap) => roadmap.id === actionsMenu.anchor?.itemId)
+        : undefined;
+    const actionsMenuItems = actionsMenuRoadmap ? (getRoadmapActions?.(actionsMenuRoadmap) ?? []) : [];
+
     return (
+        <>
         <div className="library-roadmaps">
             {roadmaps.map((roadmap, roadmapIndex) => {
                 const progress = getRoadmapProgress(roadmap);
@@ -58,6 +69,7 @@ export function RoadmapsGrid({
                 const showContinueAction = roadmap.isEnrolled && progress.totalCount > 0;
                 const assigneeCount = roadmap.assigneeCount ?? null;
                 const assigneePreview = roadmap.assigneePreview ?? [];
+                const hasCardActions = (getRoadmapActions?.(roadmap) ?? []).length > 0;
                 const openAssign = (event: MouseEvent) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -75,6 +87,11 @@ export function RoadmapsGrid({
                             .join(" ")}
                         style={{ "--roadmap-accent": accentColor } as CSSProperties}
                         onClick={canOpenRoadmap ? () => onOpenRoadmap?.(roadmap) : undefined}
+                        onContextMenu={
+                            hasCardActions
+                                ? (event) => actionsMenu.openFromContextMenu(event, roadmap.id)
+                                : undefined
+                        }
                     >
                         <div className="library-roadmap-card__head">
                             <div className="library-roadmap-card__info">
@@ -247,11 +264,29 @@ export function RoadmapsGrid({
                                         Assign
                                     </Button>
                                 )}
+                                {hasCardActions && (
+                                    <CardActionsButton
+                                        label={`More actions for ${roadmap.title}`}
+                                        expanded={actionsMenu.anchor?.itemId === roadmap.id}
+                                        onClick={(event) => actionsMenu.toggleFromButton(event, roadmap.id)}
+                                    />
+                                )}
                             </div>
                         </footer>
                     </article>
                 );
             })}
         </div>
+
+        {actionsMenu.anchor && actionsMenuRoadmap && actionsMenuItems.length > 0 && (
+            <CardActionsMenu
+                anchor={actionsMenu.anchor}
+                items={actionsMenuItems}
+                label={`Actions for ${actionsMenuRoadmap.title}`}
+                onSelect={(actionId) => onRoadmapAction?.(actionsMenuRoadmap, actionId)}
+                onClose={actionsMenu.close}
+            />
+        )}
+        </>
     );
 }

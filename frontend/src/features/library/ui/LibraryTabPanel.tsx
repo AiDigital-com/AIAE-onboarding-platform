@@ -6,6 +6,7 @@ import { MaterialsGrid } from "./MaterialsGrid";
 import { MaterialsLoadingState } from "./MaterialsLoadingState";
 import { RoadmapsGrid } from "./RoadmapsGrid";
 import type { LibraryLesson, LibraryMaterial, LibraryRoadmap } from "../api/types";
+import type { CardActionId, CardActionItem } from "../model/cardActions";
 
 interface LibraryTabPanelProps {
     activeTab: string;
@@ -26,13 +27,19 @@ interface LibraryTabPanelProps {
     onResetMaterialSearch?: () => void;
     onOpenLesson?: (lesson: LibraryLesson) => void;
     onEnrollLesson?: (lesson: LibraryLesson) => void;
-    onUnenrollLesson?: (lesson: LibraryLesson) => void;
+    showLessonStatus?: boolean;
+    canRestoreLesson?: (lesson: LibraryLesson) => boolean;
+    onRestoreLesson?: (lesson: LibraryLesson) => void;
     onAssignLesson?: (lesson: LibraryLesson) => void;
     onResetLessonFilters?: () => void;
     onResetRoadmapFilters?: () => void;
     onAssignRoadmap?: (roadmap: LibraryRoadmap) => void;
     onOpenRoadmap?: (roadmap: LibraryRoadmap) => void;
     canAssignLearning?: boolean;
+    getLessonActions?: (lesson: LibraryLesson) => CardActionItem[];
+    onLessonAction?: (lesson: LibraryLesson, actionId: CardActionId) => void;
+    getRoadmapActions?: (roadmap: LibraryRoadmap) => CardActionItem[];
+    onRoadmapAction?: (roadmap: LibraryRoadmap, actionId: CardActionId) => void;
 }
 
 function LoadMoreRow({
@@ -76,13 +83,19 @@ export function LibraryTabPanel({
     onResetMaterialSearch,
     onOpenLesson,
     onEnrollLesson,
-    onUnenrollLesson,
+    showLessonStatus = true,
+    canRestoreLesson,
+    onRestoreLesson,
     onAssignLesson,
     onResetLessonFilters,
     onResetRoadmapFilters,
     onAssignRoadmap,
     onOpenRoadmap,
     canAssignLearning = false,
+    getLessonActions,
+    onLessonAction,
+    getRoadmapActions,
+    onRoadmapAction,
 }: LibraryTabPanelProps) {
     if (activeTab === "materials") {
         if (!isHydrated) {
@@ -148,10 +161,14 @@ export function LibraryTabPanel({
                     lessons={lessons}
                     onOpenLesson={onOpenLesson}
                     onEnrollLesson={onEnrollLesson}
-                    onUnenrollLesson={onUnenrollLesson}
+                    showStatus={showLessonStatus}
+                    canRestoreLesson={canRestoreLesson}
+                    onRestoreLesson={onRestoreLesson}
                     onAssignLesson={onAssignLesson}
                     showEnrollmentAction
                     canAssignLearning={canAssignLearning}
+                    getLessonActions={getLessonActions}
+                    onLessonAction={onLessonAction}
                 />
                 <LoadMoreRow hasMore={hasMore} isLoadingMore={isLoadingMore} onLoadMore={onLoadMore} />
             </>
@@ -190,6 +207,8 @@ export function LibraryTabPanel({
                     onAssignRoadmap={onAssignRoadmap}
                     onOpenRoadmap={onOpenRoadmap}
                     canAssignLearning={canAssignLearning}
+                    getRoadmapActions={getRoadmapActions}
+                    onRoadmapAction={onRoadmapAction}
                 />
                 <LoadMoreRow hasMore={hasMore} isLoadingMore={isLoadingMore} onLoadMore={onLoadMore} />
             </>
