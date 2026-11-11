@@ -1382,3 +1382,19 @@
     align-self: center;
     margin: 0;
 }
+
+/* Static "In My Lessons" state on a learner's lesson card: a label, not an action. */
+.library-card__enrollment-status {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--accent-success);
+    font-size: var(--text-badge);
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.library-card__enrollment-status-icon {
+    font-size: 1rem;
+}

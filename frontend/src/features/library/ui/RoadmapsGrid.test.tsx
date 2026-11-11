@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { LibraryRoadmap } from "../api/types";
+import type { CardActionItem } from "../model/cardActions";
 import { RoadmapsGrid } from "./RoadmapsGrid";
 
 vi.mock("@/shared/api/files", () => ({
@@ -87,5 +88,93 @@ describe("RoadmapsGrid assignment summary", () => {
         expect(screen.queryByRole("button", { name: "Assign" })).toBeNull();
         expect(screen.queryByRole("button", { name: /Auto-assigned/ })).toBeNull();
         expect(screen.getByText("Auto-assigned to new users")).not.toBeNull();
+    });
+});
+
+describe("RoadmapsGrid card actions", () => {
+    it("should open the actions menu from the more-actions button without opening the roadmap test", () => {
+        // Given:
+        const onOpenRoadmap = vi.fn();
+        const onRoadmapAction = vi.fn();
+        const actions: CardActionItem[] = [
+            { id: "edit", label: "Edit roadmap" },
+            { id: "duplicate", label: "Duplicate" },
+            { id: "delete", label: "Delete…", danger: true, separated: true },
+        ];
+        const item = roadmap({ id: 7 });
+        renderGrid([item], { onOpenRoadmap, onRoadmapAction, getRoadmapActions: () => actions });
+
+        // When:
+        fireEvent.click(screen.getByRole("button", { name: "More actions for Company Essentials" }));
+
+        // Then:
+        expect(screen.getAllByRole("menuitem").map((node) => node.textContent)).toEqual([
+            "Edit roadmap",
+            "Duplicate",
+            "Delete…",
+        ]);
+        expect(onOpenRoadmap).not.toHaveBeenCalled();
+
+        // When:
+        fireEvent.click(screen.getByRole("menuitem", { name: "Duplicate" }));
+
+        // Then:
+        expect(onRoadmapAction).toHaveBeenCalledTimes(1);
+        expect(onRoadmapAction).toHaveBeenCalledWith(item, "duplicate");
+        expect(onOpenRoadmap).not.toHaveBeenCalled();
+        expect(screen.queryByRole("menu")).toBeNull();
+    });
+
+    it("should open the same menu on right-click and close it on Escape test", () => {
+        // Given:
+        const actions: CardActionItem[] = [{ id: "duplicate", label: "Duplicate" }];
+        renderGrid([roadmap()], { getRoadmapActions: () => actions });
+
+        // When:
+        fireEvent.contextMenu(screen.getByRole("heading", { name: "Company Essentials" }));
+
+        // Then:
+        const menu = screen.getByRole("menu");
+        expect(screen.getByRole("menuitem", { name: "Duplicate" })).not.toBeNull();
+
+        // When:
+        fireEvent.keyDown(menu, { key: "Escape" });
+
+        // Then:
+        expect(screen.queryByRole("menu")).toBeNull();
+    });
+
+    it("should move focus between menu items with the arrow keys test", () => {
+        // Given:
+        const actions: CardActionItem[] = [
+            { id: "edit", label: "Edit roadmap" },
+            { id: "delete", label: "Delete…", danger: true },
+        ];
+        renderGrid([roadmap()], { getRoadmapActions: () => actions });
+        fireEvent.click(screen.getByRole("button", { name: "More actions for Company Essentials" }));
+        const menu = screen.getByRole("menu");
+
+        // Then: the first item is focused on open
+        expect(document.activeElement).toBe(screen.getByRole("menuitem", { name: "Edit roadmap" }));
+
+        // When:
+        fireEvent.keyDown(menu, { key: "ArrowDown" });
+
+        // Then:
+        expect(document.activeElement).toBe(screen.getByRole("menuitem", { name: "Delete…" }));
+
+        // When: wraps around
+        fireEvent.keyDown(menu, { key: "ArrowDown" });
+
+        // Then:
+        expect(document.activeElement).toBe(screen.getByRole("menuitem", { name: "Edit roadmap" }));
+    });
+
+    it("should hide the more-actions button when a roadmap has no actions test", () => {
+        // Given:
+        renderGrid([roadmap()], { getRoadmapActions: () => [] });
+
+        // Then:
+        expect(screen.queryByRole("button", { name: /More actions/ })).toBeNull();
     });
 });

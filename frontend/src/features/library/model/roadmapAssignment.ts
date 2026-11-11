@@ -1,5 +1,6 @@
 import type { components } from "@/shared/api/generated/schema";
 import type { AssignableUserV1, LibraryRoadmap } from "../api/types";
+import type { CardActionId, CardActionItem } from "./cardActions";
 
 export type LearningAssigneeV1 = components["schemas"]["LearningAssigneeV1"];
 export type RoadmapGroupAssignmentV1 = components["schemas"]["RoadmapGroupAssignmentV1"];
@@ -99,6 +100,9 @@ export interface LibraryRoadmapsGridProps {
     onAssignRoadmap?: (roadmap: LibraryRoadmap) => void;
     onOpenRoadmap?: (roadmap: LibraryRoadmap) => void;
     canAssignLearning?: boolean;
+    /** Items of a roadmap's ⋯ menu; an empty list hides the button for that card. */
+    getRoadmapActions?: (roadmap: LibraryRoadmap) => CardActionItem[];
+    onRoadmapAction?: (roadmap: LibraryRoadmap, actionId: CardActionId) => void;
 }
 
 export interface RoadmapAssignDialogProps {

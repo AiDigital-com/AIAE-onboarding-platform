@@ -1,74 +1,56 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
-import ArrowDropDownOutlinedIcon from "@mui/icons-material/ArrowDropDownOutlined";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import OndemandVideoOutlinedIcon from "@mui/icons-material/OndemandVideoOutlined";
+import PersonAddAltOutlinedIcon from "@mui/icons-material/PersonAddAltOutlined";
 import PlaylistAddOutlinedIcon from "@mui/icons-material/PlaylistAddOutlined";
 import PublicOutlinedIcon from "@mui/icons-material/PublicOutlined";
 import QuizOutlinedIcon from "@mui/icons-material/QuizOutlined";
 import StyleOutlinedIcon from "@mui/icons-material/StyleOutlined";
+import UnarchiveOutlinedIcon from "@mui/icons-material/UnarchiveOutlined";
 import { Button } from "@/shared/ui/Button";
 import { getLessonCoverBackground } from "@/shared/lib/brandColors";
 import { lessonPreviewText } from "@/shared/lib/lessonPreviewText";
 import { useFilePreviewUrls } from "@/shared/api/files";
 import type { LibraryLesson } from "../api/types";
-
-/** Rough height of the 3-item enrollment menu, used to flip it upward when there's no room below. */
-const ENROLLMENT_MENU_ESTIMATED_HEIGHT = 160;
+import type { CardActionId, CardActionItem } from "../model/cardActions";
+import { CardActionsButton, CardActionsMenu } from "./CardActionsMenu";
+import { useCardActionsMenu } from "./useCardActionsMenu";
 
 const STATUS_PALETTE: Record<string, { fg: string }> = {
     ready: { fg: "rgb(34,158,90)" },
-    draft: { fg: "#ff642d" },
     generating: { fg: "#ff642d" },
     failed: { fg: "#d92d20" },
     archived: { fg: "#80808e" },
 };
 
 /**
- * Returns the readiness badge label: 'archived' when hidden entirely, the lesson's generation
- * status (draft/generating/failed) while it isn't ready yet, otherwise 'ready'. Publication
+ * Returns the single status shown on the cover: 'archived', 'failed', 'generating' or 'ready'.
+ * There is no "draft" status: the backend's short-lived pre-generation state reads as
+ * 'generating', and an unpublished ready lesson is simply Ready + Private. Visibility
  * (public/private) is a separate axis, shown by {@link getVisibilityLabel} instead.
  */
 function getPublicationLabel(lesson: LibraryLesson) {
     if (lesson.isArchived || lesson.publicationStatus === "archived") {
         return "archived";
     }
-    if (lesson.status !== "ready") {
-        return lesson.status;
+    if (lesson.status === "draft") {
+        return "generating";
     }
-    return "ready";
+    return lesson.status;
 }
 
 /**
- * Returns the accessible label for the visibility icon shown beside a ready lesson's readiness
- * chip, or {@code null} when visibility is not meaningful yet (not ready, or archived).
+ * Returns the accessible label for the visibility icon shown beside the status chip of a ready
+ * or archived lesson, or {@code null} while the lesson has no content yet (generating, failed).
  */
 function getVisibilityLabel(lesson: LibraryLesson, publicationLabel: string) {
-    if (publicationLabel !== "ready") {
+    if (publicationLabel !== "ready" && publicationLabel !== "archived") {
         return null;
     }
     return lesson.isPublished
         ? "Public — visible to everyone in the Library"
         : "Private — visible in the Library only to assigned users";
-}
-
-function getEnrollmentActionLabel(lesson: LibraryLesson, enrolledLabel: string, defaultLabel: string) {
-    if (lesson.isEnrolled) {
-        return enrolledLabel;
-    }
-    if (lesson.isArchived) {
-        return "Archived";
-    }
-    if (lesson.status === "draft") {
-        return "Draft...";
-    }
-    if (lesson.status === "generating") {
-        return "Generating...";
-    }
-    if (lesson.status === "failed") {
-        return "Failed";
-    }
-    return lesson.isPublished ? defaultLabel : "Draft...";
 }
 
 function getActivityCounts(activities: NonNullable<LibraryLesson["activities"]>) {
@@ -93,31 +75,37 @@ interface LessonsGridProps {
     lessons?: LibraryLesson[];
     onOpenLesson?: (lesson: LibraryLesson) => void;
     onEnrollLesson?: (lesson: LibraryLesson) => void;
-    onUnenrollLesson?: (lesson: LibraryLesson) => void;
     onAssignLesson?: (lesson: LibraryLesson) => void;
+    /** Restores an archived lesson; the Restore button shows only when this returns true. */
+    canRestoreLesson?: (lesson: LibraryLesson) => boolean;
+    onRestoreLesson?: (lesson: LibraryLesson) => void;
     showEnrollmentAction?: boolean;
     canAssignLearning?: boolean;
+    /** Status chip on the cover. Off for learners, who only ever see ready lessons. */
+    showStatus?: boolean;
+    /** Items of a lesson's ⋯ menu; an empty list hides the button for that card. */
+    getLessonActions?: (lesson: LibraryLesson) => CardActionItem[];
+    onLessonAction?: (lesson: LibraryLesson, actionId: CardActionId) => void;
 }
 
 export function LessonsGrid({
     lessons = [],
     onOpenLesson,
     onEnrollLesson,
-    onUnenrollLesson,
     onAssignLesson,
+    canRestoreLesson,
+    onRestoreLesson,
     showEnrollmentAction = false,
     canAssignLearning = false,
+    showStatus = true,
+    getLessonActions,
+    onLessonAction,
 }: LessonsGridProps) {
-    const enrollmentMenuRef = useRef<HTMLDivElement>(null);
-    const [enrollmentMenu, setEnrollmentMenu] = useState<{
-        lesson: LibraryLesson | null;
-        anchor: DOMRect | null;
-        openUpward: boolean;
-    }>({
-        lesson: null,
-        anchor: null,
-        openUpward: false,
-    });
+    const actionsMenu = useCardActionsMenu();
+    const actionsMenuLesson = actionsMenu.anchor
+        ? lessons.find((lesson) => lesson.id === actionsMenu.anchor?.itemId)
+        : undefined;
+    const actionsMenuItems = actionsMenuLesson ? (getLessonActions?.(actionsMenuLesson) ?? []) : [];
     const [expandedTagLessonIds, setExpandedTagLessonIds] = useState<Set<number>>(() => new Set());
 
     const coverStorageKeys = lessons
@@ -139,39 +127,6 @@ export function LessonsGrid({
         });
     };
 
-    useEffect(() => {
-        if (!enrollmentMenu.lesson) {
-            return undefined;
-        }
-
-        const handlePointerDown = (event: PointerEvent) => {
-            const target = event.target;
-            if (!(target instanceof Element)) {
-                return;
-            }
-            if (enrollmentMenuRef.current?.contains(target)) {
-                return;
-            }
-            if (target.closest("[data-library-lesson-enrollment-trigger]")) {
-                return;
-            }
-            setEnrollmentMenu({ lesson: null, anchor: null, openUpward: false });
-        };
-
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === "Escape") {
-                setEnrollmentMenu({ lesson: null, anchor: null, openUpward: false });
-            }
-        };
-
-        document.addEventListener("pointerdown", handlePointerDown);
-        document.addEventListener("keydown", handleKeyDown);
-        return () => {
-            document.removeEventListener("pointerdown", handlePointerDown);
-            document.removeEventListener("keydown", handleKeyDown);
-        };
-    }, [enrollmentMenu.lesson]);
-
     return (
         <>
             <div className="library-grid library-grid--lessons">
@@ -187,20 +142,27 @@ export function LessonsGrid({
                     const hasTeacherVideo = Boolean(
                         (lesson.generationMetadata?.teacherVideo as { videoUrl?: string } | undefined)?.videoUrl,
                     );
-                    const isEnrollmentDisabled =
-                        lesson.status !== "ready" || !lesson.isPublished || Boolean(lesson.isArchived);
-                    const isActionDisabled = canAssignLearning
-                        ? lesson.status !== "ready" || Boolean(lesson.isArchived)
-                        : isEnrollmentDisabled;
+                    const isReady = publicationLabel === "ready";
+                    const canAssign = canAssignLearning && isReady;
+                    const canRestore =
+                        publicationLabel === "archived" && Boolean(canRestoreLesson?.(lesson) && onRestoreLesson);
+                    // Learners add public lessons themselves; assigned ones are already theirs.
+                    const canEnroll = !canAssignLearning && isReady && Boolean(lesson.isPublished);
                     const areTagsExpanded = expandedTagLessonIds.has(lesson.id);
                     const visibleTags = areTagsExpanded ? tags : tags.slice(0, 2);
                     const hiddenTagCount = Math.max(tags.length - 2, 0);
+                    const hasCardActions = (getLessonActions?.(lesson) ?? []).length > 0;
 
                     return (
                         <article
                             key={lesson.id}
                             className="library-card"
                             onClick={() => onOpenLesson?.(lesson)}
+                            onContextMenu={
+                                hasCardActions
+                                    ? (event) => actionsMenu.openFromContextMenu(event, lesson.id)
+                                    : undefined
+                            }
                         >
                             <div className="library-card__preview-wrap">
                                 <div
@@ -225,12 +187,14 @@ export function LessonsGrid({
                                             {lesson.isPublished ? <PublicOutlinedIcon /> : <LockOutlinedIcon />}
                                         </span>
                                     )}
-                                    <span
-                                        className="library-status-chip library-card__status"
-                                        style={{ color: statusPalette.fg }}
-                                    >
-                                        {publicationLabel}
-                                    </span>
+                                    {showStatus && (
+                                        <span
+                                            className="library-status-chip library-card__status"
+                                            style={{ color: statusPalette.fg }}
+                                        >
+                                            {publicationLabel}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
@@ -294,47 +258,59 @@ export function LessonsGrid({
 
                             <footer className="library-card__footer">
                                 <span className="library-card__footer-author">{lesson.createdBy || "AI Onboarding"}</span>
-                                {showEnrollmentAction && (
+                                {showEnrollmentAction && canAssign && (
+                                    <Button
+                                        size="sm"
+                                        variant="primary"
+                                        startIcon={<PersonAddAltOutlinedIcon />}
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            actionsMenu.close();
+                                            onAssignLesson?.(lesson);
+                                        }}
+                                    >
+                                        Assign
+                                    </Button>
+                                )}
+                                {showEnrollmentAction && canRestore && (
+                                    <Button
+                                        size="sm"
+                                        variant="secondary"
+                                        startIcon={<UnarchiveOutlinedIcon />}
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            actionsMenu.close();
+                                            onRestoreLesson?.(lesson);
+                                        }}
+                                    >
+                                        Restore
+                                    </Button>
+                                )}
+                                {showEnrollmentAction && !canAssignLearning && lesson.isEnrolled && (
+                                    <span className="library-card__enrollment-status">
+                                        <CheckCircleOutlineOutlinedIcon className="library-card__enrollment-status-icon" /> In My Lessons
+                                    </span>
+                                )}
+                                {showEnrollmentAction && canEnroll && !lesson.isEnrolled && (
                                     <Button
                                         className="library-card__enrollment-action"
                                         size="sm"
-                                        variant={lesson.isEnrolled ? "ghost" : "primary"}
-                                        disabled={isActionDisabled}
-                                        data-library-lesson-enrollment-trigger
+                                        variant="primary"
+                                        startIcon={<PlaylistAddOutlinedIcon />}
                                         onClick={(event) => {
-                                            event.preventDefault();
                                             event.stopPropagation();
-                                            if (canAssignLearning) {
-                                                const anchor = (event.currentTarget as HTMLElement).getBoundingClientRect();
-                                                const spaceBelow = window.innerHeight - anchor.bottom;
-                                                const openUpward =
-                                                    spaceBelow < ENROLLMENT_MENU_ESTIMATED_HEIGHT &&
-                                                    anchor.top > spaceBelow;
-                                                setEnrollmentMenu((current) => ({
-                                                    lesson: current.lesson?.id === lesson.id ? null : lesson,
-                                                    anchor: current.lesson?.id === lesson.id ? null : anchor,
-                                                    openUpward,
-                                                }));
-                                                return;
-                                            }
-                                            setEnrollmentMenu({
-                                                lesson: null,
-                                                anchor: null,
-                                                openUpward: false,
-                                            });
-                                            if (lesson.isEnrolled) {
-                                                onUnenrollLesson?.(lesson);
-                                                return;
-                                            }
                                             onEnrollLesson?.(lesson);
                                         }}
                                     >
-                                        {lesson.isEnrolled ? <CheckCircleOutlineOutlinedIcon /> : <PlaylistAddOutlinedIcon />}
-                                        {canAssignLearning
-                                            ? getEnrollmentActionLabel(lesson, "Added...", "Add...")
-                                            : getEnrollmentActionLabel(lesson, "Remove from My Lessons", "Add to My Lessons")}
-                                        {canAssignLearning && <ArrowDropDownOutlinedIcon />}
+                                        Add to My Lessons
                                     </Button>
+                                )}
+                                {hasCardActions && (
+                                    <CardActionsButton
+                                        label={`More actions for ${lesson.title}`}
+                                        expanded={actionsMenu.anchor?.itemId === lesson.id}
+                                        onClick={(event) => actionsMenu.toggleFromButton(event, lesson.id)}
+                                    />
                                 )}
                             </footer>
                         </article>
@@ -342,52 +318,14 @@ export function LessonsGrid({
                 })}
             </div>
 
-            {enrollmentMenu.lesson && enrollmentMenu.anchor && (
-                <div
-                    ref={enrollmentMenuRef}
-                    className="library-menu"
-                    style={
-                        enrollmentMenu.openUpward
-                            ? {
-                                  position: "fixed",
-                                  bottom: window.innerHeight - enrollmentMenu.anchor.top + 4,
-                                  left: enrollmentMenu.anchor.left,
-                              }
-                            : {
-                                  position: "fixed",
-                                  top: enrollmentMenu.anchor.bottom + 4,
-                                  left: enrollmentMenu.anchor.left,
-                              }
-                    }
-                >
-                    <button
-                        type="button"
-                        className="library-menu__item"
-                        onClick={() => {
-                            const lesson = enrollmentMenu.lesson;
-                            setEnrollmentMenu({ lesson: null, anchor: null, openUpward: false });
-                            if (!lesson) return;
-                            if (lesson.isEnrolled) {
-                                onUnenrollLesson?.(lesson);
-                                return;
-                            }
-                            onEnrollLesson?.(lesson);
-                        }}
-                    >
-                        {enrollmentMenu.lesson.isEnrolled ? "Remove from My Lessons" : "Add to My Lessons"}
-                    </button>
-                    <button
-                        type="button"
-                        className="library-menu__item"
-                        onClick={() => {
-                            const lesson = enrollmentMenu.lesson;
-                            setEnrollmentMenu({ lesson: null, anchor: null, openUpward: false });
-                            onAssignLesson?.(lesson!);
-                        }}
-                    >
-                        Assign to users...
-                    </button>
-                </div>
+            {actionsMenu.anchor && actionsMenuLesson && actionsMenuItems.length > 0 && (
+                <CardActionsMenu
+                    anchor={actionsMenu.anchor}
+                    items={actionsMenuItems}
+                    label={`Actions for ${actionsMenuLesson.title}`}
+                    onSelect={(actionId) => onLessonAction?.(actionsMenuLesson, actionId)}
+                    onClose={actionsMenu.close}
+                />
             )}
         </>
     );
