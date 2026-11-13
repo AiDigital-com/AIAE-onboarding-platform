@@ -1,6 +1,10 @@
-# Dockerfile — local-dev / handoff only. Backend-only image (no frontend build).
+# Backend application image — PRODUCTION. Built and pushed to ECR by
+# .github/workflows/release-prod.yml (and deploy-dev.yml), and also used by
+# docker-compose for local development. Changes here ship to prod.
+# Backend-only (no frontend build): CI publishes the SPA to S3/CloudFront.
+# SPRING_PROFILES_ACTIVE=local below is the local default; the Helm chart
+# overrides it to `eks` on the cluster.
 # Java 21 must match backend/pom.xml `<java.version>` + replit.nix `pkgs.jdk21`.
-# Replit Deployment uses replit-build.sh to package the SPA into the Spring jar.
 
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /workspace
